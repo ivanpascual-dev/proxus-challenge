@@ -1,0 +1,9 @@
+{
+  "default": true,
+  "table-column-style": false,
+  "fenced-code-language": false,
+  "blanks-around-lists": false,
+  "blanks-around-headings": false,
+  "line-length": false,
+  "ol-prefix": false
+}
