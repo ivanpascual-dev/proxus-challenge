@@ -42,3 +42,10 @@ report.*.json
 
 # Generated Tailwind CSS
 packages/web/src/styles.generated.css
+
+# MCP de context7: la config real lleva la clave dentro, el ejemplo si se sube.
+# Arranque: cp .mcp.json.example .mcp.json y poner la clave real.
+.mcp.json
+
+# Ajustes locales que Claude Code genera por su cuenta
+.claude/settings.local.json
