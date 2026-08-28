@@ -23,6 +23,25 @@ interface PdfFile {
   readonly path: string;
 }
 
+const dataUrlToBytes = (dataUrl: string): Uint8Array => {
+  const comma = dataUrl.indexOf(",");
+  const base64 = comma === -1 ? dataUrl : dataUrl.slice(comma + 1);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const bytesToDataUrl = (bytes: Uint8Array): string => {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return `data:image/png;base64,${btoa(binary)}`;
+};
+
 export const FileMaterialRepository = {
   make: (directory: string): Effect.Effect<MaterialRepositoryType, never, FileSystem.FileSystem | Path.Path | PdfService | MaterialIndexRepository | IndexingService> => Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -33,6 +52,10 @@ export const FileMaterialRepository = {
     const mapError = (reason: unknown) => new MaterialRepositoryError({ reason });
 
     const pdfPath = (fileName: string) => path.join(directory, fileName);
+
+    // Cada renderPage lanza un pdftoppm; el visor de la web pide páginas en bucle. Se cachean por
+    // contenido (sha256 del PDF), hermano de la carpeta de PDFs: .data/materials/pages.
+    const pagesCacheDirectory = path.join(path.dirname(directory), "pages");
 
     const contentHash = (fullPath: string) => fs.readFile(fullPath).pipe(
       Effect.map(hashContent),
@@ -101,7 +124,28 @@ export const FileMaterialRepository = {
         });
       }
 
+      const hash = yield* contentHash(file.path);
+      const cachePath = path.join(pagesCacheDirectory, `${hash}-${page}.png`);
+
+      const cached = yield* fs.readFile(cachePath).pipe(
+        Effect.map(Option.some),
+        Effect.catch(() => Effect.succeed(Option.none<Uint8Array>()))
+      );
+      if (Option.isSome(cached)) {
+        return {
+          material: file.material,
+          image: { page, mediaType: "image/png" as const, data: bytesToDataUrl(cached.value) }
+        };
+      }
+
       const image = yield* pdf.renderPage({ path: file.path, page }).pipe(Effect.mapError(mapError));
+
+      // El fallo al escribir la caché no debe tumbar el render: se sirve la imagen igual.
+      yield* fs.makeDirectory(pagesCacheDirectory, { recursive: true }).pipe(
+        Effect.andThen(fs.writeFile(cachePath, dataUrlToBytes(image.data))),
+        Effect.catch(() => Effect.void)
+      );
+
       return { material: file.material, image };
     });
 
