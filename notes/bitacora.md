@@ -60,3 +60,81 @@ Una entrada por sesión, no por commit. Si ya hay entrada de hoy, se añade una 
   por página. La sección 4.5 del plan pedía renderizado incremental para que el presupuesto de turno
   pare entre página y página, pero no tocaba la firma del puerto; sin el cambio de firma no se puede
   parar antes de renderizar el resto.
+
+## 2026-08-28 · Fase 1 · tramo 1B
+
+- **Hueco del plan (§4.14):** la sección solo listaba 2 GET, pero el paso 22 y F1-16 necesitan un modo
+  de disparar la indexación. Decisión con Iván: "botón por material con progreso en la web".
+  Implementado como `POST /api/materials/:id/index`, ruta NDJSON manual (mismo patrón que el stream del
+  chat), más `MaterialRepository.reindex` y el error `MaterialIndexingFailed`. En fase 4 la subida
+  llamará a ese mismo endpoint.
+- **Desviación (paso 16):** se quitó el parámetro `dpi?` de `renderPage` en el puerto `PdfService`.
+  Nadie lo pasaba y, con la regla del lado corto a 1152 px, ya no significa nada.
+- **Desviación (paso 21):** además de `--prune`, `pnpm index:materials` acepta `--prune-only`, para
+  poder podar índices huérfanos sin una pasada de indexación completa (que gasta modelo).
+- **Desviación (web, dos menores heredadas del patrón del chat):** `domain/materials/stream.ts` hace
+  `fetch` a una ruta escrita en string, porque las rutas NDJSON no están en la declaración `HttpApi` y
+  no se pueden derivar; y `ReindexPanel` refresca con `useAtomRefresh(materialsQuery)` en vez de por
+  etiqueta de reactividad, porque el stream no pasa por la capa que emite ese evento.
+  `domain/tutor/stream.ts` hace exactamente lo mismo.
+- **Desviación (test):** `render-scale.test.ts` tolera ±4 px en el lado corto, porque un dpi entero no
+  cae exacto en 1152. Poppler acierta 1152 con `-scale-to`; `renderDpi` es solo el enunciado "en dpi"
+  de la regla (F1-20), no lo que se ejecuta.
+
+## 2026-08-28 · Fase 1 · retoques de interfaz del material (tras probar el tramo 1B)
+
+Iván probó el tramo 1B y pidió cambios de interfaz que reabren piezas ya cerradas del plan
+`fase1-el-suelo.md`. Se anotan porque no se deducen del diff.
+
+- **Desviación (plan §6.2 y §17):** los temas dejan de ser una lista plana. `MaterialTopic` gana
+  `parentId` y el prompt de temas se reescribió para que el modelo emita una jerarquía de dos niveles.
+  Motivo: Iván quiere un mapa mental "con relaciones", no una nube de etiquetas. `normalizeTopicHierarchy`
+  (puro, con tests) sanea lo que devuelve el modelo: referencia colgante → raíz, ciclo → se rompe,
+  tres niveles → se aplana a dos. El cambio de esquema **invalida los índices archivados**: hay que
+  relanzar `pnpm index:materials`.
+- **Desviación (plan §22-23):** `GET /materials/:id/pages/:page` devolvía `MaterialPageView` (imagen +
+  entrada de índice juntas, "en la misma respuesta, invariante 8") y exigía índice (409). Ahora
+  devuelve solo `PageImage`, sin exigir índice. Motivo: ver el PDF va antes de indexarlo. La
+  procedencia se sigue viendo, pero pintada en la web a partir de `materialIndexQuery` (que ya se
+  carga para el mapa). Se eliminan `getPageView` y `MaterialPageView`.
+- **Desviación:** caché en disco de páginas renderizadas en `.data/materials/pages/<hash>-<n>.png`, no
+  contemplada en el plan. El visor continuo pide páginas en bucle y el `CLAUDE.md` de `packages/server`
+  obliga a cachear cualquier cosa que pida páginas así. Fallo al escribir la caché no tumba el render.
+- **Desviación (plan §24):** el visor humano ya no muestra el texto indexado ni la rejilla de páginas
+  con puntos de procedencia. Queda una marca ámbar "transcrito por el modelo" en la esquina de esas
+  páginas y una banda roja en las que fallaron. La procedencia completa sigue viajando al tutor por el
+  índice.
+- **Decisión sobre la marcha:** `LIMITS.maxMaterials: 5`. La subida es fase 4, así que hoy solo se
+  declara; la impondrá el endpoint de subida y se rechazará en voz alta (invariante 11).
+- **Deuda:** falta `@guardarrailes` antes de cerrar la fase, porque se ha reescrito un prompt del
+  modelo (el de temas).
+
+## 2026-08-28 · Fase 1 · cierre: `@guardarrailes` y paso 25
+
+`@guardarrailes` pasó con veredicto 🚨. Iván decidió arreglar en la fase lo que la fase abre o incumple
+y diferir el resto a la fase 4 con nota en `NOTES.md`.
+
+- **Cierre de hueco (invariante 11):** `LIMITS.modelCallTimeoutMs` estaba declarado desde el tramo 1A
+  y no se aplicaba en ningún sitio. Ahora el adaptador de Gemini (`gemini.ts`) envuelve el `fetch` en
+  `AbortSignal.any([signal, AbortSignal.timeout(...)])`. Cubre chat e indexación de una vez, porque
+  las dos pasan por el mismo `generateText`.
+- **Cierre de hueco (ADR-008 capa 4):** la petición a Gemini no enviaba `generationConfig`, así que
+  corría a `temperature` 1.0 y sin `maxOutputTokens`. Se añaden `LIMITS.modelTemperature` (0.2) y
+  `LIMITS.maxModelOutputTokens` (8.192), y se apunta en la tabla del ADR-007.
+- **Desviación:** `normalizeTopicHierarchy` gana un parámetro `pageCount` y descarta las páginas de un
+  tema fuera de `[1, pageCount]` (y los duplicados, y ordena). Un tema que se queda sin páginas
+  válidas se descarta entero. Antes un tema podía archivarse con `pages: [9999]` y la fase 2 habría
+  citado sobre eso sin que nada lo marcara (invariante 2).
+- **Decisión sobre la marcha:** el modelo por defecto pasa de `gemini-2.5-flash` a
+  `gemini-3.1-flash-lite` (Iván). `GEMINI_MODEL` del `.env` ya mandaba; esto solo cambia el valor si
+  no está puesto. No se ha verificado que ese ID exista en la API.
+- **Decisión sobre la marcha:** el check D3 de la batería (un `tool-result` fabricado por el cliente se
+  acepta) pasa de `hard` a `knownGap` en `test-guardarrailes.mjs`: se sigue enseñando fallando pero no
+  tumba el script. La decisión 9 del plan ya lo difería a la fase 4; el paso 10 mandaba anotarlo y no
+  se había hecho. Anotado en `NOTES.md` §5.
+- **Deuda (fase 4):** envolver el material y el texto de página con delimitador de datos en
+  `topicsPrompt` y `TRANSCRIPTION_PROMPT` (ADR-008 barrera 8). El tutor revela los nombres de sus
+  herramientas ante pregunta directa (check B4), pendiente de hardening de system prompt. No hay
+  fixture de PDF con orden hostil dentro, así que B9 sale "no concluyente" siempre.
+- **Deuda:** el esquema del índice no lleva número de versión; un cambio de esquema invalida los
+  índices archivados en silencio y hace fallar el listado. Hoy la invalidación es manual.
