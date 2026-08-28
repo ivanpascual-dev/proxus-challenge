@@ -242,7 +242,8 @@ Cuatro familias:
 | | Peticiones simultáneas por cliente | 3 |
 | Tamaño de salida | Preguntas por artefacto | 50 |
 | | Bloques por nota | 200 |
-| Tiempo | Llamada al modelo | 60 s |
+| | Tokens de salida del modelo | 8.192 (`maxOutputTokens` en cada petición a Gemini) |
+| Tiempo | Llamada al modelo | 60 s, aplicado con `AbortSignal.timeout` en el adaptador |
 | | Fetch de URL externa (fase 2) | https, 5 s, 2 MB, sin IP privada |
 
 Las cifras de esta tabla son la **decisión**; los valores vivos son los de `limits.ts`. Si divergen,
@@ -272,6 +273,11 @@ para y se devuelve lo que hay **diciéndolo**: "me detuve en la página 14 de 20
   escribe en `NOTES.md` en vez de presentarlo como seguridad.
 - El tope de preguntas y bloques por artefacto es el que decide si la interfaz de la nota por bloques
   va fluida, así que es un límite de producto además de uno de coste.
+- **La petición a Gemini fija `temperature` baja (`LIMITS.modelTemperature`, 0.2) y `maxOutputTokens`
+  (`LIMITS.maxModelOutputTokens`).** Sin fijarlas, el modelo corría a temperatura 1.0 y sin techo de
+  salida: la indexación producía JSON inestable y la batería de guardarraíles daba resultados
+  distintos entre corridas del mismo ataque. La temperatura no es un techo de coste, pero es config de
+  seguridad (ADR-008, capa 4) y vive en el mismo domicilio para no repetir el número a mano.
 
 ---
 

@@ -1,3 +1,4 @@
+import { LIMITS } from "@proxus/shared";
 import { Config, Data, Effect, Layer, Redacted, Schema, Stream } from "effect";
 import {
   AiError,
@@ -206,7 +207,11 @@ const requestBody = (options: LanguageModel.ProviderOptions) => ({
   systemInstruction: promptSystemInstruction(options.prompt),
   contents: promptContents(options.prompt),
   tools: geminiTools(options.tools),
-  toolConfig: toolConfig(options)
+  toolConfig: toolConfig(options),
+  generationConfig: {
+    temperature: LIMITS.modelTemperature,
+    maxOutputTokens: LIMITS.maxModelOutputTokens
+  }
 });
 
 const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>
@@ -266,11 +271,14 @@ export const GeminiLanguageModelLive = Layer.effect(
       generateText: (options) =>
         Effect.tryPromise({
           try: async (signal) => {
+            // Techo de tiempo del ADR-007: LIMITS.modelCallTimeoutMs. Sin esto una conexión colgada
+            // retiene un permiso de concurrencia para siempre. Se combina con el signal de Effect
+            // para que una interrupción del turno también aborte la llamada.
             const response = await fetch(geminiUrl(config.model, config.apiKey), {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify(requestBody(options)),
-              signal
+              signal: AbortSignal.any([signal, AbortSignal.timeout(LIMITS.modelCallTimeoutMs)])
             });
 
             if (!response.ok) {
@@ -280,7 +288,10 @@ export const GeminiLanguageModelLive = Layer.effect(
             const json = decodeGeminiResponse(await response.json());
             return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
           },
-          catch: (cause) => toAiError(cause instanceof Error ? cause.message : String(cause))
+          catch: (cause) =>
+            cause instanceof Error && cause.name === "TimeoutError"
+              ? toAiError(`la llamada al modelo superó los ${LIMITS.modelCallTimeoutMs} ms`)
+              : toAiError(cause instanceof Error ? cause.message : String(cause))
         }),
       streamText: () => Stream.empty
     });

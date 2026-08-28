@@ -27,6 +27,10 @@ export const LIMITS = {
   maxTopicsPerPage: 3,
   maxIndexedCharactersPerPage: 8_000,
 
+  // Modelo
+  modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
+  maxModelOutputTokens: 8_192,
+
   // Tiempo
   modelCallTimeoutMs: 60_000,
   externalFetchTimeoutMs: 5_000,
