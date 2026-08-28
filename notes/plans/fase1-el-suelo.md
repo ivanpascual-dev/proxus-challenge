@@ -325,8 +325,14 @@ sabe leer (`test-guardarrailes.mjs:228`).
 - `styles.input.css`: bloque `@theme` con los tokens semánticos (Tailwind v4, la configuración vive en
   el CSS). Los valores literales están en la sección 6.
 - **Se quita `color-scheme: dark` clavado** ([`styles.input.css:8`](../../packages/web/src/styles.input.css#L8)).
-  El tema arranca siguiendo `prefers-color-scheme` y se puede cambiar con un control, que persiste en
-  `localStorage`.
+  El control del tema tiene **tres estados: sistema (por defecto), claro y oscuro**, y la elección
+  persiste en `localStorage`. "Sistema" sigue a `prefers-color-scheme` **en vivo** (un cambio de tema
+  del SO se aplica sin recargar); "claro" y "oscuro" son una elección explícita que ni el SO ni una
+  recarga pisan.
+  > **Actualizado sobre la marcha (2026-08-28).** El plan original decía un conmutador binario. En la
+  > verificación se vio que, tras el primer clic, `localStorage` guardaba `"light"` o `"dark"` para
+  > siempre y F1-21 ("y el usuario no haya elegido tema") ya no se podía volver a cumplir: el tema del
+  > SO quedaba ignorado. El tercer estado, "sistema", es el que hace que F1-21 sea reversible.
 - **Las 138 ocurrencias de color literal se sustituyen por tokens.** Ni una `slate-800` suelta queda en
   los componentes. Ese es el criterio de "hecho", y es verificable con el mismo `grep` de la sección 3.
 - Contraste AA comprobado a mano en los dos temas para texto sobre fondo, texto sobre superficie y
@@ -732,7 +738,7 @@ pnpm test
 | `F1-17` | `curl localhost:3000/api/materials/<id>/pages/11` devuelve la imagen renderizada, esté el material indexado o no |
 | `F1-18`, `F1-19` | `curl .../pages/9999` → 400 con el rango válido. `curl .../materials/no-existe/pages/1` → 404. **Ninguno 500** |
 | `F1-20` | `file` sobre la imagen devuelta: lado corto 1152 px sea cual sea el tamaño físico de la página (los PDF del corpus son A4: 1152×1630). Y test unitario de `renderDpi` |
-| `F1-21`, `F1-22` | Cambiar la preferencia del sistema y recargar: arranca en ese tema. Pulsar el control: cambia sin recargar. Recargar: se mantiene |
+| `F1-21`, `F1-22` | Con el control en "Sistema": cambiar la preferencia del SO se aplica sin recargar, y una recarga arranca en ese tema. Elegir "Claro" u "Oscuro": cambia sin recargar; recargar lo mantiene; cambiar el SO ya no lo pisa. Volver a "Sistema": vuelve a seguir al SO |
 | `F1-23` | El `grep` de clases de color literales de la sección 3 devuelve **0**. Hoy devuelve 138 |
 | `F1-24` | Medidor de contraste sobre texto/fondo, texto/superficie y texto/acento en los dos temas. AA o se ajusta el token |
 

@@ -17,8 +17,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Añadido
 
-- **Tema claro y oscuro.** La aplicación arranca en el tema que indica el sistema operativo y se puede
-  cambiar con un conmutador. La elección se recuerda en la siguiente visita.
+- **Tema claro y oscuro.** El selector tiene tres opciones: sistema (por defecto), claro y oscuro. En
+  "sistema" la aplicación sigue la preferencia del sistema operativo y reacciona si esa preferencia
+  cambia; al elegir claro u oscuro la elección se recuerda y no la pisa el sistema.
 - **Visor de material.** Al abrir un material se ven todas sus páginas en scroll continuo, como un PDF.
   No hace falta indexarlo para verlo.
 - **Indexado desde la web.** Un material sin indexar muestra un botón para indexarlo con el progreso

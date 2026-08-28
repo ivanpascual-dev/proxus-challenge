@@ -176,3 +176,18 @@ por debajo de AA. Afectaba a la marca "transcrito por el modelo" del visor (F1-1
   que lo bajaba a 4,2:1.
 - **No es deuda:** `--color-disabled` como texto da 2,54:1 en claro, pero WCAG 2.1 exime de contraste a
   los componentes de interfaz inactivos.
+
+## 2026-08-28 · Fase 1 · verifier: F1-21, el tema no volvía al del sistema
+
+Iván puso el SO en claro, recargó y la web seguía en oscuro. Causa: el conmutador era binario y
+`applyTheme` guardaba siempre `"light"` o `"dark"` en `localStorage`; tras el primer clic no existía
+forma de volver a "seguir al sistema", así que F1-21 ("y el usuario no haya elegido tema") no se podía
+volver a cumplir.
+
+- **Arreglo:** `ThemePreference = "light" | "dark" | "system"`, con `"system"` por defecto. El selector
+  pasa a `<select>` de tres opciones (cabía mejor que un segmentado de tres botones en los 340 px del
+  sidebar). `watchSystemTheme` re-pinta al vuelo cuando cambia `prefers-color-scheme`, pero solo si la
+  preferencia guardada es `"system"`. El bootstrap inline de `index.html` ya trataba cualquier valor
+  que no fuera `"light"`/`"dark"` como "seguir al SO", así que no cambió.
+- **Nota para quien pruebe:** si ya se tocó el tema antes, `localStorage` tiene una elección explícita
+  guardada; hay que elegir "Sistema" una vez para volver al comportamiento por defecto.

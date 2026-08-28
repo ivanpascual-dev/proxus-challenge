@@ -1,23 +1,26 @@
-import { useState } from "react";
-import { applyTheme, getActiveTheme, type Theme } from "../theme.ts";
+import { useEffect, useState } from "react";
+import { applyPreference, getStoredPreference, watchSystemTheme, type ThemePreference } from "../theme.ts";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => getActiveTheme());
+  const [preference, setPreference] = useState<ThemePreference>(() => getStoredPreference());
 
-  const toggle = () => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    applyTheme(next);
-    setTheme(next);
-  };
+  // Mientras la elección sea "Sistema", seguir los cambios de tema del SO sin recargar.
+  useEffect(() => watchSystemTheme(), []);
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="rounded-full border border-border px-3 py-1.5 text-muted text-xs hover:border-brand hover:text-brand"
-      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+    <select
+      aria-label="Tema"
+      value={preference}
+      onChange={(event) => {
+        const next = event.currentTarget.value as ThemePreference;
+        applyPreference(next);
+        setPreference(next);
+      }}
+      className="rounded-full border border-border bg-surface px-2.5 py-1 text-body text-xs outline-none hover:border-brand focus:border-brand"
     >
-      {theme === "dark" ? "Light mode" : "Dark mode"}
-    </button>
+      <option value="system">Sistema</option>
+      <option value="light">Claro</option>
+      <option value="dark">Oscuro</option>
+    </select>
   );
 }

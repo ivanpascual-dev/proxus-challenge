@@ -99,10 +99,11 @@ domicilio.
 
 #### Tema
 
-- **F1-21.** CUANDO el sistema operativo declare una preferencia de color y el usuario no haya elegido
-  tema, EL sistema DEBERÁ arrancar en el tema que esa preferencia indique.
-- **F1-22.** CUANDO el usuario cambie el tema, EL sistema DEBERÁ aplicarlo sin recargar y conservarlo en
-  la siguiente visita.
+- **F1-21.** MIENTRAS el usuario no haya elegido tema (el estado por defecto, al que siempre puede
+  volver), EL sistema DEBERÁ seguir la preferencia de color del sistema operativo, tanto al arrancar
+  como cuando esa preferencia cambie en caliente.
+- **F1-22.** CUANDO el usuario elija un tema explícito, EL sistema DEBERÁ aplicarlo sin recargar,
+  conservarlo en la siguiente visita y NO DEBERÁ dejar que un cambio de la preferencia del SO lo pise.
 - **F1-23.** EL sistema NO DEBERÁ contener clases de color literales de Tailwind en sus componentes:
   todo color DEBERÁ venir de un token semántico.
 - **F1-24.** EL texto DEBERÁ alcanzar contraste AA sobre su fondo (4,5:1 en texto normal, 3:1 en texto

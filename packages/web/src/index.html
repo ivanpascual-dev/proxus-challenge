@@ -7,6 +7,8 @@
     <script>
       (function () {
         try {
+          // Preferencia guardada: "light" | "dark" | "system". Sin nada guardado, o "system",
+          // se sigue a prefers-color-scheme. Se resuelve antes de pintar para no parpadear.
           var stored = localStorage.getItem("proxus-theme");
           var theme = stored === "light" || stored === "dark"
             ? stored
