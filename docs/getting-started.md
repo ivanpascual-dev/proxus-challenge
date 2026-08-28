@@ -132,14 +132,17 @@ materials view algebra-basica 2,5-7
 
 ## 6. Qué sí versionar si necesitas material demo
 
-No subas `packages/server/.data`. Si una mejora necesita datos reproducibles, usa una de estas opciones:
+No subas `packages/server/.data`. Si una mejora necesita datos reproducibles, usa fixtures sintéticos
+fuera de `.data`, como el que ya existe:
 
 ```txt
-packages/server/fixtures/materials/demo.pdf
-packages/server/fixtures/artifacts/*.json
+packages/server/fixtures/materials/densidad.pdf   # sintético, generado por make-fixture.mjs
 ```
 
-Y documenta cómo copiarlos o generarlos hacia `.data`, por ejemplo con un script `seed:demo`.
+```bash
+pnpm run fixture:materials   # regenera el fixture
+pnpm run seed:demo           # lo copia a packages/server/.data/materials/pdfs/
+```
 
 ## 7. Flujo recomendado para explorar
 

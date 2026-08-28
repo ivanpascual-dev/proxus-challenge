@@ -10,7 +10,9 @@
     "typecheck": "pnpm -r typecheck",
     "typecheck:root": "tsc --noEmit",
     "test": "node --import tsx --test \"packages/*/src/**/*.test.ts\"",
-    "test:guardarrailes": "node --import tsx scripts/test-guardarrailes.mjs"
+    "test:guardarrailes": "node --import tsx scripts/test-guardarrailes.mjs",
+    "fixture:materials": "node packages/server/fixtures/make-fixture.mjs",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "devDependencies": {
     "@effect/language-service": "^0.86.2",
