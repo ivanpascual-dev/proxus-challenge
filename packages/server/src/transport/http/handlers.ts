@@ -74,16 +74,21 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
         Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id)))
       ))
-      .handle("page", ({ params }) => materials.getPageView(params.id, params.page).pipe(
+      .handle("page", ({ params }) => Effect.gen(function* () {
+        const material = yield* materials.get(params.id);
+        if (!Number.isInteger(params.page) || params.page < 1 || params.page > material.pageCount) {
+          return yield* new ApiPageOutOfRange({
+            materialId: params.id,
+            page: params.page,
+            pageCount: material.pageCount,
+            message: `El material ${params.id} tiene ${material.pageCount} páginas; ${params.page} está fuera de rango.`
+          });
+        }
+        const { image } = yield* materials.renderPage(params.id, params.page);
+        return image;
+      }).pipe(
         Effect.catchTag("MaterialRepositoryError", Effect.die),
-        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
-        Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id))),
-        Effect.catchTag("PageOutOfRange", (error) => Effect.fail(new ApiPageOutOfRange({
-          materialId: params.id,
-          page: error.page,
-          pageCount: error.pageCount,
-          message: `El material ${params.id} tiene ${error.pageCount} páginas; ${error.page} está fuera de rango.`
-        })))
+        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
       ));
   })
 );

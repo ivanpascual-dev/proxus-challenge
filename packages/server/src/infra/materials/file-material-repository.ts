@@ -7,8 +7,6 @@ import {
   MaterialNotIndexed,
   MaterialRepository,
   MaterialRepositoryError,
-  PageOutOfRange,
-  type MaterialPageViewResult,
   type MaterialRepository as MaterialRepositoryType,
   type PdfMaterial,
   type RenderedPage
@@ -166,27 +164,6 @@ export const FileMaterialRepository = {
       return { ...content, materialId: file.material.id, fileName: file.material.fileName };
     });
 
-    const getPageView = (
-      id: string,
-      page: number
-    ): Effect.Effect<
-      MaterialPageViewResult,
-      MaterialNotFound | MaterialNotIndexed | PageOutOfRange | MaterialRepositoryError
-    > => Effect.gen(function* () {
-      const file = yield* getFile(id);
-      if (!Number.isInteger(page) || page < 1 || page > file.material.pageCount) {
-        return yield* new PageOutOfRange({ materialId: id, page, pageCount: file.material.pageCount });
-      }
-
-      const content = yield* contentFor(file);
-      const indexed = content.pages.find((entry) => entry.page === page);
-      const failed = content.failedPages.find((entry) => entry.page === page);
-      const entry = indexed ?? failed ?? { page, reason: "esta página no aparece en el índice" };
-
-      const image = yield* pdf.renderPage({ path: file.path, page }).pipe(Effect.mapError(mapError));
-      return { image, entry };
-    });
-
     const reindex = (
       id: string,
       onProgress: (progress: IndexProgress) => Effect.Effect<void>
@@ -209,7 +186,7 @@ export const FileMaterialRepository = {
       return { ...content, materialId: id, fileName: file.material.fileName };
     });
 
-    return { list, get, renderPage, getIndex, getPageView, reindex };
+    return { list, get, renderPage, getIndex, reindex };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };

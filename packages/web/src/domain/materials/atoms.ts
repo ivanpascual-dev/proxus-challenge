@@ -11,7 +11,7 @@ export const materialsQuery = apiRuntime
   )
   .pipe(Atom.keepAlive, Atom.withReactivity(["materials"]));
 
-// El índice de un material (sin imágenes): temas, procedencia y texto por página.
+// El índice de un material (sin imágenes): temas con su jerarquía, procedencia y texto por página.
 export const materialIndexQuery = Atom.family((materialId: string) =>
   apiRuntime
     .atom(
@@ -22,7 +22,7 @@ export const materialIndexQuery = Atom.family((materialId: string) =>
     .pipe(Atom.keepAlive, Atom.withReactivity({ materials: [materialId] }))
 );
 
-// La imagen real de una página más su entrada de índice, en la misma petición (invariante 8).
+// El render real de una página del PDF. No exige índice: se puede ver el PDF antes de indexarlo.
 export const materialPageQuery = Atom.family((key: string) => {
   const separator = key.lastIndexOf(":");
   const materialId = key.slice(0, separator);

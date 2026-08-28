@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
-import { MaterialListResponse, PdfMaterial } from "../schemas/material.ts";
-import { MaterialIndex, MaterialPageView } from "../schemas/material-index.ts";
+import { MaterialListResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
+import { MaterialIndex } from "../schemas/material-index.ts";
 import { MaterialNotFound, MaterialNotIndexed, PageOutOfRange } from "../errors/material-errors.ts";
 
 export class MaterialsApi extends HttpApiGroup.make("materials")
@@ -27,17 +27,16 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
         MaterialNotIndexed.pipe(HttpApiSchema.status(409))
       ]
     }),
-    // La imagen real de una página más su entrada de índice, en la misma respuesta.
+    // El render real de una página. No exige índice: ver el PDF va antes de indexarlo.
     HttpApiEndpoint.get("page", "/:id/pages/:page", {
       params: {
         id: Schema.String,
         page: Schema.NumberFromString
       },
-      success: MaterialPageView,
+      success: PageImage,
       error: [
         MaterialNotFound.pipe(HttpApiSchema.status(404)),
-        PageOutOfRange.pipe(HttpApiSchema.status(400)),
-        MaterialNotIndexed.pipe(HttpApiSchema.status(409))
+        PageOutOfRange.pipe(HttpApiSchema.status(400))
       ]
     })
   )

@@ -275,7 +275,6 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
     });
   },
   getIndex: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
-  getPageView: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
   reindex: (id) => Effect.fail(new MaterialIndexingFailed({ materialId: id, reason: "el eval no indexa materiales" }))
 });
 

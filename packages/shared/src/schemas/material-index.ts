@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { PageImage } from "./material.ts";
 
 // De dónde salió el texto indexado de una página. La invariante 8: "extracted" es el texto embebido
 // del PDF; "transcribed" lo escribió el modelo mirando la imagen, y eso hay que poder verlo.
@@ -60,17 +59,10 @@ export const MaterialIndex = Schema.Struct({
 });
 export type MaterialIndex = typeof MaterialIndex.Type;
 
-// Lo que devuelve GET /materials/:id/pages/:page: la imagen real de la página y su entrada de índice,
-// que puede ser una página indexada o una que no se pudo indexar (con su motivo). La invariante 8:
-// el texto indexado no es la verdad, la página sí.
+// La entrada de índice de una página: indexada (con su procedencia) o no indexada (con su motivo).
+// La invariante 8: el texto indexado no es la verdad, la página sí, y de dónde salió se ve.
 export const MaterialPageEntry = Schema.Union([IndexedPage, UnindexedPage]);
 export type MaterialPageEntry = typeof MaterialPageEntry.Type;
-
-export const MaterialPageView = Schema.Struct({
-  image: PageImage,
-  entry: MaterialPageEntry
-});
-export type MaterialPageView = typeof MaterialPageView.Type;
 
 // Eventos del stream NDJSON de POST /materials/:id/index. `page` es null en la fase de temas.
 export const MaterialIndexStreamEvent = Schema.Union([

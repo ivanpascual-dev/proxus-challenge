@@ -1,6 +1,6 @@
 import { Context, Data, Effect } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
-import { LIMITS, type MaterialIndex, type MaterialIndexState, type MaterialPageEntry } from "@proxus/shared";
+import { LIMITS, type MaterialIndex, type MaterialIndexState } from "@proxus/shared";
 import type { IndexProgress } from "./indexing-service.ts";
 
 export interface PdfMaterial {
@@ -44,12 +44,6 @@ export class MaterialNotIndexed extends Data.TaggedError("MaterialNotIndexed")<{
   readonly materialId: string;
 }> {}
 
-export class PageOutOfRange extends Data.TaggedError("PageOutOfRange")<{
-  readonly materialId: string;
-  readonly page: number;
-  readonly pageCount: number;
-}> {}
-
 export class MaterialRepositoryError extends Data.TaggedError("MaterialRepositoryError")<{
   readonly reason: unknown;
 }> {}
@@ -57,11 +51,6 @@ export class MaterialRepositoryError extends Data.TaggedError("MaterialRepositor
 export interface RenderedPage {
   readonly material: PdfMaterial;
   readonly image: PageImage;
-}
-
-export interface MaterialPageViewResult {
-  readonly image: PageImage;
-  readonly entry: MaterialPageEntry;
 }
 
 export interface MaterialRepository {
@@ -77,14 +66,6 @@ export interface MaterialRepository {
   readonly getIndex: (
     id: string
   ) => Effect.Effect<MaterialIndex, MaterialNotFound | MaterialNotIndexed | MaterialRepositoryError>;
-  // La imagen real de una página más su entrada de índice, en la misma respuesta (invariante 8).
-  readonly getPageView: (
-    id: string,
-    page: number
-  ) => Effect.Effect<
-    MaterialPageViewResult,
-    MaterialNotFound | MaterialNotIndexed | PageOutOfRange | MaterialRepositoryError
-  >;
   // Construye (o reconstruye) el índice de este material y lo archiva. Emite progreso por el camino.
   // Bajo demanda: lo dispara la persona desde la interfaz (paso 22 del plan de la fase 1).
   readonly reindex: (

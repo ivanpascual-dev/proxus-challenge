@@ -74,8 +74,8 @@ domicilio.
   DEBERÁ llamar al modelo.
 - **F1-11.** CUANDO se indexe una página cuyo texto extraíble no alcance el umbral, EL sistema DEBERÁ
   renderizarla, hacérsela leer al modelo y marcar su procedencia como `transcribed`.
-- **F1-12.** EL índice DEBERÁ guardar la procedencia de cada página, y la interfaz DEBERÁ mostrarla allí
-  donde muestre texto indexado.
+- **F1-12.** EL índice DEBERÁ guardar la procedencia de cada página, y la interfaz DEBERÁ señalar de
+  forma visible toda página cuya procedencia no sea `extracted`: transcrita por el modelo o fallida.
 - **F1-13.** SI la indexación de una página falla, ENTONCES EL sistema DEBERÁ guardarla como no indexada
   con su motivo, y NO DEBERÁ sustituirla por texto vacío ni por contenido de otra página.
 - **F1-14.** EL sistema DEBERÁ localizar el índice de un material por la huella `sha256` de su PDF, de
@@ -89,8 +89,8 @@ domicilio.
 
 #### Página como recurso
 
-- **F1-17.** CUANDO se pida la página N de un material indexado, EL sistema DEBERÁ devolver su
-  renderizado y su entrada de índice en la misma respuesta.
+- **F1-17.** CUANDO se pida la página N de un material, EL sistema DEBERÁ devolver su renderizado, esté
+  el material indexado o no.
 - **F1-18.** SI se pide una página fuera del rango del material, ENTONCES EL sistema DEBERÁ responder
   400 nombrando el rango válido, nunca 500.
 - **F1-19.** SI se pide un material que no existe, ENTONCES EL sistema DEBERÁ responder 404, nunca 500.
