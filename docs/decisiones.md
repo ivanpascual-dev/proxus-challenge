@@ -47,7 +47,19 @@ pagar una pasada multimodal para leer algo que ya se podía leer.
 umbral de densidad, esa página se indexa con su texto. Si no lo supera, se renderiza y la lee el modelo.
 El índice guarda, por página, **cuál de los dos caminos se usó**.
 
-El umbral se calibra en la fase 1 contra el fixture versionado y queda escrito, no se elige a ojo.
+**El umbral son 600 caracteres no blancos por página**, calibrado el 2026-08-28 sobre los 9 PDFs del
+corpus local (294 páginas), midiendo página a página con `pdftotext`:
+
+| Familia | PDFs | Páginas | Media por página | Página más pobre | Página más rica |
+| --- | --- | --- | --- | --- | --- |
+| Diapositivas 16:9 | 6 | 261 | 76 a 145 | 0 | **541** |
+| A4 de texto corrido | 3 | 33 | 2.157 a 2.458 | **853** | 3.029 |
+
+Entre 541 y 853 no cae ni una sola página del corpus, así que el 600 sale de ese hueco y no de un
+criterio. **Corrección a la redacción original de este registro:** quien calibra es el corpus real; el
+fixture sintético versionado (`packages/server/fixtures/materials/`) solo **fija** el número como test
+reproducible en cualquier clon del repo, porque el corpus real es material de cursos ajenos y no se
+sube.
 
 **Consecuencias.**
 
@@ -223,7 +235,7 @@ Cuatro familias:
 | | Bloque editado por el alumno | 5.000 caracteres |
 | | Fichero subido (fase 4) | 25 MB |
 | Coste por turno | Páginas renderizadas | 20 |
-| | Bytes de imagen | 8 MB |
+| | Bytes de imagen | 12 MB, contando la cadena base64 (medido en la fase 1) |
 | | Pasos del agente | 8, **acotado en el servidor** |
 | Frecuencia | Mensajes | 20 / 10 min · 200 / día |
 | | Artefactos generados | 5 / 10 min · 40 / día |
@@ -242,12 +254,17 @@ secundario: leer 60 páginas exige tres mensajes, y entre uno y otro hay una per
 
 **Los bytes se acumulan mientras se renderiza.** Cuando la siguiente página se pasaría del techo, se
 para y se devuelve lo que hay **diciéndolo**: "me detuve en la página 14 de 20, las imágenes llegaron a
-8 MB". No es recorte silencioso porque el modelo lee el aviso y puede pedir menos.
+12 MB". No es recorte silencioso porque el modelo lee el aviso y puede pedir menos.
 
 **Consecuencias.**
 
-- Los 8 MB son un punto de partida, no un dato: **hay que medir el tope real de tamaño de petición de
-  la API con `inlineData` en la fase 1** y ajustarlo. Queda como supuesto marcado.
+- **Los 8 MB eran un supuesto y ya está medido: son 12 MB, contando base64.** El tope real de la API de
+  Gemini con `inlineData` es de **20 MB por petición**, sumando texto, instrucciones y bytes inline. Con
+  la regla de renderizado del ADR-010, el caso más pesado medido (20 páginas A4) son **9,4 MB ya en
+  base64**, así que 8 MB habría cortado casi todas las peticiones de 20 páginas y habría convertido el
+  techo de páginas en letra muerta. Con 12 MB manda el techo de páginas en el caso normal y el de bytes
+  solo salta con material anómalo, y quedan 8 MB de holgura hasta el techo de la API. Se cuenta la
+  cadena base64 porque es lo que viaja de verdad.
 - **Sin autenticación, el limitador de frecuencia es control de coste, no control de acceso.** Solo se
   puede identificar al cliente por IP o por un identificador del navegador, y las dos cosas se cambian
   en diez segundos. Protege de un bucle accidental, de un reintento automático y de una demo abierta el
@@ -375,3 +392,121 @@ ellos.
 **Consecuencias.** Los off-by-one de los límites, que son el fallo típico de esta clase de código,
 quedan cubiertos. A cambio no hay red bajo la interfaz: un cambio de React que rompa la nota por bloques
 no lo detecta nada automático, y eso queda escrito como limitación en `NOTES.md`.
+
+---
+
+## ADR-010 · La página se renderiza con el lado corto a 1152 píxeles, no a un dpi fijo
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** Hoy `poppler-pdf-service.ts:41` renderiza a `dpi = 144` fijo. Un dpi fijo no produce un
+tamaño fijo: produce el tamaño que salga de multiplicar por el tamaño físico de la página. Medido sobre
+el corpus, esas dos formas conviven en la misma carpeta:
+
+| Forma | Tamaño de página | A 144 dpi | Peso |
+| --- | --- | --- | --- |
+| Diapositiva 16:9 | 1920 × 1080 pt | 3840 × 2160 px | 344 KB |
+| A4 | 595 × 842 pt | 1191 × 1684 px | 362 KB |
+
+**El dato que decide.** Gemini trocea cada imagen en tiles de 768 px, con unidad de recorte
+`floor(lado_corto / 1,5)`, y cobra 258 tokens por tile. **El número de tiles sale de la relación de
+aspecto, no del número de píxeles**: una página 16:9 son 6 tiles (1.548 tokens) tanto a 3840 × 2160 como
+a 2048 × 1152. Todo píxel por encima de lado corto 1152 se descarta antes de que el modelo lo mire.
+Así que las diapositivas se estaban renderizando al doble de resolución de la que llega, y pagándose.
+
+**Opciones consideradas.**
+
+- **Dejar el dpi fijo y solo ajustar el techo de bytes.** Descartada: se siguen pagando bytes que el
+  modelo tira, y el peso de una página sigue dependiendo de si el PDF es una diapositiva o un A4, que
+  es justo lo que hace imposible razonar sobre el presupuesto.
+- **`-scale-to 2048`.** Descartada: acota el lado **largo**, así que arregla el 16:9 (149 KB) y
+  empeora el A4 (464 KB, sube un 28% respecto a hoy). Acotar el lado largo es acotar la dimensión
+  equivocada, porque la unidad de recorte de Gemini se calcula sobre el lado corto.
+- **JPEG en vez de PNG.** Descartada: ahorra un 23% en A4 metiendo artefactos de compresión justo sobre
+  lo que hay que leer, que en este corpus es código y diagramas.
+
+**Decisión.** El lado corto de la página se renderiza a **1.152 píxeles**, sea cual sea el tamaño físico
+del PDF. En dpi es `82944 / lado_corto_en_puntos`: 77 para una diapositiva, 139 para un A4. Sigue siendo
+PNG. La cifra vive en `LIMITS.renderShortSidePixels` y la conversión en una función de una línea,
+`renderDpi`.
+
+Medido: diapositiva **344 KB → 149 KB** (57% menos), A4 **362 KB → 352 KB** (igual), mismo coste en
+tokens en los dos casos y sin perder un píxel de lo que el modelo consume.
+
+**Consecuencias.**
+
+- El peso de una página pasa a depender de la **forma** de la página y no de su tamaño físico, así que
+  el presupuesto de bytes del ADR-007 se vuelve razonable de antemano en vez de una lotería por PDF.
+- **Es la regla óptima para cómo Gemini trocea hoy, y eso es documentación pública, no un contrato.**
+  Si cambia el troceo, la regla deja de ser la más barata; no deja de funcionar. Está aislada en una
+  función de una línea para que cambiarla cueste eso.
+- Cambiar esta cifra más adelante obliga a **reindexar**, porque cambia lo que el modelo vio al
+  transcribir. Por eso es un registro y no un comentario.
+
+---
+
+## ADR-011 · El material se identifica por su nombre; su índice, por su contenido
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** El índice por página (ADR-001) cuesta una pasada del modelo por cada página que no llega
+al umbral: 261 de las 294 del corpus local. Hay que saber cuándo un índice guardado sigue valiendo, y la
+respuesta ingenua (nombre del fichero, tamaño y fecha de modificación) falla por los dos lados. Falla
+hacia el silencio: un PDF reemplazado por otro del mismo tamaño con la fecha tocada sirve el índice
+viejo como bueno. Y falla hacia el gasto: `cp -p`, un `git checkout` o copiar los materiales a otra
+máquina alteran el `mtime` sin alterar nada, y disparan un reindexado de 261 páginas que no hacía falta.
+
+**Opciones consideradas.**
+
+- **Derivar el `materialId` del contenido**, de forma que un PDF modificado sea un material nuevo.
+  Descartada, y es la que más se parece a la buena: ese id viaja **dentro de cada cita** de cada bloque
+  de apuntes y de cada pregunta de cada test (fases 2 y 3). Corregir una errata en una página cambiaría
+  el id y dejaría huérfanas todas las preguntas generadas desde ese material. Se cambia un índice
+  caducado, que el sistema detecta y rechaza en voz alta, por una cita rota en los apuntes del alumno,
+  que no detecta nadie.
+- **Huella por número de páginas más número de caracteres extraídos.** Descartada por débil y por cara.
+  Débil: no detecta que cambies una imagen ni que reordenes páginas sin tocar el texto, que es
+  exactamente lo que pasa en un PDF de diapositivas. Cara: medido, recorrer el corpus con `pdftotext`
+  tarda **380 ms**, frente a los **10-50 ms** de un `sha256` sobre los mismos 19,6 MB.
+
+**Decisión.** Dos identidades, separadas a propósito:
+
+| Qué | De dónde sale | Para qué sirve |
+| --- | --- | --- |
+| `materialId` | El nombre del fichero, como hoy | Lo que nombra el agente, lo que va en la URL y **lo que va dentro de cada cita**. Sobrevive a que el PDF se edite, que es el objetivo |
+| Huella de contenido | `sha256` de los bytes del fichero | El nombre del fichero del índice: `.data/materials/index/<sha256>.json` |
+
+**El índice se archiva por huella, no por id.** No hay concepto de "índice caducado": o existe un índice
+para este contenido exacto, o no existe y hay que construirlo.
+
+**La huella se calcula también en `list()`**, y eso no es un descuido. Medido sobre los 9 PDFs (19,6 MB):
+el `pdfinfo` que esa función ya lanza por cada fichero cuesta **90-210 ms**, y el `sha256` de todos ellos
+cuesta **10-40 ms**. Añadirlo es entre 5 y 9 veces más barato que lo que ya se estaba pagando ahí. A
+cambio, el listado puede decir de una sola pasada qué materiales están indexados y cuáles no, que es lo
+que exige la invariante 3 llevada a la interfaz: un material sin indexar se dice, no se enseña con un
+índice vacío.
+
+**Consecuencias.**
+
+- **Renombrar un PDF sale gratis:** mismo contenido, misma huella, mismo índice, cero páginas al modelo.
+  Con nombre y fecha habría costado un reindexado completo.
+- **Reemplazar un PDF por otro del mismo tamaño con la fecha tocada deja de poder engañar al sistema.**
+  El fallo silencioso no se detecta mejor: deja de existir.
+- Editar un PDF deja su índice viejo huérfano en el disco. **Un índice ocupa 453 KB en el peor caso**
+  (58 páginas × 8.000 caracteres), así que unos cuantos huérfanos son un par de megas en una carpeta
+  que ya está en `.gitignore`. **Y un huérfano vuelve a ser útil si se deshace la edición**: vuelve el
+  hash viejo y el índice está intacto, sin pagar el reindexado. Por eso la limpieza es explícita
+  (`index:materials --prune`) y no automática: borrar por defecto sería tirar trabajo ya pagado.
+- Un mismo PDF guardado con dos nombres comparte índice, que es lo correcto y además es gratis. **Por
+  eso el índice guardado no contiene `materialId` ni `fileName`:** son propiedades del fichero, no del
+  contenido, y grabarlas dentro haría que el segundo fichero heredase en silencio la identidad del
+  primero. La identidad se resuelve al leer, contra el fichero que hoy tiene esa huella.
+- **Borrar un PDF no borra su índice.** Se queda huérfano a propósito: borrar es el caso en que más
+  probable es que el fichero vuelva, y si vuelve el mismo contenido vuelve su huella y el índice sirve
+  intacto. Lo que sí queda roto son las citas de artefactos que apunten a un material borrado, y eso es
+  independiente de esta decisión: viene de que el `materialId` sale del nombre del fichero.
+- **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** El día que haya
+  subida de ficheros con id generado (fase 4), la primera mitad de este registro se revisa; la segunda,
+  la del archivado por huella, no cambia.
