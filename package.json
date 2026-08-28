@@ -9,10 +9,12 @@
     "prepare": "effect-language-service patch",
     "typecheck": "pnpm -r typecheck",
     "typecheck:root": "tsc --noEmit",
+    "test": "node --import tsx --test \"packages/*/src/**/*.test.ts\"",
     "test:guardarrailes": "node --import tsx scripts/test-guardarrailes.mjs"
   },
   "devDependencies": {
     "@effect/language-service": "^0.86.2",
+    "@proxus/shared": "workspace:*",
     "@types/node": "^25.9.3",
     "tsx": "^4.22.4",
     "typescript": "^5"
