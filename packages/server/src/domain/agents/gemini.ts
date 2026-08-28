@@ -7,7 +7,7 @@ import {
   Response
 } from "effect/unstable/ai";
 
-const defaultModel = "gemini-2.5-flash";
+const defaultModel = "gemini-3.1-flash-lite";
 
 const FunctionCall = Schema.Struct({
   name: Schema.optional(Schema.String),
