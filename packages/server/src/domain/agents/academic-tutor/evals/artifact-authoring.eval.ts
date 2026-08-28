@@ -17,7 +17,9 @@ import {
   gradeAttempt
 } from "../../../artifacts/artifact.ts";
 import {
+  MaterialIndexingFailed,
   MaterialNotFound,
+  MaterialNotIndexed,
   MaterialRepository,
   type PdfMaterial,
   type RenderedPage
@@ -271,7 +273,10 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
         data: `data:image/png;base64,${btoa(fixturePage?.text ?? `Page ${page}`)}`
       }
     });
-  }
+  },
+  getIndex: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
+  getPageView: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
+  reindex: (id) => Effect.fail(new MaterialIndexingFailed({ materialId: id, reason: "el eval no indexa materiales" }))
 });
 
 const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
@@ -279,7 +284,8 @@ const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
   title: material.title,
   fileName: material.fileName,
   pageCount: material.pages.length,
-  uploadedAt: material.uploadedAt
+  uploadedAt: material.uploadedAt,
+  indexState: "not-indexed"
 });
 
 const makeEvalLayer = (testCase: ArtifactAuthoringEvalCase) => Layer.mergeAll(

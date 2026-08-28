@@ -7,6 +7,8 @@ import { FileSessionRepository } from "../../infra/agents/file-session-repositor
 import { MaterialRepository } from "../materials/material.ts";
 import { ArtifactRepository } from "../artifacts/artifact.ts";
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
+import { FileMaterialIndexRepository } from "../../infra/materials/file-material-index-repository.ts";
+import { IndexingServiceLive } from "../materials/indexing-service.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
@@ -91,6 +93,8 @@ export const academicTutorAgent = Effect.gen(function* () {
     ),
     FileMaterialRepository.layer(".data/materials/pdfs").pipe(
       Layer.provide(PopplerPdfService.layer),
+      Layer.provide(FileMaterialIndexRepository.layer(".data/materials/index")),
+      Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer), Layer.provide(NodeServices.layer))),
       Layer.provide(NodeServices.layer)
     ),
     FileArtifactRepository.layer(".data/artifacts").pipe(

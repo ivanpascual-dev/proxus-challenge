@@ -1,7 +1,12 @@
 import { Effect, Layer, Option } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { HttpServerRequest } from "effect/unstable/http";
-import { ProxusApi } from "@proxus/shared";
+import {
+  MaterialNotFound as ApiMaterialNotFound,
+  MaterialNotIndexed as ApiMaterialNotIndexed,
+  PageOutOfRange as ApiPageOutOfRange,
+  ProxusApi
+} from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { ArtifactRepository, type Artifact } from "../../domain/artifacts/artifact.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
@@ -40,6 +45,15 @@ export const TutorHttpHandlers = HttpApiBuilder.group(
   })
 );
 
+const notFound = (materialId: string) =>
+  new ApiMaterialNotFound({ materialId, message: `No hay ningún material con id ${materialId}.` });
+
+const notIndexed = (materialId: string) =>
+  new ApiMaterialNotIndexed({
+    materialId,
+    message: `El material ${materialId} no está indexado. Pulsa "Indexar" para construir su índice.`
+  });
+
 export const MaterialsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
   "materials",
@@ -51,7 +65,26 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         Effect.map((items) => ({ materials: items })),
         Effect.orDie
       ))
-      .handle("get", ({ params }) => materials.get(params.id).pipe(Effect.orDie));
+      .handle("get", ({ params }) => materials.get(params.id).pipe(
+        Effect.catchTag("MaterialRepositoryError", Effect.die),
+        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
+      ))
+      .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
+        Effect.catchTag("MaterialRepositoryError", Effect.die),
+        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
+        Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id)))
+      ))
+      .handle("page", ({ params }) => materials.getPageView(params.id, params.page).pipe(
+        Effect.catchTag("MaterialRepositoryError", Effect.die),
+        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
+        Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id))),
+        Effect.catchTag("PageOutOfRange", (error) => Effect.fail(new ApiPageOutOfRange({
+          materialId: params.id,
+          page: error.page,
+          pageCount: error.pageCount,
+          message: `El material ${params.id} tiene ${error.pageCount} páginas; ${error.page} está fuera de rango.`
+        })))
+      ));
   })
 );
 
