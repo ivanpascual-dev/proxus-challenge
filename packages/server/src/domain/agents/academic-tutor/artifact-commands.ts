@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { RateLimited } from "@proxus/shared";
 import * as AgentCli from "../harness/index.ts";
 import {
   Artifact,
@@ -14,6 +15,7 @@ import {
   SubmitAttemptInput,
   type ArtifactRepository
 } from "../../artifacts/artifact.ts";
+import type { RateLimiter } from "../../limits/rate-limiter.ts";
 
 const UnknownFromJson = Schema.fromJsonString(Schema.Unknown);
 const SubmitAttemptInputFromJson = Schema.fromJsonString(SubmitAttemptInput);
@@ -21,7 +23,7 @@ const SubmitAttemptInputFromJson = Schema.fromJsonString(SubmitAttemptInput);
 const renderArtifact = (artifact: Artifact) => JSON.stringify(artifact, null, 2);
 const renderAttempt = (attempt: ArtifactAttempt) => JSON.stringify(attempt, null, 2);
 
-const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch | ArtifactRepositoryStorageError | ArtifactRepositorySerializationError) => {
+const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch | ArtifactRepositoryStorageError | ArtifactRepositorySerializationError | RateLimited) => {
   switch (error._tag) {
     case "ArtifactNotFound":
       return `Artifact not found: ${error.artifactId}`;
@@ -37,6 +39,8 @@ const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | Artifac
       return `Artifact repository storage error: ${String(error.reason)}`;
     case "ArtifactRepositorySerializationError":
       return renderSerializationError(error.reason);
+    case "RateLimited":
+      return error.message;
   }
 };
 
@@ -108,7 +112,11 @@ const decodeSubmitAttemptInput = (json: string) =>
     Effect.mapError((reason) => new ArtifactRepositorySerializationError({ reason }))
   );
 
-export const makeArtifactCommands = (repository: ArtifactRepository) => {
+export const makeArtifactCommands = (
+  repository: ArtifactRepository,
+  rateLimiter: RateLimiter,
+  clientKey: string
+) => {
   const list = AgentCli.Command.withExamples([
     { command: "artifacts list", description: "List all saved artifacts" },
     { command: "artifacts list quiz", description: "List quiz artifacts only" }
@@ -161,7 +169,8 @@ export const makeArtifactCommands = (repository: ArtifactRepository) => {
           AgentCli.Argument.withDescription("CreateArtifactInput JSON")
         )
       }, ({ json }) =>
-        decodeCreateArtifactInput(json).pipe(
+        rateLimiter.check(clientKey, "artifacts").pipe(
+          Effect.andThen(() => decodeCreateArtifactInput(json)),
           Effect.andThen((input) => repository.createArtifact(input)),
           Effect.map(renderArtifact),
           Effect.catch((error) => Effect.succeed(renderArtifactError(error)))

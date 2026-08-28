@@ -3,9 +3,9 @@ import {
   MaterialNotFound,
   MaterialRepository,
   MaterialRepositoryError,
-  type MaterialPageImages,
   type MaterialRepository as MaterialRepositoryType,
-  type PdfMaterial
+  type PdfMaterial,
+  type RenderedPage
 } from "../../domain/materials/material.ts";
 import { PdfService } from "../../domain/materials/pdf-service.ts";
 
@@ -69,30 +69,22 @@ export const FileMaterialRepository = {
       Effect.map((file) => file.material)
     );
 
-    const renderPages = (
+    const renderPage = (
       id: string,
-      pages: readonly number[]
-    ): Effect.Effect<MaterialPageImages, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
+      page: number
+    ): Effect.Effect<RenderedPage, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
       const file = yield* getFile(id);
-      const invalidPage = pages.find((page) => page < 1 || page > file.material.pageCount);
-      if (invalidPage !== undefined) {
+      if (page < 1 || page > file.material.pageCount) {
         return yield* new MaterialRepositoryError({
-          reason: `Page ${invalidPage} is outside 1-${file.material.pageCount} for material ${id}`
+          reason: `Page ${page} is outside 1-${file.material.pageCount} for material ${id}`
         });
       }
 
-      const images = yield* Effect.forEach(pages, (page) => pdf.renderPage({ path: file.path, page }).pipe(
-        Effect.mapError(mapError)
-      ), { concurrency: 1 });
-
-      return {
-        type: "material-page-images" as const,
-        material: file.material,
-        pages: images
-      };
+      const image = yield* pdf.renderPage({ path: file.path, page }).pipe(Effect.mapError(mapError));
+      return { material: file.material, image };
     });
 
-    return { list, get, renderPages };
+    return { list, get, renderPage };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };
