@@ -59,11 +59,6 @@ export const MaterialIndex = Schema.Struct({
 });
 export type MaterialIndex = typeof MaterialIndex.Type;
 
-// La entrada de índice de una página: indexada (con su procedencia) o no indexada (con su motivo).
-// La invariante 8: el texto indexado no es la verdad, la página sí, y de dónde salió se ve.
-export const MaterialPageEntry = Schema.Union([IndexedPage, UnindexedPage]);
-export type MaterialPageEntry = typeof MaterialPageEntry.Type;
-
 // Eventos del stream NDJSON de POST /materials/:id/index. `page` es null en la fase de temas.
 export const MaterialIndexStreamEvent = Schema.Union([
   Schema.Struct({

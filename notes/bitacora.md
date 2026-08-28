@@ -138,3 +138,23 @@ y diferir el resto a la fase 4 con nota en `NOTES.md`.
   fixture de PDF con orden hostil dentro, así que B9 sale "no concluyente" siempre.
 - **Deuda:** el esquema del índice no lleva número de versión; un cambio de esquema invalida los
   índices archivados en silencio y hace fallar el listado. Hoy la invalidación es manual.
+
+## 2026-08-28 · Fase 1 · cierre de la deriva de `@fiel-al-plan`
+
+`@fiel-al-plan` dio ⚠️ DERIVA (sin contrato roto). Se cierra lo que marcó:
+
+- **F1-09 (la interfaz no leía `LIMITS`):** `Chat.tsx` importa `LIMITS`, pinta el contador de caracteres
+  contra `maxMessageCharacters` (rojo y `Send` deshabilitado al pasarse; el servidor sigue siendo quien
+  rechaza en voz alta, F1-02) y manda `maxSteps: LIMITS.maxAgentSteps` en vez del `8` escrito a mano.
+- **`orDie` en handlers nuevos:** `MaterialRepositoryError` (fallo de disco) se mapea a
+  `MaterialStorageError` **declarado**, 500 con cuerpo y motivo, en los handlers `index` y `page`.
+  Nuevo error en `packages/shared/src/errors/material-errors.ts`. Se retira `MaterialPageEntry` (muerto
+  desde que `pages/:page` devuelve solo `PageImage`).
+- **Plan desincronizado:** §4.14 y §4.15 reciben su nota "Actualizado sobre la marcha" (tercer endpoint
+  NDJSON, `pages/:page` sin índice, visor como scroll continuo), y las filas de §8 dejan de citar
+  `SETS.pdf` y "entrada de índice en la misma respuesta".
+- **Barrido real (paso 21):** corrido sobre los **3 PDFs** del corpus actual (Psicología Social,
+  A4 de texto; `LIMITS.maxMaterials: 5`). 33 páginas, **todas `extracted`, 0 llamadas de transcripción**,
+  1 llamada de temas por material (3 en total), 0 páginas fallidas. El camino de extracción se come el
+  corpus entero: el gasto de modelo del barrido es 3 llamadas. Índices archivados por `sha256` en
+  `.data/materials/index/`.

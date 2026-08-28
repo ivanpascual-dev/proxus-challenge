@@ -1,5 +1,5 @@
 import { useAtomRefresh } from "@effect/atom-react";
-import type { AgentMessage } from "@proxus/shared";
+import { LIMITS, type AgentMessage } from "@proxus/shared";
 import { useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
@@ -23,9 +23,13 @@ export function Chat() {
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
 
+  // El techo lo impone el servidor en voz alta (F1-02); el contador es la cortesía que evita mandar
+  // un mensaje que ya se sabe que va a rebotar. La cifra sale de LIMITS, nunca escrita a mano (F1-09).
+  const overMessageLimit = input.length > LIMITS.maxMessageCharacters;
+
   const submit = async (nextInput: string) => {
     const trimmed = nextInput.trim();
-    if (trimmed.length === 0 || isSending) {
+    if (trimmed.length === 0 || isSending || trimmed.length > LIMITS.maxMessageCharacters) {
       return;
     }
 
@@ -37,7 +41,7 @@ export function Chat() {
       for await (const event of streamTutorMessage({
         input: trimmed,
         messages,
-        maxSteps: 8
+        maxSteps: LIMITS.maxAgentSteps
       })) {
         if (event.type === "done") {
           continue;
@@ -120,17 +124,30 @@ export function Chat() {
           void submit(input);
         }}
       >
-        <textarea
-          className="w-full resize-y rounded-2xl border border-border-strong bg-surface px-4 py-3 text-heading outline-none focus:border-transparent focus:ring-2 focus:ring-brand"
-          value={input}
-          onChange={(event) => setInput(event.currentTarget.value)}
-          placeholder="Ask your tutor something…"
-          rows={3}
-        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <textarea
+            className={`w-full resize-y rounded-2xl border bg-surface px-4 py-3 text-heading outline-none focus:border-transparent focus:ring-2 ${
+              overMessageLimit ? "border-danger focus:ring-danger" : "border-border-strong focus:ring-brand"
+            }`}
+            value={input}
+            onChange={(event) => setInput(event.currentTarget.value)}
+            placeholder="Ask your tutor something…"
+            rows={3}
+            aria-invalid={overMessageLimit}
+          />
+          <p
+            className={`self-end text-xs ${overMessageLimit ? "text-danger-ink" : "text-muted"}`}
+            aria-live="polite"
+          >
+            {overMessageLimit
+              ? `${input.length} / ${LIMITS.maxMessageCharacters} caracteres: pasa del máximo`
+              : `${input.length} / ${LIMITS.maxMessageCharacters}`}
+          </p>
+        </div>
         <button
-          className="self-end rounded-full border border-border-strong bg-surface px-5 py-3 text-heading hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
+          className="self-start rounded-full border border-border-strong bg-surface px-5 py-3 text-heading hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
           type="submit"
-          disabled={isSending || input.trim().length === 0}
+          disabled={isSending || input.trim().length === 0 || overMessageLimit}
         >
           {isSending ? "Thinking…" : "Send"}
         </button>

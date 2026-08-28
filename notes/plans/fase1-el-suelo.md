@@ -451,26 +451,45 @@ sigue intacto. Borrarlo por defecto sería tirar un reindexado ya pagado.
 **Progreso observable**: el servicio emite eventos de progreso (`página N de M`, camino usado) que el
 script imprime y que la interfaz muestra mientras el material esté indexándose.
 
-#### 4.14 Los dos endpoints nuevos
+#### 4.14 Los endpoints nuevos
+
+> **Actualizado sobre la marcha (2026-08-28).** Al construir el tramo 1B salieron dos cambios, los dos
+> documentados en [`notes/bitacora.md`](../bitacora.md):
+>
+> 1. Se añade un **tercer endpoint**, `POST /materials/:id/index` (ruta NDJSON manual, mismo patrón que
+>    el stream del chat), para disparar la indexación desde la web con progreso página a página. Lo pide
+>    el paso 22 y el criterio F1-16, y en la fase 4 la subida llamará a ese mismo endpoint. Su error
+>    declarado es `MaterialIndexingFailed`.
+> 2. `GET /materials/:id/pages/:page` devuelve **solo `PageImage`**, no `{ image, entry }`, y **no exige
+>    índice** (se quita el 409): ver el PDF va antes de indexarlo (F1-17). La procedencia se sigue
+>    viendo, pintada en la web a partir de `materialIndexQuery`. Se eliminan `getPageView`,
+>    `MaterialPageView` y `MaterialPageEntry`.
+> 3. `MaterialRepositoryError` (fallo de disco) se mapea a un `MaterialStorageError` **declarado**, 500
+>    con cuerpo y motivo, en los handlers `index` y `page`: ningún `orDie` mudo en handler nuevo.
 
 En `packages/shared/src/api/materials.ts`, **con sus errores declarados** (ADR-005, invariante 6: nada
 de `orDie` en handlers nuevos):
 
 | Endpoint | Devuelve | Errores declarados |
 | --- | --- | --- |
-| `GET /materials/:id/index` | `MaterialIndex` sin imágenes | `MaterialNotFound` (404), `MaterialNotIndexed` (409) |
-| `GET /materials/:id/pages/:page` | `{ image: PageImage, entry: IndexedPage \| UnindexedPage }` | `MaterialNotFound` (404), `PageOutOfRange` (400), `MaterialNotIndexed` (409) |
+| `GET /materials/:id/index` | `MaterialIndex` sin imágenes | `MaterialNotFound` (404), `MaterialNotIndexed` (409), `MaterialStorageError` (500) |
+| `GET /materials/:id/pages/:page` | `PageImage` | `MaterialNotFound` (404), `PageOutOfRange` (400), `MaterialStorageError` (500) |
+| `POST /materials/:id/index` (NDJSON) | stream de progreso, `MaterialIndex` al terminar | `MaterialNotFound` (404), `MaterialIndexingFailed` (500) |
 
 El visor de página **no consume presupuesto de turno**: el presupuesto acota lo que gasta el agente, y
 esto es una persona pulsando un botón. El techo que sí aplica es el de frecuencia.
 
 #### 4.15 El visor en la web
 
-Se abre la página desde donde haya una cita. Muestra el render y, junto a él, **de dónde salió el texto
-indexado**: extraído del PDF o transcrito por el modelo. Es la invariante 8 hecha interfaz: el texto
-indexado no es la verdad, la página sí, y el lector tiene que poder comprobarlo. Un atom nuevo en
-`domain/materials/atoms.ts`, siguiendo el patrón de `domain/artifacts/atoms.ts`, con sus cuatro estados
-(cargando, vacío, error, con datos).
+> **Actualizado sobre la marcha (2026-08-28).** Tras probar el tramo 1B, Iván pidió el visor como
+> **scroll continuo de todas las páginas** (como un PDF), en dos pestañas junto al mapa mental de temas,
+> no una página suelta abierta desde una cita. La procedencia se muestra como **marca ámbar en la
+> esquina** de las páginas transcritas y **banda roja** en las fallidas, no como texto indexado ni
+> rejilla de puntos. La invariante 8 se mantiene: la imagen real está delante y lo transcrito por el
+> modelo se señala. Contexto en [`notes/bitacora.md`](../bitacora.md).
+
+Un atom nuevo en `domain/materials/atoms.ts`, siguiendo el patrón de `domain/artifacts/atoms.ts`, con
+sus cuatro estados (cargando, vacío, error, con datos).
 
 #### 4.16 El fixture sintético
 
@@ -703,16 +722,16 @@ pnpm test
 | `F1-04` | `pnpm --filter @proxus/server run agent:tutor "muéstrame las páginas 1-1000 de SETS"`. El agente tiene que recibir un rechazo que nombre el techo de 20 y las 1000 pedidas, y **ninguna página renderizada** |
 | `F1-05`, `F1-06` | Test de `planRender` con una lista cuyos tamaños acumulados cruzan los 12 MB en la página 14. El aviso tiene que decir 14 y 20. Y a mano: pedir dos veces 15 páginas en el mismo turno; la segunda vez el agente recibe el aviso de presupuesto |
 | `F1-07`, `F1-08` | Tests del `RateLimiter` con reloj inyectado. A mano: 21 mensajes seguidos, el 21 da 429 con `retryAfterMs` |
-| `F1-09` | `grep -rn "2000\|maxMessage" packages/web/src` tiene que llevar a `LIMITS`, no a un número escrito a mano |
+| `F1-09` | `grep -rn "maxMessageCharacters\|maxAgentSteps" packages/web/src` lleva a `Chat.tsx`, que importa `LIMITS`: el contador y el `maxSteps` salen de ahí, ninguna cifra escrita a mano |
 | `F1-10`, `F1-11` | `pnpm index:materials` sobre el fixture sintético. Páginas 2 y 4 → `extracted`; 1 y 3 → `transcribed`. Y test unitario de `classifyPage` con 599 y 601 |
-| `F1-12` | Abrir en la web una página transcrita y una extraída del corpus real: la procedencia se ve en las dos |
+| `F1-12` | Abrir el fixture `densidad.pdf` en la web: las páginas 1 y 3 (transcritas) llevan marca ámbar, la 2 y la 4 (extraídas) no. Y un material real indexado: sus páginas extraídas no llevan marca |
 | `F1-13` | Test: se fuerza un fallo del modelo en una página y se comprueba que va a `failedPages` con motivo y **no** a `pages` con texto vacío |
 | `F1-14` | Tres pruebas, una por dirección. **(a)** Editar un PDF ya indexado: `GET /materials/:id/index` responde `MaterialNotIndexed`, no el índice viejo. **(b)** `touch` sobre un PDF ya indexado: el índice **se sigue sirviendo** y no se reindexa nada, porque el contenido no cambió. **(c)** Renombrar el PDF: el índice se encuentra al instante con el id nuevo, cero páginas al modelo |
-| `F1-15` | `pnpm index:materials` sobre `Psicologia Social Tema 1`: el índice trae entre 3 y 40 temas, ninguna página con contenido queda sin tema, y **ningún `label` traduce vocabulario del material** (revisión a ojo, y es invariante 1) |
+| `F1-15` | `pnpm index:materials` sobre `Psicologia Social Tema 1`: el índice trae entre 3 y 40 temas en jerarquía de dos niveles, ninguna página con contenido queda sin tema, y **ningún `label` traduce vocabulario del material** (revisión a ojo, y es invariante 1) |
 | `F1-16` | Borrar `.data/materials/index/` y abrir la web: cada material dice "sin indexar", con su acción para indexarlo, **y esa información viene del propio `list`**, sin una petición por material. Ninguno enseña un índice vacío |
-| `F1-17` | `curl localhost:3000/api/materials/SETS/pages/11` devuelve imagen y entrada de índice en la misma respuesta |
+| `F1-17` | `curl localhost:3000/api/materials/<id>/pages/11` devuelve la imagen renderizada, esté el material indexado o no |
 | `F1-18`, `F1-19` | `curl .../pages/9999` → 400 con el rango válido. `curl .../materials/no-existe/pages/1` → 404. **Ninguno 500** |
-| `F1-20` | `file` sobre la imagen devuelta: 2048×1152 para `SETS.pdf`, 1152×1630 para el A4. Y test unitario de `renderDpi` |
+| `F1-20` | `file` sobre la imagen devuelta: lado corto 1152 px sea cual sea el tamaño físico de la página (los PDF del corpus son A4: 1152×1630). Y test unitario de `renderDpi` |
 | `F1-21`, `F1-22` | Cambiar la preferencia del sistema y recargar: arranca en ese tema. Pulsar el control: cambia sin recargar. Recargar: se mantiene |
 | `F1-23` | El `grep` de clases de color literales de la sección 3 devuelve **0**. Hoy devuelve 138 |
 | `F1-24` | Medidor de contraste sobre texto/fondo, texto/superficie y texto/acento en los dos temas. AA o se ajusta el token |

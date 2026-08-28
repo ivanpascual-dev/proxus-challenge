@@ -4,6 +4,7 @@ import { HttpServerRequest } from "effect/unstable/http";
 import {
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
+  MaterialStorageError as ApiMaterialStorageError,
   PageOutOfRange as ApiPageOutOfRange,
   ProxusApi
 } from "@proxus/shared";
@@ -54,6 +55,13 @@ const notIndexed = (materialId: string) =>
     message: `El material ${materialId} no está indexado. Pulsa "Indexar" para construir su índice.`
   });
 
+// El almacenamiento falló al leer. 500, pero con cuerpo y motivo: nada de orDie mudo (invariante 6).
+const storageError = (materialId: string, reason: unknown) =>
+  new ApiMaterialStorageError({
+    materialId,
+    message: `No se pudo leer el material ${materialId} del almacenamiento: ${String(reason)}`
+  });
+
 export const MaterialsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
   "materials",
@@ -70,7 +78,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
       ))
       .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
-        Effect.catchTag("MaterialRepositoryError", Effect.die),
+        Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
         Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id)))
       ))
@@ -87,7 +95,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         const { image } = yield* materials.renderPage(params.id, params.page);
         return image;
       }).pipe(
-        Effect.catchTag("MaterialRepositoryError", Effect.die),
+        Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
       ));
   })
