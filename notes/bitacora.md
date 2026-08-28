@@ -33,3 +33,30 @@ Una entrada por sesión, no por commit. Si ya hay entrada de hoy, se añade una 
 ```
 
 ---
+
+## 2026-08-28 · Fase 1 · tramo 1A
+
+- **Desviación:** `@proxus/shared` se añadió como `devDependency` de la raíz (`package.json`) y se corrió
+  `pnpm install`. El plan no lo contemplaba. Sin ello, `scripts/test-guardarrailes.mjs` no resolvía
+  `@proxus/shared` desde la raíz y caía siempre al respaldo hardcodeado del ADR-007: el punto de control
+  del paso 10 validaba cifras fijas, no las de `LIMITS`.
+- **Causa raíz:** el campo `error` de `HttpApiEndpoint` quiere un array de esquemas, no un
+  `Schema.Union`. Con `Schema.Union([...])` el servidor devolvía 500 en vez de 400/429; se vio probando
+  contra el servidor real, no en el typecheck. La forma que funciona es
+  `error: [LimitExceeded.pipe(HttpApiSchema.status(400)), RateLimited.pipe(HttpApiSchema.status(429))]`.
+- **Desviación:** en `packages/web/src/styles.input.css` el `@import` de Google Fonts va **antes** de
+  `@import "tailwindcss"`, al revés que el texto literal de la sección 6.3 del plan. Si no, el
+  minificador de Tailwind avisa de `@import` mal situado. Cambio mecánico, sin efecto visual.
+- **Desviación:** se añadieron dos tokens fuera de la paleta de la sección 6.3, `--color-success-ink` y
+  `--color-danger-ink`. Medido: `--color-success` y `--color-danger` como texto sobre superficie clara
+  dan 2.28:1 y 3.76:1, por debajo de AA. F1-24 autoriza ajustar el token cuando falla; se dejaron
+  `success`/`danger`/`warning` intactos (bordes e insignias, donde basta 3:1) y se añadieron las
+  variantes de texto. El override de tema oscuro reusa el verde/rojo claro que la app ya usaba.
+- **Desviación:** se quitó `shadow-slate-950/30` sin sustituto (queda `shadow-2xl` con el negro por
+  defecto de Tailwind). Una sombra no debe aclararse en tema claro y ningún token de la paleta encaja
+  como color de sombra.
+- **Desviación:** el puerto `MaterialRepository.renderPages` (lote) se sustituyó por `renderPage` (una
+  página), con el error de página fuera de rango pasando de `MaterialRepositoryError` a comprobación
+  por página. La sección 4.5 del plan pedía renderizado incremental para que el presupuesto de turno
+  pare entre página y página, pero no tocaba la firma del puerto; sin el cambio de firma no se puede
+  parar antes de renderizar el resto.
