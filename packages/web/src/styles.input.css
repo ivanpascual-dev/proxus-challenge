@@ -1,11 +1,67 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+
+/* El tema es manual (atributo, no solo prefers-color-scheme), así que dark: se redefine para
+   seguir el mismo atributo que usan los tokens de @theme, no el media query por defecto. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @source "./**/*.{ts,tsx,html}";
 @source "../node_modules/streamdown/dist/*.js";
 
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  /* Marca */
+  --color-brand:            #793EF9;
+  --color-brand-strong:     #9900A1;
+  --color-brand-soft:       #EAD9FF;
+  --color-on-brand:         #FFFFFF;
+
+  /* Superficies, tema claro */
+  --color-canvas:           #F8FAFC;
+  --color-surface:          #FFFFFF;
+  --color-surface-muted:    #F3F4F6;
+  --color-border:           #E5E7EB;
+  --color-border-strong:    #D1D5DB;
+
+  /* Texto, tema claro */
+  --color-heading:          #111827;
+  --color-body:             #1F2937;
+  --color-muted:            #6B7280;
+  --color-disabled:         #9CA3AF;
+
+  /* Semánticos */
+  --color-success:          #22C55E;
+  --color-danger:           #EF4444;
+  --color-warning:          #FF9800;
+  --color-accent-gold:      #D4AF37;
+
+  /* Texto en success/danger: --color-success y --color-danger, medidos como texto sobre
+     canvas/surface, no llegan a 3:1 en el tema claro (2.28:1 y 3.76:1). F1-24 permite ajustar el
+     token cuando falla AA: estos dos son invariantes de tema, igual que success/danger/warning. */
+  --color-success-ink:      #15803D;
+  --color-danger-ink:       #B91C1C;
+}
+
 @layer base {
-  :root {
+  :root { color-scheme: light; }
+
+  :root[data-theme="dark"] {
     color-scheme: dark;
+    --color-canvas:        #0B1020;
+    --color-surface:       #131A2E;
+    --color-surface-muted: #1B2439;
+    --color-border:        #2A3350;
+    --color-border-strong: #3A4665;
+    --color-heading:       #F8FAFC;
+    --color-body:          #E2E8F0;
+    --color-muted:         #94A3B8;
+    --color-disabled:      #64748B;
+    --color-brand:         #A67CFF;
+    --color-brand-soft:    #2B1E4D;
+    --color-on-brand:      #0B1020;
+    --color-success-ink:   #A7F3D0;
+    --color-danger-ink:    #FECACA;
   }
 
   body {
