@@ -191,6 +191,10 @@ comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno
 - **La jerarquía de temas depende del criterio del modelo.** El saneador garantiza que el árbol es
   válido (sin ciclos, sin referencias colgantes, dos niveles como mucho), no que el reparto de subtemas
   sea el que haría un profesor.
+- **El `typecheck:root` de la plantilla nunca pasó y lo quité.** `tsc --noEmit` desde la raíz usaba el
+  `tsconfig` base (el que extienden los paquetes), que no fija `jsx`, así que barría `packages/web` y
+  reventaba con 206 errores de JSX desde el commit inicial. No hay ningún `.ts` en la raíz fuera de
+  `packages/`, de modo que no cubría nada que `pnpm -r typecheck` (los 4 paquetes) no cubra ya.
 
 ### Cómo lo evalúo
 

@@ -8,7 +8,6 @@
     "dev": "pnpm --parallel --filter @proxus/server --filter @proxus/web run dev",
     "prepare": "effect-language-service patch",
     "typecheck": "pnpm -r typecheck",
-    "typecheck:root": "tsc --noEmit",
     "test": "node --import tsx --test \"packages/*/src/**/*.test.ts\"",
     "test:guardarrailes": "node --import tsx scripts/test-guardarrailes.mjs",
     "fixture:materials": "node packages/server/fixtures/make-fixture.mjs",
