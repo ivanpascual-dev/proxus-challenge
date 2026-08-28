@@ -44,6 +44,7 @@ Este fichero existe solo porque Claude Code lee `CLAUDE.md` y otros agentes leen
 | --------------- | ------ |
 | `@git-commit`   | Siempre, antes de cualquier commit |
 | `@fiel-al-plan` | A mitad de fase, cuando la deriva ya no se ve desde dentro. No espera al OK de fin de fase |
+| `@guardarrailes` | Se ha tocado el tutor (prompt, comandos, adaptador de Gemini o endpoint), o antes de cerrar una fase que lo toque |
 
 **El ciclo de una fase:** `fase` (decidir) → `ejecutar-fase` (construir, con commits por el camino) →
 **Iván la prueba y la da por terminada** → `proxus-verifier` (cerrar).

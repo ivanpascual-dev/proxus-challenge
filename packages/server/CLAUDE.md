@@ -24,6 +24,12 @@ para cualquier repositorio nuevo.
   `pdftoppm`, el servidor no levanta. No lo conviertas en un aviso.
 - **`.data/` no se sube nunca.** Ni apuntes, ni artefactos generados, ni imágenes de páginas.
 - **Cada `renderPage` lanza un proceso.** Si algo va a pedir páginas en bucle, se cachea antes.
+- **El adaptador de Gemini vivo es `domain/agents/gemini.ts`.** `packages/ai-google` está en las
+  dependencias de este paquete (`package.json:16`) y **ningún `.ts` lo importa**: si acabas editando
+  ahí, estás en el fichero equivocado. En `gemini.ts:124-154` está el `switch` que traduce los
+  parámetros de cada herramienta a mano, con un `default` que devuelve la firma del agente de sumar
+  (`{ a, b }`). Por eso las capacidades nuevas son comandos del CLI y no herramientas nuevas
+  (`docs/decisiones.md`, ADR-004).
 
 ## Dónde está el resto
 
