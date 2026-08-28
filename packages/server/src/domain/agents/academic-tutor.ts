@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect";
+import { Console, Effect, Layer, Ref, Stream } from "effect";
 import { Model as AiModel } from "effect/unstable/ai";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { SessionRepository, AgentHarness, AgentSession } from "./harness/index.ts";
@@ -7,15 +7,22 @@ import { FileSessionRepository } from "../../infra/agents/file-session-repositor
 import { MaterialRepository } from "../materials/material.ts";
 import { ArtifactRepository } from "../artifacts/artifact.ts";
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
+import { FileMaterialIndexRepository } from "../../infra/materials/file-material-index-repository.ts";
+import { IndexingServiceLive } from "../materials/indexing-service.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
 import { makeArtifactCommands } from "./academic-tutor/artifact-commands.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills/index.ts";
+import { initialTurnBudgetState, type TurnBudgetState } from "../limits/turn-budget.ts";
+import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limiter.ts";
 
 export const makeAcademicTutorHarness = (
   materialRepository: MaterialRepository,
-  artifactRepository: ArtifactRepository
+  artifactRepository: ArtifactRepository,
+  budgetRef: Ref.Ref<TurnBudgetState>,
+  rateLimiter: RateLimiter,
+  clientKey: string
 ) => AgentHarness.make({
   name: `You are an academic tutor agent.
 
@@ -23,8 +30,8 @@ You help students understand academic material, especially their uploaded PDF ma
 Be precise, pedagogical, and honest about what you can infer from the available materials.`,
   skills: AcademicTutorSkills,
   commands: [
-    makeMaterialCommands(materialRepository),
-    makeArtifactCommands(artifactRepository)
+    makeMaterialCommands(materialRepository, budgetRef),
+    makeArtifactCommands(artifactRepository, rateLimiter, clientKey)
   ]
 });
 
@@ -40,7 +47,9 @@ export const academicTutorAgent = Effect.gen(function* () {
     Effect.catchTag("SessionNotFound", () => sessionRepository.makeSession({ id: sessionId }))
   );
 
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository);
+  const budgetRef = yield* Ref.make(initialTurnBudgetState);
+  const rateLimiter = yield* makeRateLimiter();
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, budgetRef, rateLimiter, sessionId);
   const session = AgentSession.make(harness);
 
   console.log(`Provider: ${provider}`);
@@ -84,6 +93,8 @@ export const academicTutorAgent = Effect.gen(function* () {
     ),
     FileMaterialRepository.layer(".data/materials/pdfs").pipe(
       Layer.provide(PopplerPdfService.layer),
+      Layer.provide(FileMaterialIndexRepository.layer(".data/materials/index")),
+      Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer), Layer.provide(NodeServices.layer))),
       Layer.provide(NodeServices.layer)
     ),
     FileArtifactRepository.layer(".data/artifacts").pipe(

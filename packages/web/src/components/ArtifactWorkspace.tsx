@@ -29,12 +29,12 @@ export function ArtifactWorkspace({ artifactId }: ArtifactWorkspaceProps) {
 
 function EmptyWorkspace() {
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
-      <div className="grid h-full place-items-center rounded-3xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center">
+    <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+      <div className="grid h-full place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-8 text-center">
         <div>
-          <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">Practice workspace</p>
-          <h2 className="text-balance font-bold text-3xl text-slate-100">Select a note, quiz, or test from the sidebar.</h2>
-          <p className="mt-3 max-w-xl text-slate-400">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
+          <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Practice workspace</p>
+          <h2 className="text-balance font-bold text-3xl text-heading">Select a note, quiz, or test from the sidebar.</h2>
+          <p className="mt-3 max-w-xl text-muted">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
         </div>
       </div>
     </main>
@@ -45,11 +45,11 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
   const artifact = useAtomValue(artifactQuery(artifactId));
 
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+    <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       {AsyncResult.matchWithError(artifact, {
-        onInitial: () => <p className="text-slate-400">Loading artifact…</p>,
-        onError: (error) => <p className="text-red-200">{String(error)}</p>,
-        onDefect: (defect) => <p className="text-red-200">{String(defect)}</p>,
+        onInitial: () => <p className="text-muted">Loading artifact…</p>,
+        onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
+        onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
         onSuccess: ({ value }) => <ArtifactContent artifact={value} />
       })}
     </main>
@@ -68,10 +68,10 @@ function ArtifactContent({ artifact }: { readonly artifact: Artifact }) {
 
 function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "note" }> }) {
   return (
-    <article className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-slate-950/30">
-      <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">Note</p>
-      <h2 className="mb-6 font-bold text-3xl text-slate-100">{artifact.title}</h2>
-      <div className="prose prose-invert max-w-none">
+    <article className="mx-auto max-w-4xl rounded-3xl border border-border bg-surface p-6 shadow-2xl">
+      <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Note</p>
+      <h2 className="mb-6 font-bold text-3xl text-heading">{artifact.title}</h2>
+      <div className="prose dark:prose-invert max-w-none">
         <Streamdown>{artifact.markdown}</Streamdown>
       </div>
     </article>
@@ -115,10 +115,10 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
 
   return (
     <article className="mx-auto max-w-4xl">
-      <header className="mb-5 rounded-3xl border border-slate-800 bg-slate-900 p-6">
-        <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">{artifact.kind}</p>
-        <h2 className="font-bold text-3xl text-slate-100">{artifact.title}</h2>
-        <p className="mt-2 text-slate-400">Answer every question, submit, and review your corrections.</p>
+      <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
+        <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">{artifact.kind}</p>
+        <h2 className="font-bold text-3xl text-heading">{artifact.title}</h2>
+        <p className="mt-2 text-muted">Answer every question, submit, and review your corrections.</p>
       </header>
 
       <div className="grid gap-4">
@@ -135,21 +135,21 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
         ))}
       </div>
 
-      {error !== undefined && <p className="mt-4 rounded-2xl border border-red-900 bg-red-950/50 p-4 text-red-100">{error}</p>}
+      {error !== undefined && <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>}
 
       {attempt?.status === "graded" && <AttemptSummary attempt={attempt} />}
 
-      <footer className="sticky bottom-0 mt-6 rounded-3xl border border-slate-800 bg-slate-950/95 p-4 backdrop-blur">
+      <footer className="sticky bottom-0 mt-6 rounded-3xl border border-border bg-canvas/95 p-4 backdrop-blur">
         {attempt === null
           ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-slate-400 text-sm">
+                <p className="text-muted text-sm">
                   {unansweredQuestions.length === 0
                     ? "Ready to submit."
                     : `${unansweredQuestions.length} question${unansweredQuestions.length === 1 ? "" : "s"} unanswered.`}
                 </p>
                 <button
-                  className="rounded-full bg-sky-400 px-5 py-2 font-semibold text-slate-950 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                   disabled={unansweredQuestions.length > 0 || isSubmitting}
                   onClick={submit}
@@ -160,9 +160,9 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
             )
           : (
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold text-emerald-200">Attempt graded.</p>
+                <p className="font-semibold text-success-ink">Attempt graded.</p>
                 <button
-                  className="rounded-full border border-slate-700 px-5 py-2 text-slate-200 hover:border-sky-400"
+                  className="rounded-full border border-border-strong px-5 py-2 text-body hover:border-brand"
                   type="button"
                   onClick={() => {
                     setAnswers({});
@@ -195,11 +195,11 @@ function QuestionCard({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
+    <section className="rounded-3xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-2 text-slate-400 text-sm">Question {index + 1} · {question.type}</p>
-          <h3 className="font-semibold text-lg text-slate-100">{question.prompt}</h3>
+          <p className="mb-2 text-muted text-sm">Question {index + 1} · {question.type}</p>
+          <h3 className="font-semibold text-lg text-heading">{question.prompt}</h3>
         </div>
         {correction !== undefined && <CorrectionBadge correction={correction} />}
       </div>
@@ -212,7 +212,7 @@ function QuestionCard({
       )}
       {question.type === "short-answer" && (
         <textarea
-          className="min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 outline-none focus:border-sky-400 disabled:opacity-70"
+          className="min-h-32 w-full rounded-2xl border border-border-strong bg-canvas p-3 text-heading outline-none focus:border-brand disabled:opacity-70"
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.currentTarget.value)}
@@ -239,7 +239,7 @@ function MultipleChoiceInput({
   return (
     <div className="grid gap-2">
       {question.options.map((option) => (
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 hover:border-sky-500" key={option.id}>
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand" key={option.id}>
           <input
             type="radio"
             name={question.id}
@@ -270,7 +270,7 @@ function TrueFalseInput({
         ["true", "True"],
         ["false", "False"]
       ] as const).map(([nextValue, label]) => (
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 hover:border-sky-500" key={nextValue}>
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand" key={nextValue}>
           <input
             type="radio"
             name={`true-false-${label}`}
@@ -288,21 +288,21 @@ function TrueFalseInput({
 
 function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt, { readonly status: "graded" }> }) {
   return (
-    <section className="mt-6 rounded-3xl border border-emerald-900 bg-emerald-950/30 p-5">
-      <p className="font-bold text-emerald-200 text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
-      <p className="mt-1 text-emerald-100/80">{attempt.summary}</p>
+    <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
+      <p className="font-bold text-success-ink text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
+      <p className="mt-1 text-success-ink">{attempt.summary}</p>
     </section>
   );
 }
 
 function CorrectionBadge({ correction }: { readonly correction: QuestionCorrection }) {
   if (correction.questionType === "short-answer") {
-    return <span className="rounded-full bg-sky-950 px-3 py-1 font-semibold text-sky-200 text-sm">{correction.score}/{correction.maxScore}</span>;
+    return <span className="rounded-full bg-brand px-3 py-1 font-semibold text-on-brand text-sm">{correction.score}/{correction.maxScore}</span>;
   }
 
   return correction.correct
-    ? <span className="rounded-full bg-emerald-950 px-3 py-1 font-semibold text-emerald-200 text-sm">Correct</span>
-    : <span className="rounded-full bg-red-950 px-3 py-1 font-semibold text-red-200 text-sm">Review</span>;
+    ? <span className="rounded-full bg-success/20 px-3 py-1 font-semibold text-success-ink text-sm">Correct</span>
+    : <span className="rounded-full bg-danger/20 px-3 py-1 font-semibold text-danger-ink text-sm">Review</span>;
 }
 
 function CorrectionDetails({
@@ -313,21 +313,21 @@ function CorrectionDetails({
   readonly question: QuizQuestion | TestQuestion;
 }) {
   return (
-    <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm">
+    <div className="mt-4 rounded-2xl border border-border bg-canvas p-4 text-sm">
       {correction.questionType === "multiple-choice" && question.type === "multiple-choice" && (
         <>
-          <p className="text-slate-300">Correct answer: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
-          <p className="mt-2 text-slate-400">{correction.explanation}</p>
+          <p className="text-body">Correct answer: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
+          <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "true-false" && (
         <>
-          <p className="text-slate-300">Correct answer: <strong>{correction.correctAnswer ? "True" : "False"}</strong></p>
-          <p className="mt-2 text-slate-400">{correction.explanation}</p>
+          <p className="text-body">Correct answer: <strong>{correction.correctAnswer ? "True" : "False"}</strong></p>
+          <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "short-answer" && (
-        <p className="text-slate-300">{correction.feedback}</p>
+        <p className="text-body">{correction.feedback}</p>
       )}
     </div>
   );

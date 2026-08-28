@@ -5,7 +5,7 @@ import { isMaterialPageImages } from "../../materials/material.ts";
 import { AgentMessage, type AgentMessage as AgentMessageType } from "./message.ts";
 
 export interface AgentSessionRunOptions {
-  readonly maxSteps?: number;
+  readonly maxSteps: number;
 }
 
 export interface AgentSessionRunInput extends AgentSessionRunOptions {
@@ -77,7 +77,7 @@ function execute(
     yield* appendMessage(AgentMessage.user(input.input));
 
     let lastToolResult = "";
-    const maxSteps = input.maxSteps ?? 8;
+    const maxSteps = input.maxSteps;
 
     for (let step = 0; step < maxSteps; step++) {
       const prompt = renderPrompt(harness.systemPrompt, allMessages());
@@ -172,12 +172,13 @@ const renderMessage = (message: AgentMessageType): Prompt.MessageEncoded => {
     case "tool-result":
       if (!message.isFailure && isMaterialPageImages(message.result)) {
         const result = message.result;
+        const noticeText = result.notice === undefined ? "" : ` ${result.notice}`;
         return {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Tool result ${message.name}: rendered pages ${result.pages.map((page) => page.page).join(", ")} from ${result.material.title}.`
+              text: `Tool result ${message.name}: rendered pages ${result.pages.map((page) => page.page).join(", ")} from ${result.material.title}.${noticeText}`
             },
             ...result.pages.map((page) => ({
               type: "file" as const,

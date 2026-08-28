@@ -71,7 +71,7 @@ artifacts grade <attemptId>
 
 ```env
 GOOGLE_GENERATIVE_AI_API_KEY=...
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 ## Buenas prácticas al tocar AI

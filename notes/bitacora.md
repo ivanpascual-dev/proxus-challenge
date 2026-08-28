@@ -33,3 +33,161 @@ Una entrada por sesión, no por commit. Si ya hay entrada de hoy, se añade una 
 ```
 
 ---
+
+## 2026-08-28 · Fase 1 · tramo 1A
+
+- **Desviación:** `@proxus/shared` se añadió como `devDependency` de la raíz (`package.json`) y se corrió
+  `pnpm install`. El plan no lo contemplaba. Sin ello, `scripts/test-guardarrailes.mjs` no resolvía
+  `@proxus/shared` desde la raíz y caía siempre al respaldo hardcodeado del ADR-007: el punto de control
+  del paso 10 validaba cifras fijas, no las de `LIMITS`.
+- **Causa raíz:** el campo `error` de `HttpApiEndpoint` quiere un array de esquemas, no un
+  `Schema.Union`. Con `Schema.Union([...])` el servidor devolvía 500 en vez de 400/429; se vio probando
+  contra el servidor real, no en el typecheck. La forma que funciona es
+  `error: [LimitExceeded.pipe(HttpApiSchema.status(400)), RateLimited.pipe(HttpApiSchema.status(429))]`.
+- **Desviación:** en `packages/web/src/styles.input.css` el `@import` de Google Fonts va **antes** de
+  `@import "tailwindcss"`, al revés que el texto literal de la sección 6.3 del plan. Si no, el
+  minificador de Tailwind avisa de `@import` mal situado. Cambio mecánico, sin efecto visual.
+- **Desviación:** se añadieron dos tokens fuera de la paleta de la sección 6.3, `--color-success-ink` y
+  `--color-danger-ink`. Medido: `--color-success` y `--color-danger` como texto sobre superficie clara
+  dan 2.28:1 y 3.76:1, por debajo de AA. F1-24 autoriza ajustar el token cuando falla; se dejaron
+  `success`/`danger`/`warning` intactos (bordes e insignias, donde basta 3:1) y se añadieron las
+  variantes de texto. El override de tema oscuro reusa el verde/rojo claro que la app ya usaba.
+- **Desviación:** se quitó `shadow-slate-950/30` sin sustituto (queda `shadow-2xl` con el negro por
+  defecto de Tailwind). Una sombra no debe aclararse en tema claro y ningún token de la paleta encaja
+  como color de sombra.
+- **Desviación:** el puerto `MaterialRepository.renderPages` (lote) se sustituyó por `renderPage` (una
+  página), con el error de página fuera de rango pasando de `MaterialRepositoryError` a comprobación
+  por página. La sección 4.5 del plan pedía renderizado incremental para que el presupuesto de turno
+  pare entre página y página, pero no tocaba la firma del puerto; sin el cambio de firma no se puede
+  parar antes de renderizar el resto.
+
+## 2026-08-28 · Fase 1 · tramo 1B
+
+- **Hueco del plan (§4.14):** la sección solo listaba 2 GET, pero el paso 22 y F1-16 necesitan un modo
+  de disparar la indexación. Decisión con Iván: "botón por material con progreso en la web".
+  Implementado como `POST /api/materials/:id/index`, ruta NDJSON manual (mismo patrón que el stream del
+  chat), más `MaterialRepository.reindex` y el error `MaterialIndexingFailed`. En fase 4 la subida
+  llamará a ese mismo endpoint.
+- **Desviación (paso 16):** se quitó el parámetro `dpi?` de `renderPage` en el puerto `PdfService`.
+  Nadie lo pasaba y, con la regla del lado corto a 1152 px, ya no significa nada.
+- **Desviación (paso 21):** además de `--prune`, `pnpm index:materials` acepta `--prune-only`, para
+  poder podar índices huérfanos sin una pasada de indexación completa (que gasta modelo).
+- **Desviación (web, dos menores heredadas del patrón del chat):** `domain/materials/stream.ts` hace
+  `fetch` a una ruta escrita en string, porque las rutas NDJSON no están en la declaración `HttpApi` y
+  no se pueden derivar; y `ReindexPanel` refresca con `useAtomRefresh(materialsQuery)` en vez de por
+  etiqueta de reactividad, porque el stream no pasa por la capa que emite ese evento.
+  `domain/tutor/stream.ts` hace exactamente lo mismo.
+- **Desviación (test):** `render-scale.test.ts` tolera ±4 px en el lado corto, porque un dpi entero no
+  cae exacto en 1152. Poppler acierta 1152 con `-scale-to`; `renderDpi` es solo el enunciado "en dpi"
+  de la regla (F1-20), no lo que se ejecuta.
+
+## 2026-08-28 · Fase 1 · retoques de interfaz del material (tras probar el tramo 1B)
+
+Iván probó el tramo 1B y pidió cambios de interfaz que reabren piezas ya cerradas del plan
+`fase1-el-suelo.md`. Se anotan porque no se deducen del diff.
+
+- **Desviación (plan §6.2 y §17):** los temas dejan de ser una lista plana. `MaterialTopic` gana
+  `parentId` y el prompt de temas se reescribió para que el modelo emita una jerarquía de dos niveles.
+  Motivo: Iván quiere un mapa mental "con relaciones", no una nube de etiquetas. `normalizeTopicHierarchy`
+  (puro, con tests) sanea lo que devuelve el modelo: referencia colgante → raíz, ciclo → se rompe,
+  tres niveles → se aplana a dos. El cambio de esquema **invalida los índices archivados**: hay que
+  relanzar `pnpm index:materials`.
+- **Desviación (plan §22-23):** `GET /materials/:id/pages/:page` devolvía `MaterialPageView` (imagen +
+  entrada de índice juntas, "en la misma respuesta, invariante 8") y exigía índice (409). Ahora
+  devuelve solo `PageImage`, sin exigir índice. Motivo: ver el PDF va antes de indexarlo. La
+  procedencia se sigue viendo, pero pintada en la web a partir de `materialIndexQuery` (que ya se
+  carga para el mapa). Se eliminan `getPageView` y `MaterialPageView`.
+- **Desviación:** caché en disco de páginas renderizadas en `.data/materials/pages/<hash>-<n>.png`, no
+  contemplada en el plan. El visor continuo pide páginas en bucle y el `CLAUDE.md` de `packages/server`
+  obliga a cachear cualquier cosa que pida páginas así. Fallo al escribir la caché no tumba el render.
+- **Desviación (plan §24):** el visor humano ya no muestra el texto indexado ni la rejilla de páginas
+  con puntos de procedencia. Queda una marca ámbar "transcrito por el modelo" en la esquina de esas
+  páginas y una banda roja en las que fallaron. La procedencia completa sigue viajando al tutor por el
+  índice.
+- **Decisión sobre la marcha:** `LIMITS.maxMaterials: 5`. La subida es fase 4, así que hoy solo se
+  declara; la impondrá el endpoint de subida y se rechazará en voz alta (invariante 11).
+- **Deuda:** falta `@guardarrailes` antes de cerrar la fase, porque se ha reescrito un prompt del
+  modelo (el de temas).
+
+## 2026-08-28 · Fase 1 · cierre: `@guardarrailes` y paso 25
+
+`@guardarrailes` pasó con veredicto 🚨. Iván decidió arreglar en la fase lo que la fase abre o incumple
+y diferir el resto a la fase 4 con nota en `NOTES.md`.
+
+- **Cierre de hueco (invariante 11):** `LIMITS.modelCallTimeoutMs` estaba declarado desde el tramo 1A
+  y no se aplicaba en ningún sitio. Ahora el adaptador de Gemini (`gemini.ts`) envuelve el `fetch` en
+  `AbortSignal.any([signal, AbortSignal.timeout(...)])`. Cubre chat e indexación de una vez, porque
+  las dos pasan por el mismo `generateText`.
+- **Cierre de hueco (ADR-008 capa 4):** la petición a Gemini no enviaba `generationConfig`, así que
+  corría a `temperature` 1.0 y sin `maxOutputTokens`. Se añaden `LIMITS.modelTemperature` (0.2) y
+  `LIMITS.maxModelOutputTokens` (8.192), y se apunta en la tabla del ADR-007.
+- **Desviación:** `normalizeTopicHierarchy` gana un parámetro `pageCount` y descarta las páginas de un
+  tema fuera de `[1, pageCount]` (y los duplicados, y ordena). Un tema que se queda sin páginas
+  válidas se descarta entero. Antes un tema podía archivarse con `pages: [9999]` y la fase 2 habría
+  citado sobre eso sin que nada lo marcara (invariante 2).
+- **Decisión sobre la marcha:** el modelo por defecto pasa de `gemini-2.5-flash` a
+  `gemini-3.1-flash-lite` (Iván). `GEMINI_MODEL` del `.env` ya mandaba; esto solo cambia el valor si
+  no está puesto. No se ha verificado que ese ID exista en la API.
+- **Decisión sobre la marcha:** el check D3 de la batería (un `tool-result` fabricado por el cliente se
+  acepta) pasa de `hard` a `knownGap` en `test-guardarrailes.mjs`: se sigue enseñando fallando pero no
+  tumba el script. La decisión 9 del plan ya lo difería a la fase 4; el paso 10 mandaba anotarlo y no
+  se había hecho. Anotado en `NOTES.md` §5.
+- **Deuda (fase 4):** envolver el material y el texto de página con delimitador de datos en
+  `topicsPrompt` y `TRANSCRIPTION_PROMPT` (ADR-008 barrera 8). El tutor revela los nombres de sus
+  herramientas ante pregunta directa (check B4), pendiente de hardening de system prompt. No hay
+  fixture de PDF con orden hostil dentro, así que B9 sale "no concluyente" siempre.
+- **Deuda:** el esquema del índice no lleva número de versión; un cambio de esquema invalida los
+  índices archivados en silencio y hace fallar el listado. Hoy la invalidación es manual.
+
+## 2026-08-28 · Fase 1 · cierre de la deriva de `@fiel-al-plan`
+
+`@fiel-al-plan` dio ⚠️ DERIVA (sin contrato roto). Se cierra lo que marcó:
+
+- **F1-09 (la interfaz no leía `LIMITS`):** `Chat.tsx` importa `LIMITS`, pinta el contador de caracteres
+  contra `maxMessageCharacters` (rojo y `Send` deshabilitado al pasarse; el servidor sigue siendo quien
+  rechaza en voz alta, F1-02) y manda `maxSteps: LIMITS.maxAgentSteps` en vez del `8` escrito a mano.
+- **`orDie` en handlers nuevos:** `MaterialRepositoryError` (fallo de disco) se mapea a
+  `MaterialStorageError` **declarado**, 500 con cuerpo y motivo, en los handlers `index` y `page`.
+  Nuevo error en `packages/shared/src/errors/material-errors.ts`. Se retira `MaterialPageEntry` (muerto
+  desde que `pages/:page` devuelve solo `PageImage`).
+- **Plan desincronizado:** §4.14 y §4.15 reciben su nota "Actualizado sobre la marcha" (tercer endpoint
+  NDJSON, `pages/:page` sin índice, visor como scroll continuo), y las filas de §8 dejan de citar
+  `SETS.pdf` y "entrada de índice en la misma respuesta".
+- **Barrido real (paso 21):** corrido sobre los **3 PDFs** del corpus actual (Psicología Social,
+  A4 de texto; `LIMITS.maxMaterials: 5`). 33 páginas, **todas `extracted`, 0 llamadas de transcripción**,
+  1 llamada de temas por material (3 en total), 0 páginas fallidas. El camino de extracción se come el
+  corpus entero: el gasto de modelo del barrido es 3 llamadas. Índices archivados por `sha256` en
+  `.data/materials/index/`.
+
+## 2026-08-28 · Fase 1 · verifier: F1-24 en las insignias
+
+`proxus-verifier` dio 🚨 NO CIERRA por F1-24: las insignias de estado ponían el color semántico como
+texto (`text-warning`, `text-success`) sobre su propio tinte al 15%, y en el tema claro eso da ~1,9:1,
+por debajo de AA. Afectaba a la marca "transcrito por el modelo" del visor (F1-12) y a la insignia
+"sin indexar" de la barra lateral (F1-16).
+
+- **Arreglo:** se añade `--color-warning-ink` (claro `#92400E`, oscuro `#FDE68A`), gemelo de los
+  `success-ink` / `danger-ink` que ya existían del tramo 1A. Las tres insignias pasan a
+  `text-*-ink`. `--color-success-ink` claro se oscurece de `#15803D` a `#166534` porque sobre
+  `bg-success/15` se quedaba en 4,4:1. Medido: todas las combinaciones reales de texto semántico sobre
+  tinte quedan ahora ≥ 6:1 en claro y ≥ 10:1 en oscuro.
+- **De paso:** la insignia de nota corta de `ArtifactWorkspace` (`text-brand` sobre `bg-brand-soft`,
+  4,1:1 en claro) pasa a `bg-brand` + `text-on-brand`; y el resumen de intento deja el `/80` de opacidad
+  que lo bajaba a 4,2:1.
+- **No es deuda:** `--color-disabled` como texto da 2,54:1 en claro, pero WCAG 2.1 exime de contraste a
+  los componentes de interfaz inactivos.
+
+## 2026-08-28 · Fase 1 · verifier: F1-21, el tema no volvía al del sistema
+
+Iván puso el SO en claro, recargó y la web seguía en oscuro. Causa: el conmutador era binario y
+`applyTheme` guardaba siempre `"light"` o `"dark"` en `localStorage`; tras el primer clic no existía
+forma de volver a "seguir al sistema", así que F1-21 ("y el usuario no haya elegido tema") no se podía
+volver a cumplir.
+
+- **Arreglo:** `ThemePreference = "light" | "dark" | "system"`, con `"system"` por defecto. El selector
+  pasa a `<select>` de tres opciones (cabía mejor que un segmentado de tres botones en los 340 px del
+  sidebar). `watchSystemTheme` re-pinta al vuelo cuando cambia `prefers-color-scheme`, pero solo si la
+  preferencia guardada es `"system"`. El bootstrap inline de `index.html` ya trataba cualquier valor
+  que no fuera `"light"`/`"dark"` como "seguir al SO", así que no cambió.
+- **Nota para quien pruebe:** si ya se tocó el tema antes, `localStorage` tiene una elección explícita
+  guardada; hay que elegir "Sistema" una vez para volver al comportamiento por defecto.

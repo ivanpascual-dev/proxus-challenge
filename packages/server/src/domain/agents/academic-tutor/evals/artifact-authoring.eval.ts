@@ -17,11 +17,15 @@ import {
   gradeAttempt
 } from "../../../artifacts/artifact.ts";
 import {
+  MaterialIndexingFailed,
   MaterialNotFound,
+  MaterialNotIndexed,
   MaterialRepository,
-  type MaterialPageImages,
-  type PdfMaterial
+  type PdfMaterial,
+  type RenderedPage
 } from "../../../materials/material.ts";
+import { initialTurnBudgetState } from "../../../limits/turn-budget.ts";
+import { make as makeRateLimiter } from "../../../limits/rate-limiter.ts";
 
 const EvalId = Schema.String;
 const EvalCaseId = Schema.String;
@@ -254,27 +258,24 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
       ? Effect.fail(new MaterialNotFound({ materialId: id }))
       : Effect.succeed(toPdfMaterial(material));
   },
-  renderPages: (id, pages) => {
+  renderPage: (id, page) => {
     const material = materials.find((candidate) => candidate.id === id);
     if (material === undefined) {
       return Effect.fail(new MaterialNotFound({ materialId: id }));
     }
 
-    const renderedPages = pages.map((page) => {
-      const fixturePage = material.pages.find((candidate) => candidate.page === page);
-      return {
+    const fixturePage = material.pages.find((candidate) => candidate.page === page);
+    return Effect.succeed<RenderedPage>({
+      material: toPdfMaterial(material),
+      image: {
         page,
         mediaType: "image/png" as const,
         data: `data:image/png;base64,${btoa(fixturePage?.text ?? `Page ${page}`)}`
-      };
+      }
     });
-
-    return Effect.succeed<MaterialPageImages>({
-      type: "material-page-images",
-      material: toPdfMaterial(material),
-      pages: renderedPages
-    });
-  }
+  },
+  getIndex: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
+  reindex: (id) => Effect.fail(new MaterialIndexingFailed({ materialId: id, reason: "el eval no indexa materiales" }))
 });
 
 const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
@@ -282,7 +283,8 @@ const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
   title: material.title,
   fileName: material.fileName,
   pageCount: material.pages.length,
-  uploadedAt: material.uploadedAt
+  uploadedAt: material.uploadedAt,
+  indexState: "not-indexed"
 });
 
 const makeEvalLayer = (testCase: ArtifactAuthoringEvalCase) => Layer.mergeAll(
@@ -400,7 +402,9 @@ const runEvalCase = (
 ) => Effect.gen(function* () {
   const materialRepository = yield* MaterialRepository;
   const artifactRepository = yield* ArtifactRepository;
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository);
+  const budgetRef = yield* Ref.make(initialTurnBudgetState);
+  const rateLimiter = yield* makeRateLimiter();
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, budgetRef, rateLimiter, "eval");
   const session = AgentSession.make(harness);
   const result = yield* session.run({
     input: testCase.input,

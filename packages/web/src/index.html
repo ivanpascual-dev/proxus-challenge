@@ -4,6 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Proxus Tutor</title>
+    <script>
+      (function () {
+        try {
+          // Preferencia guardada: "light" | "dark" | "system". Sin nada guardado, o "system",
+          // se sigue a prefers-color-scheme. Se resuelve antes de pintar para no parpadear.
+          var stored = localStorage.getItem("proxus-theme");
+          var theme = stored === "light" || stored === "dark"
+            ? stored
+            : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          if (theme === "dark") {
+            document.documentElement.setAttribute("data-theme", "dark");
+          }
+        } catch (error) {
+          // Sin localStorage o sin matchMedia: se queda en el tema claro por defecto del CSS.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

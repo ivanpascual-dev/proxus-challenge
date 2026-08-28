@@ -49,3 +49,6 @@ packages/web/src/styles.generated.css
 
 # Ajustes locales que Claude Code genera por su cuenta
 .claude/settings.local.json
+
+# Capturas y snapshots de verificación manual con Playwright MCP
+.playwright-mcp/

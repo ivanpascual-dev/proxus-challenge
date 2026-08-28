@@ -11,6 +11,9 @@ importers:
       '@effect/language-service':
         specifier: ^0.86.2
         version: 0.86.2
+      '@proxus/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       '@types/node':
         specifier: ^25.9.3
         version: 25.9.3

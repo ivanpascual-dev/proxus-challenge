@@ -35,15 +35,17 @@ después nace con clases oscuras literales y hay que reescribirla al añadir el 
 - **Endpoint de página.** Hoy `api/materials.ts` solo tiene `list` y `get`. Sin él la cita no se puede
   abrir y la invariante 8 no se puede cumplir.
 - **`packages/shared/src/limits.ts`** con las cuatro familias del ADR-007, y el contador con estado en
-  `packages/server/src/domain/limits/`. Aquí se mide el tope real de petición de la API con `inlineData`
-  y se ajustan los 8 MB, que hoy son un supuesto.
+  `packages/server/src/domain/limits/`. El tope real de petición de la API con `inlineData` ya está
+  medido (20 MB) y el techo de bytes por turno queda en **12 MB contando base64**, no en los 8 MB que
+  eran un supuesto.
 - **Presupuesto por turno** de páginas y bytes, con aviso explícito al agotarse.
 - **Las tres barreras deterministas** (ADR-008), que son límites y por eso están aquí y no en la fase 4:
   `maxSteps` acotado en el servidor (`tutor-chat-service.ts:33` hoy hace `input.maxSteps ?? 8`, que es
   un valor por defecto y no un techo), tope de longitud del array `messages`, y tope de caracteres del
   mensaje.
 - **Tokens de tema claro y oscuro** con la paleta de Proxus, respetando la preferencia del sistema.
-  Sustituyen a las 77 clases de color literales (ArtifactWorkspace 37, Sidebar 24, Chat 15, App 1).
+  Sustituyen a las **138 ocurrencias** de clase de color literal (ArtifactWorkspace 66, Sidebar 38,
+  Chat 34, App 2), que son 51 clases distintas. La cifra de 77 que estaba aquí era incorrecta.
 - **Andamio de tests**: `node:test`, script `pnpm test`, y los primeros casos (fronteras de
   `parsePageSelection`, cada límite justo por encima y justo por debajo, presupuesto agotado).
 

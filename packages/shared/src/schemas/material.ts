@@ -1,11 +1,21 @@
 import { Schema } from "effect";
 
+// "indexed" si hay un índice archivado para el contenido exacto de este PDF (ADR-011). Lo calcula
+// `list` en una sola pasada (sha256 del fichero), para que la barra lateral no tenga que pedir el
+// índice de cada material por separado (criterio F1-16).
+export const MaterialIndexState = Schema.Union([
+  Schema.Literal("indexed"),
+  Schema.Literal("not-indexed")
+]);
+export type MaterialIndexState = typeof MaterialIndexState.Type;
+
 export const PdfMaterial = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   fileName: Schema.String,
   pageCount: Schema.Number,
-  uploadedAt: Schema.String
+  uploadedAt: Schema.String,
+  indexState: MaterialIndexState
 });
 export type PdfMaterial = typeof PdfMaterial.Type;
 
