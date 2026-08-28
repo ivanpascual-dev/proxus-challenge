@@ -1,0 +1,61 @@
+# CI · el carril de verificación
+#
+# El paso de "análisis estático" de este repo es `pnpm typecheck`, no un linter aparte.
+# Las reglas de estilo (las de @effect/language-service) viven DENTRO del compilador:
+# el script `prepare` de la raíz parchea `tsc` y `_tsc.js`, así que `tsc --noEmit` ya
+# ejecuta esas reglas junto al chequeo de tipos en modo estricto máximo. Un ESLint o un
+# Biome encima duplicaría reglas, metería ruido de diff en código ajeno y añadiría una
+# config más que mantener.
+#
+# Fuera de CI: `pnpm test:guardarrailes` necesita el servidor levantado y una clave real
+# del modelo. Este workflow no toca secretos, así que esa batería se corre a mano.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [feat/challenge-proxus]
+
+# El token por defecto solo necesita leer el repo para clonar y correr checks.
+permissions:
+  contents: read
+
+# Un push nuevo sobre la misma rama o PR cancela el run anterior en vuelo.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Poppler es dependencia dura del repo (el servidor no arranca sin él) y un test
+      # de clasificación de páginas llama a `pdftotext` de verdad. Lo instalamos explícito
+      # aunque hoy la imagen de ubuntu ya lo traiga: así el check no depende de eso.
+      - name: Instala Poppler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+
+      # Lee la versión de pnpm de "packageManager" en package.json (pnpm@10.23.0).
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      # `prepare` (parche de tsc con las reglas de Effect) corre solo tras el install.
+      - name: Instala dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Tipos y análisis estático (los 4 paquetes)
+        run: pnpm typecheck
+
+      - name: Build de la web (Tailwind + Vite)
+        run: pnpm --filter @proxus/web run build
+
+      - name: Tests
+        run: pnpm test

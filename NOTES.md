@@ -136,6 +136,14 @@ pnpm --filter @proxus/web run build
 
 _Salida literal al cerrar la entrega._
 
+Estos checks corren solos en cada PR (`.github/workflows/ci.yml`): typecheck de los cuatro
+paquetes, build de la web y `pnpm test`. No hay un linter aparte a propósito. El análisis estático
+de este repo es `pnpm typecheck`: `tsconfig` en modo estricto máximo más las reglas de
+`@effect/language-service`, que el script `prepare` inyecta dentro del propio compilador. Un
+ESLint o un Biome encima repetiría reglas que ya se comprueban, ensuciaría el diff de código de
+plantilla y dejaría otra config que defender. La batería de guardarraíles queda fuera de CI:
+necesita el servidor y una clave real del modelo, y CI no toca secretos.
+
 ---
 
 ## 5. Comportamiento esperado, fallos conocidos y cómo lo evalúo
