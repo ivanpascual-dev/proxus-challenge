@@ -12,6 +12,12 @@ export interface PdfService {
     readonly page: number;
     readonly dpi?: number;
   }) => Effect.Effect<PageImage, PdfServiceError>;
+  // Texto embebido de UNA página, tal cual sale del PDF. Vacío o casi vacío en páginas que son
+  // imagen: eso es lo que el clasificador de densidad usa para decidir si hay que transcribir.
+  readonly extractText: (input: {
+    readonly path: string;
+    readonly page: number;
+  }) => Effect.Effect<string, PdfServiceError>;
 }
 
 export const PdfService = Context.Service<PdfService>(

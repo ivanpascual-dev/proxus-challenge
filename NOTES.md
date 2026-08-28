@@ -62,7 +62,7 @@ _Pendiente: fase 4._
 <!-- Tiene que poder seguirlo alguien que no ha visto el repo, en orden, sin saltarse nada.
      Material concreto, comando concreto, y qué se tiene que ver en pantalla. -->
 
-**Requisitos:** Node, pnpm, Poppler (`pdfinfo` y `pdftoppm` en el PATH) y `GOOGLE_GENERATIVE_AI_API_KEY`
+**Requisitos:** Node, pnpm, Poppler (`pdfinfo`, `pdftoppm` y `pdftotext` en el PATH) y `GOOGLE_GENERATIVE_AI_API_KEY`
 en `.env`. El servidor falla al arrancar si falta alguno, a propósito.
 
 **Datos de prueba:** `pnpm run seed:demo` copia los materiales de ejemplo versionados en

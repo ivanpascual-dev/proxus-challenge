@@ -12,18 +12,19 @@ const make = (): Effect.Effect<PdfServiceType, PdfServiceError, ChildProcessSpaw
     ChildProcess.make(command, ["-v"])
   ).pipe(
     Effect.mapError((reason) => new PdfServiceError({
-      reason: `Missing required Poppler command "${command}". Install Poppler so pdfinfo and pdftoppm are available on PATH. Cause: ${String(reason)}`
+      reason: `Missing required Poppler command "${command}". Install Poppler so pdfinfo, pdftoppm and pdftotext are available on PATH. Cause: ${String(reason)}`
     })),
     Effect.flatMap((exitCode) => exitCode === 0
       ? Effect.void
       : Effect.fail(new PdfServiceError({
-          reason: `Missing required Poppler command "${command}". Install Poppler so pdfinfo and pdftoppm are available on PATH. Exit code: ${exitCode}`
+          reason: `Missing required Poppler command "${command}". Install Poppler so pdfinfo, pdftoppm and pdftotext are available on PATH. Exit code: ${exitCode}`
         }))
     )
   );
 
   yield* assertExecutable("pdfinfo");
   yield* assertExecutable("pdftoppm");
+  yield* assertExecutable("pdftotext");
 
   const pageCount = (pdfPath: string) => spawner.string(
     ChildProcess.make("pdfinfo", [pdfPath])
@@ -77,7 +78,20 @@ const make = (): Effect.Effect<PdfServiceType, PdfServiceError, ChildProcessSpaw
     };
   });
 
-  return { pageCount, renderPage };
+  const extractText: PdfServiceType["extractText"] = ({ path: pdfPath, page }) => spawner.string(
+    ChildProcess.make("pdftotext", [
+      "-f",
+      String(page),
+      "-l",
+      String(page),
+      pdfPath,
+      "-"
+    ])
+  ).pipe(
+    Effect.mapError((reason) => new PdfServiceError({ reason }))
+  );
+
+  return { pageCount, renderPage, extractText };
 });
 
 export const PopplerPdfService = {

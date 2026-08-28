@@ -44,9 +44,10 @@ Si vas a usar PDFs, instala Poppler:
 brew install poppler
 which pdfinfo
 which pdftoppm
+which pdftotext
 ```
 
-El server valida `pdfinfo` y `pdftoppm` al arrancar.
+El server valida `pdfinfo`, `pdftoppm` y `pdftotext` al arrancar.
 
 ## 3. Dónde van los PDFs
 
@@ -171,6 +172,7 @@ Instala Poppler y verifica que los comandos están en `PATH`:
 brew install poppler
 pdfinfo -v
 pdftoppm -v
+pdftotext -v
 ```
 
 ### El tutor no usa el PDF

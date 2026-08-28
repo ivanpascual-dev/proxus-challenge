@@ -26,10 +26,11 @@ Los PDFs viven en:
 packages/server/.data/materials/pdfs/
 ```
 
-El repo espera que Poppler esté instalado para inspeccionar/renderizar PDFs:
+El repo espera que Poppler esté instalado para inspeccionar/renderizar/extraer texto de PDFs:
 
 - `pdfinfo`
 - `pdftoppm`
+- `pdftotext`
 
 El tutor puede usar:
 

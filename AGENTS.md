@@ -33,7 +33,7 @@ pnpm --filter @proxus/server run typecheck
 
 - `.env` lives at repo root.
 - `GOOGLE_GENERATIVE_AI_API_KEY` is required for the server to start.
-- Poppler commands `pdfinfo` and `pdftoppm` are required for the server to start.
+- Poppler commands `pdfinfo`, `pdftoppm` and `pdftotext` are required for the server to start.
 - Local runtime data lives under `packages/server/.data` and must not be committed.
 
 ## Effect version
