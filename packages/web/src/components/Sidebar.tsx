@@ -6,10 +6,12 @@ import { ThemeToggle } from "./ThemeToggle.tsx";
 
 interface SidebarProps {
   readonly selectedArtifactId: string | null;
+  readonly selectedMaterialId: string | null;
   readonly onSelectArtifact: (artifactId: string) => void;
+  readonly onSelectMaterial: (materialId: string) => void;
 }
 
-export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) {
+export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifact, onSelectMaterial }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
   const artifacts = useAtomValue(artifactsQuery);
 
@@ -45,9 +47,28 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
                   </summary>
                   <ul className="grid gap-2 border-border border-t p-3">
                     {value.materials.map((material) => (
-                      <li className="rounded-xl bg-canvas/70 p-3" key={material.id}>
-                        <strong className="block text-heading">{material.title}</strong>
-                        <span className="mt-1 block text-muted text-sm">{material.pageCount} pages · {material.fileName}</span>
+                      <li key={material.id}>
+                        <button
+                          type="button"
+                          onClick={() => onSelectMaterial(material.id)}
+                          className={`w-full rounded-xl p-3 text-left transition hover:border-brand hover:bg-canvas ${
+                            selectedMaterialId === material.id
+                              ? "border border-brand bg-brand-soft"
+                              : "border border-transparent bg-canvas/70"
+                          }`}
+                        >
+                          <strong className="block text-heading">{material.title}</strong>
+                          <span className="mt-1 flex items-center gap-2 text-muted text-sm">
+                            <span>{material.pageCount} pages</span>
+                            <span
+                              className={material.indexState === "indexed"
+                                ? "rounded-full bg-success/15 px-2 py-0.5 text-[0.7rem] text-success"
+                                : "rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning"}
+                            >
+                              {material.indexState === "indexed" ? "indexado" : "sin indexar"}
+                            </span>
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
