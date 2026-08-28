@@ -36,11 +36,13 @@
   --color-warning:          #FF9800;
   --color-accent-gold:      #D4AF37;
 
-  /* Texto en success/danger: --color-success y --color-danger, medidos como texto sobre
-     canvas/surface, no llegan a 3:1 en el tema claro (2.28:1 y 3.76:1). F1-24 permite ajustar el
-     token cuando falla AA: estos dos son invariantes de tema, igual que success/danger/warning. */
-  --color-success-ink:      #15803D;
+  /* Texto en success/danger/warning: --color-success, --color-danger y --color-warning como texto
+     no llegan a AA en el tema claro, ni siquiera sobre su propio tinte al 15% (2.0:1, 3.76:1 y
+     1.92:1). F1-24 permite ajustar el token cuando falla: estas variantes de texto son invariantes
+     de tema, igual que success/danger/warning. Medido sobre bg-{success,danger,warning}/10..20. */
+  --color-success-ink:      #166534;
   --color-danger-ink:       #B91C1C;
+  --color-warning-ink:      #92400E;
 }
 
 @layer base {
@@ -62,6 +64,7 @@
     --color-on-brand:      #0B1020;
     --color-success-ink:   #A7F3D0;
     --color-danger-ink:    #FECACA;
+    --color-warning-ink:   #FDE68A;
   }
 
   body {

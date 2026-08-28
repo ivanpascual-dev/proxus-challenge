@@ -41,4 +41,7 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Corregido
 
+- **Las insignias de estado se leen en el tema claro.** "Sin indexar", "transcrito por el modelo" y
+  las marcas de acierto usaban un color que sobre su fondo claro no llegaba al mínimo de contraste.
+
 ### Eliminado

@@ -290,14 +290,14 @@ function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt
   return (
     <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
       <p className="font-bold text-success-ink text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
-      <p className="mt-1 text-success-ink/80">{attempt.summary}</p>
+      <p className="mt-1 text-success-ink">{attempt.summary}</p>
     </section>
   );
 }
 
 function CorrectionBadge({ correction }: { readonly correction: QuestionCorrection }) {
   if (correction.questionType === "short-answer") {
-    return <span className="rounded-full bg-brand-soft px-3 py-1 font-semibold text-brand text-sm">{correction.score}/{correction.maxScore}</span>;
+    return <span className="rounded-full bg-brand px-3 py-1 font-semibold text-on-brand text-sm">{correction.score}/{correction.maxScore}</span>;
   }
 
   return correction.correct

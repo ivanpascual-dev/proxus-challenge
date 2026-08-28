@@ -178,7 +178,7 @@ function PdfPage({ materialId, page, marker }: { readonly materialId: string; re
           ? <PdfPageImage materialId={materialId} page={page} />
           : <div className="grid h-[70vh] place-items-center rounded-lg border border-border bg-surface text-muted text-sm">Página {page}</div>}
         {marker?.kind === "transcribed" && (
-          <span className="absolute top-2 right-2 rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning">
+          <span className="absolute top-2 right-2 rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
             transcrito por el modelo
           </span>
         )}

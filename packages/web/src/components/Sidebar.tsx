@@ -62,8 +62,8 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
                             <span>{material.pageCount} pages</span>
                             <span
                               className={material.indexState === "indexed"
-                                ? "rounded-full bg-success/15 px-2 py-0.5 text-[0.7rem] text-success"
-                                : "rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning"}
+                                ? "rounded-full bg-success/15 px-2 py-0.5 text-[0.7rem] text-success-ink"
+                                : "rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink"}
                             >
                               {material.indexState === "indexed" ? "indexado" : "sin indexar"}
                             </span>

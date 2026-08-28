@@ -158,3 +158,21 @@ y diferir el resto a la fase 4 con nota en `NOTES.md`.
   1 llamada de temas por material (3 en total), 0 páginas fallidas. El camino de extracción se come el
   corpus entero: el gasto de modelo del barrido es 3 llamadas. Índices archivados por `sha256` en
   `.data/materials/index/`.
+
+## 2026-08-28 · Fase 1 · verifier: F1-24 en las insignias
+
+`proxus-verifier` dio 🚨 NO CIERRA por F1-24: las insignias de estado ponían el color semántico como
+texto (`text-warning`, `text-success`) sobre su propio tinte al 15%, y en el tema claro eso da ~1,9:1,
+por debajo de AA. Afectaba a la marca "transcrito por el modelo" del visor (F1-12) y a la insignia
+"sin indexar" de la barra lateral (F1-16).
+
+- **Arreglo:** se añade `--color-warning-ink` (claro `#92400E`, oscuro `#FDE68A`), gemelo de los
+  `success-ink` / `danger-ink` que ya existían del tramo 1A. Las tres insignias pasan a
+  `text-*-ink`. `--color-success-ink` claro se oscurece de `#15803D` a `#166534` porque sobre
+  `bg-success/15` se quedaba en 4,4:1. Medido: todas las combinaciones reales de texto semántico sobre
+  tinte quedan ahora ≥ 6:1 en claro y ≥ 10:1 en oscuro.
+- **De paso:** la insignia de nota corta de `ArtifactWorkspace` (`text-brand` sobre `bg-brand-soft`,
+  4,1:1 en claro) pasa a `bg-brand` + `text-on-brand`; y el resumen de intento deja el `/80` de opacidad
+  que lo bajaba a 4,2:1.
+- **No es deuda:** `--color-disabled` como texto da 2,54:1 en claro, pero WCAG 2.1 exime de contraste a
+  los componentes de interfaz inactivos.
