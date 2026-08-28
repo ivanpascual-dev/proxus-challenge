@@ -8,7 +8,7 @@ export function App() {
 
   return (
     <div
-      className="grid h-screen min-h-screen overflow-hidden bg-slate-950 text-slate-100"
+      className="grid h-screen min-h-screen overflow-hidden bg-canvas text-heading"
       style={{
         gridTemplateColumns: selectedArtifactId === null
           ? "340px minmax(0, 1fr)"
