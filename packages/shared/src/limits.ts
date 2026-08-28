@@ -6,6 +6,7 @@ export const LIMITS = {
   maxHistoryCharacters: 200_000,
   maxBlockCharacters: 5_000,
   maxUploadBytes: 25 * 1024 * 1024,
+  maxMaterials: 5,
 
   // Coste por turno
   maxPagesPerTurn: 20,
