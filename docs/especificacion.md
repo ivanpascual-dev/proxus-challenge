@@ -82,8 +82,8 @@ domicilio.
   modo que un contenido modificado NO DEBERÁ encontrar índice, y un mismo contenido renombrado o con
   otra fecha de modificación SÍ DEBERÁ encontrar el suyo sin reindexar.
 - **F1-15.** CUANDO termine de indexarse un material, EL sistema DEBERÁ producir su lista de temas, como
-  mucho `maxTopicsPerMaterial`, asignar temas a cada página con contenido, y NO DEBERÁ traducir el
-  vocabulario del material al nombrarlos.
+  mucho `maxTopicsPerMaterial`, organizados en una jerarquía de como mucho dos niveles, asignar al menos
+  un tema a cada página con contenido, y NO DEBERÁ traducir el vocabulario del material al nombrarlos.
 - **F1-16.** MIENTRAS un material no esté indexado, EL sistema DEBERÁ decirlo explícitamente en la
   interfaz y en la respuesta del comando, y NO DEBERÁ devolver un índice vacío como si lo estuviera.
 

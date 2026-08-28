@@ -4,6 +4,7 @@ import { LIMITS, type IndexedPage, type MaterialIndexContent, type MaterialTopic
 import { PdfService } from "./pdf-service.ts";
 import { classifyPage, countDenseCharacters, type PageProvenance } from "./page-classifier.ts";
 import { parseTopics, parseTranscription } from "./model-json.ts";
+import { normalizeTopicHierarchy } from "./topic-hierarchy.ts";
 import { TRANSCRIPTION_PROMPT, topicsPrompt } from "./indexing-prompts.ts";
 
 export class IndexingError extends Data.TaggedError("IndexingError")<{
@@ -129,7 +130,7 @@ export const IndexingServiceLive = Layer.effect(
 
       yield* emit({ page: null, pageCount: input.pageCount, message: "generando los temas del material" });
 
-      const topics = yield* generateTopics(indexedPages);
+      const topics = yield* generateTopics(indexedPages, input.pageCount);
 
       const indexedAt = yield* Effect.sync(() => new Date().toISOString());
 
@@ -150,7 +151,8 @@ export const IndexingServiceLive = Layer.effect(
     });
 
     const generateTopics = (
-      pages: readonly IndexedPage[]
+      pages: readonly IndexedPage[],
+      pageCount: number
     ): Effect.Effect<readonly MaterialTopic[], IndexingError, LanguageModel.LanguageModel> => Effect.gen(function* () {
       const withContent = pages.filter((page) => page.text.trim().length > 0);
       if (withContent.length === 0) {
@@ -169,10 +171,9 @@ export const IndexingServiceLive = Layer.effect(
       );
 
       return yield* Effect.try({
-        try: () => parseTopics(response.text)
-          .filter((topic) => topic.pages.length > 0)
-          .slice(0, LIMITS.maxTopicsPerMaterial)
-          .map((topic): MaterialTopic => ({ id: topic.id, label: topic.label, pages: topic.pages })),
+        try: () =>
+          normalizeTopicHierarchy(parseTopics(response.text), pageCount)
+            .slice(0, LIMITS.maxTopicsPerMaterial),
         catch: (error) => new IndexingError({ reason: `los temas no se pudieron parsear: ${String(error)}` })
       });
     });

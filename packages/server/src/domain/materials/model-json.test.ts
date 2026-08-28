@@ -24,7 +24,17 @@ test("parseTranscription throws when text is missing", () => {
 
 test("parseTopics keeps only integer pages and requires id, label, pages", () => {
   const topics = parseTopics("{\"topics\":[{\"id\":\"sets\",\"label\":\"set\",\"pages\":[1,2.5,3]}]}");
-  assert.deepEqual(topics, [{ id: "sets", label: "set", pages: [1, 3] }]);
+  assert.deepEqual(topics, [{ id: "sets", label: "set", pages: [1, 3], parent: null }]);
+});
+
+test("parseTopics reads the parent reference and normalizes an absent one to null", () => {
+  const topics = parseTopics(
+    "{\"topics\":[{\"id\":\"a\",\"label\":\"A\",\"pages\":[1],\"parent\":null},{\"id\":\"b\",\"label\":\"B\",\"pages\":[2],\"parent\":\"a\"}]}"
+  );
+  assert.deepEqual(topics, [
+    { id: "a", label: "A", pages: [1], parent: null },
+    { id: "b", label: "B", pages: [2], parent: "a" }
+  ]);
 });
 
 test("parseTopics throws when the topics array is absent", () => {

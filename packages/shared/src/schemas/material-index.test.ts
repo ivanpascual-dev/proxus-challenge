@@ -9,13 +9,13 @@ test("MaterialIndexContent round-trips through JSON", () => {
     pageCount: 2,
     indexedAt: "2026-08-28T00:00:00.000Z",
     threshold: 600,
-    topics: [{ id: "sets", label: "set", pages: [1, 2] }],
+    topics: [{ id: "sets", label: "set", pages: [1, 2], parentId: null }],
     pages: [{ page: 1, provenance: "transcribed" as const, text: "PYTHON", denseCharacters: 6, topicIds: ["sets"] }],
     failedPages: [{ page: 2, reason: "el modelo devolvió JSON no parseable" }]
   };
   const codec = Schema.fromJsonString(MaterialIndexContent);
   const back = Schema.decodeUnknownSync(codec)(Schema.encodeUnknownSync(codec)(content));
-  assert.deepEqual(back.topics, [{ id: "sets", label: "set", pages: [1, 2] }]);
+  assert.deepEqual(back.topics, [{ id: "sets", label: "set", pages: [1, 2], parentId: null }]);
   assert.deepEqual(back.pages, content.pages);
   assert.deepEqual(back.failedPages, [{ page: 2, reason: "el modelo devolvió JSON no parseable" }]);
 });

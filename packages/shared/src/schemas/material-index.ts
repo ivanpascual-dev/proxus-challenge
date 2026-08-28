@@ -10,10 +10,13 @@ export const PageProvenance = Schema.Union([
 export type PageProvenance = typeof PageProvenance.Type;
 
 // Un tema es una unidad de estudio del material. `pages` son las páginas donde se trata de verdad.
+// `parentId` es el `id` de otro tema de la misma lista (o null): la jerarquía de dos niveles que el
+// modelo detecta y que el mapa mental dibuja. La raíz visual del mapa es el propio material.
 export const MaterialTopic = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
-  pages: Schema.Array(Schema.Number)
+  pages: Schema.Array(Schema.Number),
+  parentId: Schema.NullOr(Schema.String)
 });
 export type MaterialTopic = typeof MaterialTopic.Type;
 

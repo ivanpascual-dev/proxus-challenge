@@ -45,9 +45,9 @@ const fakeModel = (replies: { readonly transcription: string; readonly topics: s
 
 const validTopics = JSON.stringify({
   topics: [
-    { id: "sets", label: "set", pages: [1, 2] },
-    { id: "listas", label: "listas", pages: [2] },
-    { id: "tuplas", label: "tuplas", pages: [1] }
+    { id: "sets", label: "set", pages: [1, 2], parent: null },
+    { id: "listas", label: "listas", pages: [2], parent: "sets" },
+    { id: "tuplas", label: "tuplas", pages: [1], parent: null }
   ]
 });
 
@@ -78,6 +78,9 @@ test("una página densa se indexa como extracted sin llamar al modelo para trans
   assert.equal(index.failedPages.length, 0);
   assert.equal(index.threshold, LIMITS.textDensityThreshold);
   assert.deepEqual(index.pages.find((page) => page.page === 1)?.topicIds, ["sets", "tuplas"]);
+  // La jerarquía del modelo llega hasta el índice: `listas` cuelga de `sets`.
+  assert.equal(index.topics.find((topic) => topic.id === "listas")?.parentId, "sets");
+  assert.equal(index.topics.find((topic) => topic.id === "sets")?.parentId, null);
 });
 
 test("una página escasa se transcribe y su procedencia queda como transcribed", async () => {

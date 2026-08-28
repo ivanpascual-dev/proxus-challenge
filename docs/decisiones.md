@@ -510,3 +510,42 @@ que exige la invariante 3 llevada a la interfaz: un material sin indexar se dice
 - **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** El día que haya
   subida de ficheros con id generado (fase 4), la primera mitad de este registro se revisa; la segunda,
   la del archivado por huella, no cambia.
+
+---
+
+## ADR-012 · Los temas del material son un árbol de dos niveles, no una lista plana
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+- **Sustituye:** amplía la decisión 6 del plan de la fase 1, no la revierte (sigue siendo una sola
+  llamada al modelo por material, sobre el texto ya indexado).
+
+**Contexto.** El plan cerró los temas como una lista plana: `{id, label, pages}`. Al probar el tramo 1B,
+Iván pidió que el alumno pudiera **relacionar** los temas entre sí, en un mapa mental, no leer una nube
+de etiquetas. Una lista plana no tiene de dónde sacar esa relación.
+
+**Opciones consideradas.**
+
+- **Inferir la jerarquía en la web** a partir de las páginas que comparten los temas (un tema que cubre
+  un superconjunto de páginas de otro es su padre). Descartada: es un heurístico frágil (dos temas
+  hermanos que abarcan todo el material saldrían como padre e hijo) y esconde en el cliente una decisión
+  que es del contenido.
+- **Pedir al modelo un árbol de profundidad libre.** Descartada: un árbol profundo no cabe en un mapa
+  mental legible y multiplica las formas en que el modelo se equivoca (ciclos, cadenas largas). Dos
+  niveles es lo que un alumno abarca de un vistazo.
+
+**Decisión.** `MaterialTopic` gana `parentId: string | null`. El prompt de temas (`indexing-prompts.ts`,
+plan §6.2) pide al modelo un `parent` por tema, con un máximo de dos niveles y entre 2 y 6 temas de
+primer nivel. Lo que el modelo devuelve **no se confía**: `normalizeTopicHierarchy`
+(`domain/materials/topic-hierarchy.ts`, puro y con tests) sanea el resultado antes de archivarlo:
+referencia a un tema que no existe → el tema pasa a raíz; ciclo → se rompe; tres o más niveles → se
+aplana al ancestro raíz. Un `parentId` colgante nunca llega al índice.
+
+**Consecuencias.**
+
+- **El esquema del índice cambia, así que todo índice archivado antes de esta fecha queda invalidado**
+  y hay que relanzar `pnpm index:materials`. Es coherente con el ADR-011: no hay "índice caducado", hay
+  un índice para este contenido y este esquema, o no lo hay. (Pendiente: el esquema no lleva número de
+  versión; hoy la invalidación es manual.)
+- La fase 3 se encuentra los temas ya jerarquizados y no tiene que volver a pasar el modelo.
+- El coste no sube: sigue siendo una llamada por material.

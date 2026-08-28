@@ -14,7 +14,7 @@ const contentFor = (contentHash: string): MaterialIndexContent => ({
   pageCount: 1,
   indexedAt: "2026-08-28T00:00:00.000Z",
   threshold: 600,
-  topics: [{ id: "sets", label: "set", pages: [1] }],
+  topics: [{ id: "sets", label: "set", pages: [1], parentId: null }],
   pages: [{ page: 1, provenance: "transcribed", text: "PYTHON", denseCharacters: 6, topicIds: ["sets"] }],
   failedPages: []
 });

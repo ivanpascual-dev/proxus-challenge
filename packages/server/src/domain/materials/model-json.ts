@@ -36,9 +36,12 @@ export interface ParsedTopic {
   readonly id: string;
   readonly label: string;
   readonly pages: readonly number[];
+  // Referencia cruda al padre tal cual la devolvió el modelo. La coherencia (que exista, que no haya
+  // ciclos, que no baje de dos niveles) la impone normalizeTopicHierarchy, no este parseo.
+  readonly parent: string | null;
 }
 
-// Espera { "topics": [{ "id": "kebab-case", "label": "...", "pages": [1, 2] }] }.
+// Espera { "topics": [{ "id": "kebab-case", "label": "...", "pages": [1, 2], "parent": null }] }.
 export const parseTopics = (raw: string): readonly ParsedTopic[] => {
   const value = parseModelJson(raw);
   if (typeof value !== "object" || value === null || !Array.isArray((value as { topics?: unknown }).topics)) {
@@ -53,6 +56,7 @@ export const parseTopics = (raw: string): readonly ParsedTopic[] => {
       throw new Error(`el tema ${index} no tiene id, label y pages`);
     }
     const pages = record.pages.filter((page): page is number => typeof page === "number" && Number.isInteger(page));
-    return { id: record.id, label: record.label, pages };
+    const parent = typeof record.parent === "string" && record.parent.length > 0 ? record.parent : null;
+    return { id: record.id, label: record.label, pages, parent };
   });
 };
