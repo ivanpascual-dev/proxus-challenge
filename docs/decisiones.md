@@ -555,3 +555,129 @@ aplana al ancestro raíz. Un `parentId` colgante nunca llega al índice.
   versión; hoy la invalidación es manual.)
 - La fase 3 se encuentra los temas ya jerarquizados y no tiene que volver a pasar el modelo.
 - El coste no sube: sigue siendo una llamada por material.
+
+---
+
+## ADR-013 · El apunte es una lista de bloques, y su procedencia la copia el código
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** La nota era `{kind, id, title, markdown}`: un texto que se lee y se cierra. No se puede
+corregir un párrafo, ni añadir lo que dijo el profesor y no está en el PDF, ni saber de qué página
+salió cada idea. Y sin esa procedencia, "explícame esto mejor" obliga a releer el material entero.
+
+**Opciones consideradas.**
+
+- **Dejar el markdown y anotar la procedencia aparte**, por rangos de caracteres. Descartada: cualquier
+  edición del texto desplaza los rangos y las citas apuntan a otra frase sin que nada lo detecte. La
+  unidad de la procedencia tiene que ser la misma que la unidad de la edición.
+- **Mantener `markdown` junto a `blocks`** para no romper lo guardado. Descartada: son dos fuentes de
+  verdad del mismo texto, y la que se quede sin actualizar miente en silencio. Las notas guardadas eran
+  de prueba y se borran.
+- **Que el modelo escriba el fragmento de origen dentro de cada bloque.** Descartada, y es la que más
+  se parece a la buena: sale gratis y ya viene en la misma llamada. Pero entonces el fragmento que
+  "prueba" la cita lo escribe el mismo que hizo la cita, que es verificar al modelo con el modelo
+  (invariante 8).
+
+**Decisión.** El apunte es `{kind, id, title, blocks, proposals}`. Cada bloque lleva identidad,
+autoría (`tutor` o `student`), marca de énfasis y fuente, que puede ser un material con sus páginas o
+una URL. **El fragmento cacheado del origen lo copia el servidor del índice**, nunca el modelo; el
+modelo solo declara qué páginas cita.
+
+Una cita que no se puede comprobar contra el índice (material inexistente, sin indexar, página fuera de
+rango o página fallida) **no se descarta ni se publica como buena**: el bloque se guarda con el motivo
+concreto y la interfaz lo marca.
+
+**Consecuencias.**
+
+- Reescribir un bloque cuesta su fragmento, no el material. Ese es el ahorro que justifica la caché y
+  es medible: la petición de reescritura no lleva ni una imagen.
+- La marca de énfasis vive en el bloque. El perfil de estudio (fase 3) la derivará a temas por las
+  páginas del bloque, que es determinista. Señal separada, nunca sumada (ADR-003).
+- El fragmento es una copia: si el material se reindexa, el fragmento del bloque se queda como estaba.
+  Es deliberado (el apunte no debe cambiar solo bajo los pies del alumno) y el bloque siempre puede
+  abrir la página real, que sí está al día.
+- El esquema de artefactos está duplicado entre `packages/shared` y `packages/server/src/domain`. Este
+  cambio obliga a tocar los dos y **el typecheck no avisa si solo se toca uno**. La deuda es anterior a
+  esta decisión y sigue anotada.
+
+---
+
+## ADR-014 · El tutor propone cambios en los apuntes; aplicarlos es siempre del alumno
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** Editar los apuntes de alguien es una acción sensible: el agente lee páginas de PDF, que
+son entrada no confiable capaz de dirigir herramientas (ADR-008). Y a la vez, "añádeme aquí lo que
+faltaba" es de lo más útil que puede hacer un tutor.
+
+**Opciones consideradas.**
+
+- **Que el comando escriba directamente y el prompt le diga que pida permiso antes.** Descartada: eso
+  pone la confirmación en el prompt, que es exactamente lo que el ADR-008 prohíbe. Una inyección desde
+  el PDF conseguiría reescribir los apuntes del alumno.
+- **Que el tutor no toque los apuntes existentes.** Descartada por producto: deja "el documento vivo"
+  siendo un documento que solo vive por la mano del alumno, y el tutor solo sabe crear notas nuevas.
+- **Numerar revisiones por bloque** para detectar que el bloque cambió desde que se propuso.
+  Descartada: guardar el texto que el tutor vio cuesta lo mismo, no añade estado al bloque y además
+  permite enseñar qué cambió, no solo que cambió.
+
+**Decisión.** El tutor puede proponer insertar, reescribir o borrar un bloque, mediante
+`artifacts note propose`. La propuesta se guarda como pendiente dentro del apunte y **no altera ningún
+bloque**. La aplica o la descarta el alumno desde la interfaz.
+
+**La confirmación está en el código de la forma más fuerte posible: no existe ningún comando que
+acepte, aplique o rechace una propuesta** (ADR-008, barrera 4: lo que no debe hacer, no se le da). Una
+propuesta de reescritura o de borrado guarda `baseMarkdown`, el texto que el tutor vio; si al aceptar
+el bloque ya no coincide, se rechaza con 409 y se enseñan los dos textos.
+
+**Consecuencias.**
+
+- La peor inyección desde un PDF consigue que aparezca una propuesta que el alumno ve y descarta. No
+  consigue una escritura.
+- Es conservador de más: un espacio añadido a un bloque caduca la propuesta igual que una reescritura
+  completa. Preferimos rechazar de más a aplicar sobre un texto que el tutor no vio.
+- Las propuestas viven dentro del JSON del apunte, así que no hay almacén nuevo y tienen su techo
+  (`maxPendingProposalsPerNote`), como cualquier otra capacidad (invariante 11).
+
+---
+
+## ADR-015 · La URL externa se trae con guardas en código, y una redirección se rechaza
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** Un bloque de apuntes puede tener como fuente una URL. Eso convierte al servidor en un
+cliente HTTP que visita direcciones que elige otro, que es la definición de SSRF. El ADR-007 ya declaró
+los techos (https, 5 s, 2 MB, sin IP privada); esta decisión fija cómo se imponen.
+
+**Opciones consideradas.**
+
+- **Seguir redirecciones** (`redirect: "follow"`, el valor por defecto de `fetch`). Descartada: obliga a
+  revalidar cada salto contra la lista de direcciones privadas, y una revalidación olvidada reabre
+  entero el agujero que la comprobación inicial cerraba. Un redirector público a `127.0.0.1` es trivial
+  de montar.
+- **Filtrar por lista de dominios permitidos.** Descartada por producto: el alumno pega la URL de sus
+  apuntes, de una wiki o del blog del profesor, y una lista blanca la rechazaría casi siempre.
+- **Aceptar cualquier tipo de contenido y extraer lo que se pueda.** Descartada: traer 2 MB de binario
+  para sacar cero texto es gasto sin nada a cambio, y el mensaje de error se vuelve inexplicable.
+
+**Decisión.** Siete guardas, todas en código y todas rechazando en voz alta con el motivo concreto:
+solo `https`; el host se resuelve con `dns.lookup` y se rechaza si **alguna** dirección resuelta es
+privada, de loopback, de enlace local o no enrutable (IPv4, IPv6 y las mapeadas); `redirect: "manual"`,
+así que una redirección se rechaza nombrando el destino; `AbortSignal.timeout`; corte por bytes leídos;
+solo `text/html` y `text/plain`; y extracción de texto con una función pura y probada.
+
+**Consecuencias.**
+
+- **Queda el DNS rebinding**, y decirlo es parte de la entrega: entre nuestra resolución y la que hace
+  `fetch` por su cuenta, un DNS hostil puede cambiar la respuesta. Cerrarlo exige fijar la IP y pasar
+  la cabecera `Host` a mano. Sin autenticación, quien lo explotaría es el propio usuario contra su
+  propia máquina, así que se documenta en `NOTES.md` en vez de arreglarse.
+- La extracción de texto no es un parser de HTML y con markup roto puede colar texto que no es
+  contenido. El fragmento se enseña antes de aceptarlo, así que el fallo es visible y reversible.
+- Muchas páginas reales redirigen (de `example.com` a `www.example.com`, de HTTP a HTTPS). El alumno
+  verá el rechazo con el destino y podrá pegar la URL final. Es fricción a cambio de una superficie de
+  ataque que no se puede auditar a ojo.

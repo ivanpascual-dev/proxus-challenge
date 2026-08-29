@@ -111,7 +111,100 @@ domicilio.
 
 ### Fase 2 · Apuntes: el documento vivo
 
-_Pendiente._
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/fase2-apuntes-vivos.md`](../notes/plans/fase2-apuntes-vivos.md). Las cifras en
+mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domicilio.
+
+#### El apunte por bloques
+
+- **F2-01.** EL sistema DEBERÁ representar todo apunte como una lista ordenada de bloques, cada uno con
+  identidad propia, autoría (`tutor` o `student`), marca de énfasis y fuente, o ninguna fuente.
+- **F2-02.** CUANDO el alumno guarde un apunte, EL sistema DEBERÁ persistir el orden, el texto, la
+  autoría y la marca de cada bloque, y devolver el apunte guardado.
+- **F2-03.** SI un apunte guardado supera `maxBlocksPerNote` bloques, ENTONCES EL sistema DEBERÁ
+  rechazar el guardado con 400 nombrando el techo y el número recibido, y NO DEBERÁ guardar nada.
+- **F2-04.** SI un bloque supera `maxBlockCharacters` caracteres, ENTONCES EL sistema DEBERÁ rechazar el
+  guardado con 400 nombrando el techo, la longitud recibida y el bloque afectado, y NO DEBERÁ guardar
+  nada.
+- **F2-05.** CUANDO el alumno añada, edite, reordene o borre un bloque, EL sistema DEBERÁ reflejarlo en
+  la siguiente lectura del apunte sin recargar la página.
+- **F2-06.** CUANDO el alumno marque un bloque como importante, EL sistema DEBERÁ guardar esa marca como
+  señal propia del bloque, y NO DEBERÁ mezclarla con ninguna otra señal.
+- **F2-07.** SI el fichero de un artefacto guardado no se puede decodificar, ENTONCES el listado DEBERÁ
+  devolver los demás y nombrar el que falla con su motivo, y NO DEBERÁ fallar entero.
+- **F2-08.** EL sistema NO DEBERÁ usar `Effect.orDie` en ningún handler del grupo `artifacts`: todo
+  error DEBERÁ estar declarado en `packages/shared` y mapeado a su estado HTTP.
+
+#### Procedencia del bloque
+
+- **F2-09.** CUANDO un bloque declare material y páginas, EL sistema DEBERÁ rellenar su fragmento
+  cacheado desde el índice de ese material, y NO DEBERÁ aceptar como fragmento ningún texto propuesto
+  por el modelo.
+- **F2-10.** SI la cita de un bloque no se puede comprobar contra el índice (material inexistente, sin
+  indexar, página fuera de rango o página fallida), ENTONCES EL sistema DEBERÁ guardar el bloque con el
+  motivo concreto y la interfaz DEBERÁ mostrarlo, y NO DEBERÁ descartar el bloque ni presentarlo como
+  anclado.
+- **F2-11.** CUANDO alguna de las páginas citadas tenga procedencia `transcribed`, EL sistema DEBERÁ
+  marcar el fragmento como transcripción del modelo y la interfaz DEBERÁ señalarlo.
+- **F2-12.** EL fragmento cacheado de un bloque NO DEBERÁ superar `maxSourceExcerptCharacters`
+  caracteres, y si se recorta EL sistema DEBERÁ decirlo en el propio bloque.
+- **F2-13.** CUANDO el alumno abra la cita de un bloque, EL sistema DEBERÁ mostrar el renderizado de la
+  página citada sin sacarle del apunte.
+- **F2-14.** CUANDO el tutor ejecute `materials read` sobre páginas de un material indexado, EL sistema
+  DEBERÁ devolver el texto indexado de esas páginas con su procedencia, sin renderizar ninguna imagen y
+  sin gastar presupuesto de páginas ni de bytes.
+- **F2-15.** CUANDO una lectura de índice alcance `maxIndexTextCharactersPerTurn`, EL sistema DEBERÁ
+  devolver lo leído hasta ahí acompañado de un aviso que nombre la última página servida y el total
+  pedido.
+- **F2-16.** SI se pide `materials read` de un material sin indexar, ENTONCES EL sistema DEBERÁ decirlo
+  explícitamente y NO DEBERÁ devolver texto vacío.
+
+#### Reescritura de un bloque
+
+- **F2-17.** CUANDO el alumno pida reescribir un bloque, EL sistema DEBERÁ enviar al modelo únicamente
+  el texto del bloque y su fragmento cacheado, y NO DEBERÁ renderizar ninguna página ni releer el PDF.
+- **F2-18.** CUANDO el modelo devuelva la reescritura, EL sistema DEBERÁ mostrarla junto al texto
+  actual, y NO DEBERÁ guardarla hasta que el alumno la acepte.
+- **F2-19.** SI el bloque no tiene fragmento cacheado, ENTONCES EL sistema DEBERÁ reescribir solo con el
+  texto del bloque y DEBERÁ decir que lo hizo sin fuente.
+
+#### URL externa como fuente
+
+- **F2-20.** CUANDO el alumno añada una URL como fuente, EL sistema DEBERÁ aceptar solo `https`, y
+  DEBERÁ rechazar cualquier otro esquema nombrándolo.
+- **F2-21.** SI el host de la URL resuelve a una dirección privada, de loopback, de enlace local o no
+  enrutable, ENTONCES EL sistema DEBERÁ rechazar la petición nombrando la dirección, y NO DEBERÁ hacer
+  ninguna petición a ella.
+- **F2-22.** SI la respuesta supera `maxExternalFetchBytes` o tarda más de `externalFetchTimeoutMs`,
+  ENTONCES EL sistema DEBERÁ abortarla y DEBERÁ decir cuál de los dos techos se alcanzó.
+- **F2-23.** SI la URL responde con una redirección, ENTONCES EL sistema DEBERÁ rechazarla nombrando el
+  destino, y NO DEBERÁ seguirla.
+- **F2-24.** SI el tipo de contenido no es `text/html` ni `text/plain`, ENTONCES EL sistema DEBERÁ
+  rechazarla nombrando el tipo recibido.
+- **F2-25.** CUANDO una URL se traiga con éxito, EL bloque resultante DEBERÁ guardar la URL, la fecha de
+  la descarga y el fragmento extraído, y la interfaz DEBERÁ mostrarlos.
+
+#### Propuestas del tutor
+
+- **F2-26.** CUANDO el tutor proponga añadir, reescribir o borrar un bloque, EL sistema DEBERÁ guardarlo
+  como propuesta pendiente y NO DEBERÁ alterar ningún bloque del apunte.
+- **F2-27.** EL sistema NO DEBERÁ exponer al agente ningún comando que acepte, aplique o rechace una
+  propuesta.
+- **F2-28.** CUANDO el alumno acepte una propuesta, EL sistema DEBERÁ aplicarla y retirarla de las
+  pendientes; cuando la rechace, DEBERÁ retirarla sin aplicarla.
+- **F2-29.** SI el bloque afectado por una propuesta ha cambiado desde que se propuso, ENTONCES EL
+  sistema DEBERÁ rechazar la aceptación con 409, DEBERÁ mostrar el texto que el tutor vio frente al
+  actual, y NO DEBERÁ aplicarla.
+- **F2-30.** SI un apunte acumula `maxPendingProposalsPerNote` propuestas pendientes, ENTONCES EL
+  sistema DEBERÁ rechazar la siguiente nombrando el techo.
+
+#### Interfaz
+
+- **F2-31.** La interfaz DEBERÁ llamar "Apuntes" al artefacto de tipo `note`, y el contrato DEBERÁ
+  seguir usando `note`.
+- **F2-32.** EL texto de la interfaz DEBERÁ estar en español en todas las pantallas.
+- **F2-33.** Toda vista de los apuntes DEBERÁ tener sus cuatro estados: cargando, vacío, error con
+  motivo y con datos.
 
 ### Fase 3 · El test que enseña
 
