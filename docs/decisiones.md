@@ -201,9 +201,9 @@ página sea un entero positivo y que el rango no esté invertido, y nada más: n
 ahí que `materials view apuntes 1-1000` renderice mil páginas a 144 dpi, las convierta a base64 y las
 meta todas en una petición. Eso no es lento: es una factura y casi seguro un error de tamaño de la API.
 
-**Por qué el techo por llamada no sirve.** El agente tiene 8 pasos por turno y puede llamar a
-`materials view` en cada uno. Con un tope de 20 páginas por llamada, un solo mensaje del usuario puede
-leer 160 páginas cumpliendo el límite las ocho veces.
+**Por qué el techo por llamada no sirve.** El agente tiene 8 pasos por turno (12 desde la fase 2,
+decisión 22) y puede llamar a `materials view` en cada uno. Con un tope de 20 páginas por llamada, un
+solo mensaje del usuario puede leer 160 páginas cumpliendo el límite las ocho veces.
 
 **Opciones consideradas.**
 
@@ -236,7 +236,7 @@ Cuatro familias:
 | | Fichero subido (fase 4) | 25 MB |
 | Coste por turno | Páginas renderizadas | 20 |
 | | Bytes de imagen | 12 MB, contando la cadena base64 (medido en la fase 1) |
-| | Pasos del agente | 8, **acotado en el servidor** |
+| | Pasos del agente | 12, **acotado en el servidor** (subió de 8 en la fase 2, decisión 22 del plan: holgura para el camino de generación, no más seguridad) |
 | Frecuencia | Mensajes | 20 / 10 min · 200 / día |
 | | Artefactos generados | 5 / 10 min · 40 / día |
 | | Peticiones simultáneas por cliente | 3 |
@@ -681,3 +681,59 @@ solo `text/html` y `text/plain`; y extracción de texto con una función pura y 
 - Muchas páginas reales redirigen (de `example.com` a `www.example.com`, de HTTP a HTTPS). El alumno
   verá el rechazo con el destino y podrá pegar la URL final. Es fricción a cambio de una superficie de
   ataque que no se puede auditar a ojo.
+
+---
+
+## ADR-016 · El tutor autora lo abierto; transformar un material es un servicio con ruta
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-29
+
+**Contexto.** La fase 2 añade la generación de apuntes. La primera versión la hacía el tutor: un
+`artifacts create` con el JSON del apunte entero, autorado por el modelo de una tacada. Falló de tres
+formas a la vez (un solo bloque plano, JSON frágil, y fallos del agente que la interfaz daba por
+"creado" sin nada detrás, violando la invariante 3). La tercera pasada la sacó del agente:
+`NoteGenerationService` en el dominio pone la estructura (un bloque por tema hoja del índice, en orden,
+cita copiada del índice) y el modelo solo redacta la prosa de cada bloque. Quedaba decidir cómo se
+dispara.
+
+**Opciones consideradas.**
+
+- **Comando del CLI del tutor** (`artifacts note generate <materialId>`), disparado desde la pestaña
+  "Apuntes" mandando un mensaje al chat. Descartada por dos motivos. Uno, comprobado: el arnés está
+  diseñado sin canal de dependencias, los comandos son `Effect<unknown, CliError>` sin `R`
+  (`harness/cli.ts:198`), así que pasar el `LanguageModel` a un comando obliga a enhebrarlo a mano por
+  los tres sitios donde se construye el arnés. Dos, de fondo: generar el apunte no tiene **ninguna
+  decisión** para el modelo (la forma la pone el código, la entrada es solo el `materialId`); poner un
+  LLM no determinista delante de una operación que la persona dispara con un botón añade un salto que
+  puede fallar o alucinar sin aportar nada.
+- **Que el tutor autore el JSON del apunte**, como al principio. Descartada: es exactamente lo que
+  falló y motivó sacar la generación del agente.
+
+**Decisión.** Generar apuntes es un **servicio del dominio con su ruta** (`POST /api/materials/:id/notes`,
+progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `create-study-artifacts` le
+dice que se generan desde la pestaña "Apuntes" del material y que remita ahí a quien se lo pida.
+
+El límite general: **el tutor autora lo que tiene forma abierta y se pide conversando** (quiz y test;
+el modelo decide cuántas preguntas, qué evalúan y la dificultad desde texto libre). **Transformar un
+material en un activo de estudio estructurado es un servicio con ruta** (indexar, generar apuntes): el
+modelo se llama, pero no decide la forma, y la operación tiene que poder correr fuera de una
+conversación.
+
+**Esto no contradice el ADR-004.** El ADR-004 dice que una capacidad **nueva del agente** viaja sobre
+las tools que ya existen, no que todo lo que llama al modelo sea una capacidad del agente. Indexar
+llama a Gemini, no es un comando del tutor y nadie lo discute; generar apuntes es la misma categoría.
+
+**Consecuencias.**
+
+- **La fase 4 lo agradece.** Al subir ficheros, la cadena "indexar y generar apuntes solos" es
+  `IndexingService` y `NoteGenerationService` encadenados en el handler de subida. Si generar apuntes
+  fuese un comando del tutor, subir un PDF tendría que arrancar un turno de agente por material. El
+  servicio con su ruta ya queda listo para encadenar.
+- **El tutor pierde una frase de su repertorio** ("te hago unos apuntes"). A cambio, su frontera es
+  honesta y observable: ante la petición, dice dónde se hace. Donde el agente sube de valor de verdad
+  es en la fase 4, con más materiales, el perfil de estudio (ADR-002) y el selector de contexto, no
+  sellando un clic.
+- **Queda una costura**: el servidor tiene dos caminos que llaman al modelo (el arnés del tutor y los
+  servicios `IndexingService` / `NoteGenerationService`). Es deliberada y está aquí explicada; no se
+  unifica en esta fase.

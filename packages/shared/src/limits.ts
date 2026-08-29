@@ -11,7 +11,7 @@ export const LIMITS = {
   // Coste por turno
   maxPagesPerTurn: 20,
   maxTurnImageBytes: 12 * 1024 * 1024, // base64, medido en la fase 1
-  maxAgentSteps: 8,
+  maxAgentSteps: 12, // holgura para el camino de generación de apuntes (fase 2, decisión 22); sigue lejos del riesgo de ADR-007
 
   // Frecuencia
   messagesPerWindow: { limit: 20, windowMs: 10 * 60 * 1000 },

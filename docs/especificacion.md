@@ -206,6 +206,24 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 - **F2-33.** Toda vista de los apuntes DEBERÁ tener sus cuatro estados: cargando, vacío, error con
   motivo y con datos.
 
+#### El apunte y su material (tramo 2B, tras probar Iván)
+
+- **F2-34.** EL sistema DEBERÁ atar cada apunte a un material mediante `materialId`, y NO DEBERÁ
+  permitir más de un apunte por material: el segundo intento de generar uno DEBERÁ rechazarse
+  nombrando el material, sin crear nada.
+- **F2-35.** La interfaz DEBERÁ mostrar el apunte de un material dentro de la vista de ese material, y
+  NO DEBERÁ listar los apuntes en la barra lateral de artefactos.
+- **F2-36.** CUANDO el alumno pulse "Crear apuntes" en la pestaña Apuntes de un material, EL sistema
+  DEBERÁ generar el apunte con una llamada directa (sin pasar por el tutor), emitir el progreso tema a
+  tema, y estructurar el apunte con un bloque por cada tema hoja del índice del material, en orden,
+  con la cita de las páginas de ese tema. La prosa de cada bloque se redacta a partir del texto
+  indexado de esas páginas.
+- **F2-37.** CUANDO la generación de un apunte falle a mitad (el modelo, el almacenamiento), la
+  pestaña DEBERÁ mostrar el motivo real del fallo, nunca darlo por hecho.
+- **F2-38.** CUANDO el alumno borre un apunte, EL sistema DEBERÁ eliminarlo y la vista del material
+  DEBERÁ volver a ofrecer la creación de apuntes.
+- **F2-39.** EL tutor NO DEBERÁ crear apuntes: `artifacts create` solo acepta quiz y test.
+
 ### Fase 3 · El test que enseña
 
 _Pendiente._

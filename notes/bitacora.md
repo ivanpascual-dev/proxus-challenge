@@ -224,3 +224,33 @@ plan. Lo que la sesión siguiente (2B) no vería en el diff:
 - **Duda cerrada de refilón:** el esquema de artefactos sigue duplicado entre `shared` y
   `server/domain` (deuda anterior, `architecture.md:288`). El mirror de los esquemas de note lo
   hereda; lo tapa `note-schema.test.ts`, que decodifica un apunte con los dos esquemas y compara.
+
+## 2026-08-29 · Fase 2 · tramo 2B · la generación de apuntes sale del agente
+
+El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesión siguiente no vería en el diff:
+
+- **Desviación (enfoque de generación, 3 pasadas):** el plan original (§7 paso 17) generaba apuntes con
+  `artifacts create` autorado por el tutor. Iván lo rechazó dos veces: el agente colapsaba todos los
+  temas en un bloque, y la interfaz daba por "creado" lo que el agente no llegaba a guardar (viola
+  invariante 3). Solución final: `NoteGenerationService` en el dominio con ruta
+  `POST /api/materials/:id/notes`, sin agente. La estructura (un bloque por tema hoja del índice, en
+  orden, cita copiada del índice) la pone el código; el modelo solo redacta la prosa de cada bloque.
+- **Causa raíz del "bloque único":** no era el código de creación (siempre manejó N bloques). Se
+  sumaban `maxAgentSteps: 8` (empujaba al modelo a cerrar de una tacada), un único ejemplo de un
+  bloque en la skill, y el JSON entero emitido de una vez. Subir a 12 y reescribir la skill no bastó;
+  por eso la estructura pasó a código.
+- **Decisión sobre la marcha (ADR-016):** el disparador es una ruta directa, no un comando del tutor.
+  Se trazó el arnés: los comandos del `cli` son `Effect<unknown, CliError>` sin canal de dependencias
+  (`harness/cli.ts:198`), así que pasar `LanguageModel` a un comando obliga a enhebrarlo a mano por
+  los tres constructores del arnés; y generar un apunte no tiene ninguna decisión para el modelo.
+  Contexto aquí, decisión en el ADR-016.
+- **Deuda (costura de dos caminos al modelo):** el servidor llama al modelo por el arnés del tutor y
+  por los servicios `IndexingService` / `NoteGenerationService`. Deliberado y explicado en el ADR-016;
+  no se unifica en esta fase.
+- **Deuda (apuntes pobres por índice pobre):** `NoteGenerationService` redacta desde
+  `index.pages[].text`; si la extracción falló (visto: páginas con 30-670 caracteres) el bloque sale
+  flojo. `draftBlock` marca el bloque cuando el texto del tema no llega a 60 caracteres, pero no
+  re-mira el PDF. Se desbloquea re-indexando el material.
+- **Limpieza:** se retiró el parámetro `noteService` que la segunda pasada había enhebrado hasta
+  `makeArtifactCommands` sin llegar a usarlo (era para `artifacts note propose`, tramo 2D). Cuando 2D
+  lo necesite, se vuelve a cablear.

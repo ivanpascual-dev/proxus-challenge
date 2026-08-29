@@ -4,9 +4,13 @@
 
 El tutor ayuda a estudiar usando materiales locales y creando artefactos de aprendizaje:
 
-- `note`: apunte/explicación.
 - `quiz`: ejercicio corto, cerrado y autocorregible.
 - `test`: evaluación más completa; puede incluir respuesta corta.
+
+Los apuntes (`note`) **no** los crea el tutor: se generan desde la pestaña "Apuntes" de cada material
+(`POST /api/materials/:id/notes`, un servicio del dominio como la indexación). El tutor, si se lo
+piden, remite a esa pestaña. El porqué del límite está en el ADR-016: el tutor autora lo abierto
+(quiz, test); transformar un material en un activo estructurado es un servicio con ruta.
 
 ## Archivos principales
 
@@ -53,6 +57,8 @@ artifacts submit '<json>'
 artifacts attempts [artifactId]
 artifacts grade <attemptId>
 ```
+
+`artifacts create` solo acepta `quiz` y `test`. Los apuntes se generan fuera del tutor (ver arriba).
 
 `materials view` puede devolver imágenes de páginas para llamadas multimodales a Gemini.
 

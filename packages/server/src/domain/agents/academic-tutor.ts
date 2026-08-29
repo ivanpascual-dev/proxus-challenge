@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, Ref, Stream } from "effect";
 import { Model as AiModel } from "effect/unstable/ai";
+import { LIMITS } from "@proxus/shared";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { SessionRepository, AgentHarness, AgentSession } from "./harness/index.ts";
 import { GeminiModel } from "./gemini.ts";
@@ -60,7 +61,7 @@ export const academicTutorAgent = Effect.gen(function* () {
   const messages = yield* session.stream({
     input: task,
     messages: storedSession.messages,
-    maxSteps: 8
+    maxSteps: LIMITS.maxAgentSteps
   }).pipe(
     Stream.provide(harness.layer),
     Stream.tap((message) => Effect.gen(function* () {

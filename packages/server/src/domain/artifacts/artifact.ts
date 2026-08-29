@@ -127,6 +127,7 @@ export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
   id: Schema.String,
   title: Schema.String,
+  materialId: Schema.String,
   blocks: Schema.Array(NoteBlock),
   proposals: Schema.Array(NoteProposal)
 });
@@ -156,13 +157,9 @@ export const Artifact = Schema.Union([
 export type Artifact = typeof Artifact.Type;
 export type ArtifactKind = Artifact["kind"];
 
-export const CreateNoteArtifactInput = Schema.Struct({
-  kind: Schema.Literal("note"),
-  title: Schema.String,
-  markdown: Schema.String
-});
-export type CreateNoteArtifactInput = typeof CreateNoteArtifactInput.Type;
-
+// Fase 2, decisión 25: el agente ya no crea apuntes. La generación es un servicio del dominio
+// (`NoteGenerationService`) con su ruta HTTP, no `artifacts create`. Un apunte se edita luego bloque a
+// bloque con `SaveNoteInput`. Por eso `CreateArtifactInput` solo tiene quiz y test.
 export const CreateQuizArtifactInput = Schema.Struct({
   kind: Schema.Literal("quiz"),
   title: Schema.String,
@@ -178,7 +175,6 @@ export const CreateTestArtifactInput = Schema.Struct({
 export type CreateTestArtifactInput = typeof CreateTestArtifactInput.Type;
 
 export const CreateArtifactInput = Schema.Union([
-  CreateNoteArtifactInput,
   CreateQuizArtifactInput,
   CreateTestArtifactInput
 ]);
@@ -381,6 +377,14 @@ export class ArtifactRepositoryStorageError extends Data.TaggedError("ArtifactRe
   readonly reason: unknown;
 }> {}
 
+// Un material tiene como mucho un apunte (fase 2, decisión 19). Lo comprueba `NoteGenerationService`
+// antes de guardar; para rehacer el apunte hay que borrar el que hay. No es un error del repositorio
+// de artefactos: `createArtifact` ya no crea apuntes (decisión 25).
+export class MaterialAlreadyHasNote extends Data.TaggedError("MaterialAlreadyHasNote")<{
+  readonly materialId: string;
+  readonly noteId: string;
+}> {}
+
 export class ArtifactRepositorySerializationError extends Data.TaggedError("ArtifactRepositorySerializationError")<{
   readonly reason: unknown;
 }> {}
@@ -398,6 +402,7 @@ export interface ArtifactRepository {
   readonly createArtifact: (input: CreateArtifactInput) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly saveArtifact: (artifact: Artifact) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getArtifact: (id: string) => Effect.Effect<Artifact, ArtifactRepositoryError>;
+  readonly deleteArtifact: (id: string) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly listArtifacts: (input?: ListArtifactsInput) => Effect.Effect<ArtifactListing, ArtifactRepositoryError>;
   readonly submitAttempt: (input: SubmitAttemptInput) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly saveAttempt: (attempt: ArtifactAttempt) => Effect.Effect<void, ArtifactRepositoryError>;
@@ -413,22 +418,6 @@ export const ArtifactRepository = Context.Service<ArtifactRepository>(
 export const makeArtifact = (input: CreateArtifactInput): Artifact => {
   const id = crypto.randomUUID();
   switch (input.kind) {
-    case "note":
-      // Fase 2A: crear un apunte lo arranca como un único bloque del tutor. El paso 15 (tramo 2B)
-      // pasa `artifacts create` a aceptar la lista de bloques directamente.
-      return {
-        kind: "note",
-        id,
-        title: input.title,
-        blocks: [{
-          id: crypto.randomUUID(),
-          markdown: input.markdown,
-          author: "tutor",
-          emphasis: false,
-          source: null
-        }],
-        proposals: []
-      };
     case "quiz":
       return { ...input, id };
     case "test":

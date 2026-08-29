@@ -49,6 +49,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
 - **El espacio de trabajo de artefactos habla español.** Los textos de la zona de apuntes, quizzes y
   tests (encabezados, estados de carga y de error) pasan de inglés a español.
+- **El tutor ya no crea apuntes.** Los apuntes se generan desde la pestaña "Apuntes" de cada material,
+  no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña. El tutor sigue creando
+  quizzes y tests.
+- **El aviso de fichero de artefacto ilegible da un motivo en lenguaje humano** ("no tiene el formato
+  de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
+  detalle técnico va al log del servidor.
 
 ### Corregido
 

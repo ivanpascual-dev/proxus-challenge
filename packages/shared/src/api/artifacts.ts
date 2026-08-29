@@ -62,6 +62,18 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         UnknownBlock.pipe(HttpApiSchema.status(400)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
+    }),
+    // Borrar un apunte para poder regenerarlo: un material tiene como mucho un apunte (fase 2,
+    // decisión 19), así que sin borrado no habría forma de rehacerlo.
+    HttpApiEndpoint.delete("deleteArtifact", "/:id", {
+      params: {
+        id: Schema.String
+      },
+      success: HttpApiSchema.NoContent,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
     })
   )
   .prefix("/artifacts")

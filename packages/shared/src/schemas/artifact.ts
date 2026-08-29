@@ -48,10 +48,13 @@ export const TestQuestion = Schema.Union([
 ]);
 export type TestQuestion = typeof TestQuestion.Type;
 
+// El apunte nace atado a un material y hay como mucho uno por material (fase 2, decisiones 17 y 19).
+// El apunte se ve dentro de la vista de ese material, no en una lista suelta de artefactos.
 export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
   id: Schema.String,
   title: Schema.String,
+  materialId: Schema.String,
   blocks: Schema.Array(NoteBlock),
   proposals: Schema.Array(NoteProposal)
 });
@@ -88,7 +91,10 @@ export const ArtifactSummary = Schema.Struct({
     Schema.Literal("quiz"),
     Schema.Literal("test")
   ]),
-  title: Schema.String
+  title: Schema.String,
+  // Presente solo en los apuntes: la interfaz lo usa para colocar el apunte en su material y para no
+  // ofrecer generar otro (fase 2, decisiones 17 a 19).
+  materialId: Schema.optional(Schema.String)
 });
 export type ArtifactSummary = typeof ArtifactSummary.Type;
 

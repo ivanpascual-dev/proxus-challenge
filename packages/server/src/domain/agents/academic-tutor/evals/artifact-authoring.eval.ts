@@ -15,7 +15,8 @@ import {
   type CreateArtifactInput,
   type ListArtifactsInput,
   type SubmitAttemptInput,
-  gradeAttempt
+  gradeAttempt,
+  makeArtifact
 } from "../../../artifacts/artifact.ts";
 import {
   MaterialIndexingFailed,
@@ -136,10 +137,10 @@ const InMemoryArtifactRepository = Layer.effect(
 
     const createArtifact = (input: CreateArtifactInput): Effect.Effect<Artifact, ArtifactRepositoryError> =>
       Ref.modify(ref, (state) => {
-        const artifact = {
-          ...input,
+        const artifact: Artifact = {
+          ...makeArtifact(input),
           id: `artifact-${state.nextArtifactId}`
-        } as Artifact;
+        };
 
         return [
           artifact,
@@ -155,6 +156,12 @@ const InMemoryArtifactRepository = Layer.effect(
       Ref.update(ref, (state) => ({
         ...state,
         artifacts: [...state.artifacts.filter((candidate) => candidate.id !== artifact.id), artifact]
+      }));
+
+    const deleteArtifact = (id: string): Effect.Effect<void, ArtifactRepositoryError> =>
+      Ref.update(ref, (state) => ({
+        ...state,
+        artifacts: state.artifacts.filter((candidate) => candidate.id !== id)
       }));
 
     const getArtifact = (id: string): Effect.Effect<Artifact, ArtifactRepositoryError> =>
@@ -241,6 +248,7 @@ const InMemoryArtifactRepository = Layer.effect(
 
     return ArtifactRepository.of({
       createArtifact,
+      deleteArtifact,
       saveArtifact,
       getArtifact,
       listArtifacts,
@@ -277,7 +285,32 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
       }
     });
   },
-  getIndex: (id) => Effect.fail(new MaterialNotIndexed({ materialId: id })),
+  getIndex: (id) => {
+    const material = materials.find((candidate) => candidate.id === id);
+    if (material === undefined) {
+      return Effect.fail(new MaterialNotFound({ materialId: id }));
+    }
+    if (material.pages.length === 0) {
+      return Effect.fail(new MaterialNotIndexed({ materialId: id }));
+    }
+    return Effect.succeed({
+      materialId: material.id,
+      fileName: material.fileName,
+      contentHash: `eval-${material.id}`,
+      pageCount: material.pages.length,
+      indexedAt: material.uploadedAt,
+      threshold: 600,
+      topics: [],
+      pages: material.pages.map((page) => ({
+        page: page.page,
+        provenance: "extracted" as const,
+        text: page.text,
+        denseCharacters: page.text.length,
+        topicIds: [] as readonly string[]
+      })),
+      failedPages: []
+    });
+  },
   reindex: (id) => Effect.fail(new MaterialIndexingFailed({ materialId: id, reason: "el eval no indexa materiales" }))
 });
 
@@ -372,12 +405,6 @@ const dataset = ArtifactAuthoringEvalDataset.make({
   id: "academic-tutor.artifact-authoring",
   description: "The tutor creates valid note, quiz, and test artifacts when the user asks for academic practice material.",
   cases: [
-    {
-      id: "creates-note",
-      input: "Crea una nota breve sobre la regla de la potencia. Usa el comando artifacts create para persistirla. Mantén el markdown en una sola frase simple, sin fórmulas LaTeX, sin comillas y sin saltos de línea.",
-      expected: { artifactKind: "note" },
-      maxSteps: 8
-    },
     {
       id: "creates-quiz",
       input: "Crea un quiz de 3 preguntas sobre derivadas. Usa preguntas true-false o multiple-choice y persiste el quiz con artifacts create.",

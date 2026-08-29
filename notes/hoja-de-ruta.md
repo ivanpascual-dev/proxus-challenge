@@ -148,6 +148,11 @@ viene del cliente, que puede fabricar mensajes de `assistant` y resultados de he
   orden.
 - **Subir ficheros**: PDF, `.md` y `.txt`, con techo de 25 MB y tipo comprobado por contenido, no por
   extensión.
+- **Al subir, indexar y generar apuntes solos** (idea de Iván, tras probar la fase 2). Subir un PDF
+  dispara el indexado, y al terminar dispara `NoteGenerationService.forMaterial` (fase 2, decisión
+  27): el alumno sube 5 archivos y se encuentra 5 mapas mentales con sus apuntes sin pulsar nada. El
+  servicio y su ruta (`POST /api/materials/:id/notes`) ya existen; aquí solo se encadenan al alta.
+  "Mapa mental automático" = "indexar automático": el mapa ya se deriva del índice.
 - **`scripts/test-guardarrailes.mjs`**, la batería completa (ADR-008).
 - Todo **sobre el comando `cli` que ya existe** (ADR-004): cero herramientas nuevas.
 

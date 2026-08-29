@@ -112,7 +112,9 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
 const artifactSummary = (artifact: Artifact) => ({
   id: artifact.id,
   kind: artifact.kind,
-  title: artifact.title
+  title: artifact.title,
+  // Solo los apuntes lo llevan: la interfaz los coloca en su material (fase 2, decisiones 17 a 19).
+  ...(artifact.kind === "note" ? { materialId: artifact.materialId } : {})
 });
 
 // 500 con cuerpo y motivo, nunca un orDie mudo (invariante 6, F2-08).
@@ -165,7 +167,12 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
           }
         })
       ))
-      .handle("saveNote", ({ params, payload }) => notes.saveNote(params.id, payload));
+      .handle("saveNote", ({ params, payload }) => notes.saveNote(params.id, payload))
+      .handle("deleteArtifact", ({ params }) => artifacts.deleteArtifact(params.id).pipe(
+        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+          ? artifactNotFound(params.id)
+          : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))
+      ));
   })
 );
 

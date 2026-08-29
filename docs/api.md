@@ -30,9 +30,16 @@ La ruta streaming está implementada manualmente para soportar eventos increment
 ```http
 GET /api/materials/
 GET /api/materials/:id
+POST /api/materials/:id/index
+POST /api/materials/:id/notes
 ```
 
 Los materiales representan PDFs disponibles para el tutor. El server puede renderizar páginas vía Poppler para que Gemini las procese como imágenes.
+
+`POST /:id/index` y `POST /:id/notes` devuelven NDJSON con el progreso. `/notes` genera los apuntes del
+material (un bloque por tema del índice, prosa redactada por el modelo) como un servicio del dominio
+con ruta, igual que la indexación y sin pasar por el tutor (ADR-016). Emite el progreso tema a tema y
+termina con `done` (el resumen del apunte) o `failed` (el motivo).
 
 ### Artifacts
 
@@ -41,9 +48,13 @@ GET /api/artifacts/
 GET /api/artifacts/:id
 POST /api/artifacts/:id/submit
 PUT /api/artifacts/:id/note
+DELETE /api/artifacts/:id
 ```
 
 `submit` crea y corrige un intento, devolviendo un attempt con estado `graded` cuando aplica.
+
+`DELETE /:id` borra un artefacto (204). Sirve para rehacer los apuntes de un material: hay como mucho
+un apunte por material, así que regenerar exige borrar el que hay.
 
 `PUT /:id/note` guarda el apunte entero: editar, añadir, reordenar, borrar y marcar un bloque son la
 misma operación y gana el último que guarda. El servidor genera el `id` de los bloques nuevos y
@@ -56,9 +67,10 @@ pudieron decodificar, cada uno con su motivo, en vez de fallar entero.
 
 ## Tipos de artifact
 
-- `note`: lista ordenada de bloques, cada uno con autoría (`tutor` o `student`), marca de énfasis y
-  fuente opcional (un material con sus páginas o una URL). Lleva además las propuestas del tutor
-  pendientes de que el alumno las acepte o descarte.
+- `note`: atado a un material (`materialId`), uno por material. Lista ordenada de bloques, cada uno con
+  autoría (`tutor` o `student`), marca de énfasis y fuente opcional (un material con sus páginas o una
+  URL). Lleva además las propuestas del tutor pendientes de que el alumno las acepte o descarte. Lo
+  genera `POST /api/materials/:id/notes`, no `artifacts create` (el tutor solo crea quiz y test).
 - `quiz`: preguntas cerradas.
 - `test`: preguntas cerradas o `short-answer`.
 

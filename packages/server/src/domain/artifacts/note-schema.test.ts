@@ -12,6 +12,7 @@ const noteJson = JSON.stringify({
   kind: "note",
   id: "note-1",
   title: "Conjuntos",
+  materialId: "conjuntos",
   blocks: [
     {
       id: "b1",

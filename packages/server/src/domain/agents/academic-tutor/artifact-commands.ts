@@ -158,20 +158,18 @@ export const makeArtifactCommands = (
     )
   );
 
+  // Fase 2, decisión 25: `artifacts create` solo hace quiz y test. Los apuntes los genera
+  // `NoteGenerationService` desde la pestaña Apuntes del material, no el tutor.
   const create = AgentCli.Command.withExamples([
-    {
-      command: `artifacts create '{"kind":"note","title":"Derivatives summary","markdown":"# Derivatives\\n..."}'`,
-      description: "Create a note artifact"
-    },
     {
       command: `artifacts create '{"kind":"quiz","title":"Basics quiz","questions":[{"type":"true-false","id":"q1","prompt":"2+2=4","correctAnswer":true,"explanation":"Basic arithmetic."}]}'`,
       description: "Create a quiz artifact"
     }
   ])(
-    AgentCli.Command.withDescription("Create a note, quiz, or test artifact from JSON")(
+    AgentCli.Command.withDescription("Create a quiz or test artifact from JSON")(
       AgentCli.Command.exec("create", {
         json: AgentCli.Argument.string("json").pipe(
-          AgentCli.Argument.withDescription("CreateArtifactInput JSON")
+          AgentCli.Argument.withDescription("CreateArtifactInput JSON (quiz or test)")
         )
       }, ({ json }) =>
         rateLimiter.check(clientKey, "artifacts").pipe(
