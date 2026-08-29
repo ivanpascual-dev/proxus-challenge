@@ -3,7 +3,9 @@ import type { AgentMessage } from "@proxus/shared";
 type ResourceKey = "artifacts" | "materials";
 
 export interface InvalidationHandlers {
-  readonly refreshArtifacts: () => void;
+  // Invalida la etiqueta `artifacts`, no solo recarga la lista: el tutor puede haber tocado el apunte
+  // abierto (`artifactQuery(id)`), no solo el listado.
+  readonly invalidateArtifacts: () => void;
   readonly refreshMaterials: () => void;
 }
 
@@ -33,7 +35,7 @@ export const applyInvalidations = (
   handlers: InvalidationHandlers
 ) => {
   if (keys.includes("artifacts")) {
-    handlers.refreshArtifacts();
+    handlers.invalidateArtifacts();
   }
 
   if (keys.includes("materials")) {
@@ -53,7 +55,8 @@ const cliInput = (input: unknown) => {
 const isArtifactMutation = (input: string) =>
   input.startsWith("artifacts create ") ||
   input.startsWith("artifacts submit ") ||
-  input.startsWith("artifacts grade ");
+  input.startsWith("artifacts grade ") ||
+  input.startsWith("artifacts note ");
 
 const isMaterialMutation = (input: string) =>
   input.startsWith("materials import ") ||

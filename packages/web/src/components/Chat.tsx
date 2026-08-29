@@ -1,9 +1,9 @@
-import { useAtomRefresh } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet } from "@effect/atom-react";
 import { LIMITS, type AgentMessage } from "@proxus/shared";
 import { useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
-import { artifactsQuery } from "../domain/artifacts/atoms.ts";
+import { invalidateArtifactsAction } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
@@ -19,7 +19,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const refreshArtifacts = useAtomRefresh(artifactsQuery);
+  const invalidateArtifacts = useAtomSet(invalidateArtifactsAction);
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
 
@@ -58,7 +58,7 @@ export function Chat() {
           const keys = pendingInvalidations.current.shift() ?? [];
           if (!message.isFailure) {
             applyInvalidations(keys, {
-              refreshArtifacts,
+              invalidateArtifacts: () => invalidateArtifacts(),
               refreshMaterials
             });
           }

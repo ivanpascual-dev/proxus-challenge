@@ -89,6 +89,15 @@ export const rejectProposalAction = apiRuntime.fn(
   { reactivityKeys: ["artifacts"] }
 );
 
+// El tutor crea propuestas (y quizzes, y califica intentos) desde el chat, por su cuenta: eso no pasa
+// por ningún atom de mutación, así que nada invalida `artifacts`. Este atom no hace nada salvo tocar
+// esa etiqueta de reactividad; el chat lo dispara cuando ve que una llamada del tutor tocó artefactos,
+// y así el apunte abierto (`artifactQuery(id)`) y las listas se recargan al momento.
+export const invalidateArtifactsAction = apiRuntime.fn(
+  (_: void) => Effect.void,
+  { reactivityKeys: ["artifacts"] }
+);
+
 export const submitArtifactAttemptAction = apiRuntime.fn(
   (input: SubmitAttemptInput) =>
     ApiClient.use((client) => input.artifactKind === "quiz"
