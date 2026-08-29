@@ -348,3 +348,15 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   `ArtifactWorkspace.tsx` (grep del resto de `packages/web/src`, todo lo demás ya estaba). Los valores
   del contrato (`multiple-choice`, `true-false`, `short-answer`, `quiz`, `test`) no se traducen: se
   mapean a etiquetas en español solo para mostrar.
+- **Guardarraíles del cierre (§18 del plan):** la auditoría estática encontró un bypass ALTO de la
+  guarda anti-SSRF. `isPrivateAddress` solo casaba `::ffff:` + IPv4 con puntos; la misma dirección en
+  hex (`::ffff:7f00:1` = 127.0.0.1), y las formas 6to4 y NAT64, pasaban como públicas. Lo no evidente:
+  `new URL("https://[::ffff:a9fe:a9fe]/")` **no** normaliza a la forma con puntos, `isIP` la da por
+  IPv6 válida y `resolveAddresses` la devuelve sin pasar por DNS. Arreglo: `parseIpv6` expande a 16
+  bytes, `isPrivateIpv6` clasifica por prefijo y decodifica la IPv4 embebida en cualquiera de las tres
+  formas. Además: `rewrite`/`url-source` toman permiso de concurrencia (les faltaba), y las escrituras
+  de artefacto (`saveNote`, `accept`/`reject`, `DELETE`) pasan a tener fusible de frecuencia.
+- **DNS rebinding, no arreglado a propósito:** el arreglo correcto (fijar la IP resuelta en la
+  conexión) necesita un dispatcher de undici (no es dependencia directa de `@proxus/server`, solo
+  transitiva vía `@effect/platform-node`) o un cliente HTTP nuevo. Sobre una beta y para un riesgo
+  autoinfligido sin autenticación, no compensa. A `NOTES.md`.

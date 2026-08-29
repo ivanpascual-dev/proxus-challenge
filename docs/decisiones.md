@@ -675,16 +675,22 @@ los techos (https, 5 s, 2 MB, sin IP privada); esta decisión fija cómo se impo
 
 **Decisión.** Siete guardas, todas en código y todas rechazando en voz alta con el motivo concreto:
 solo `https`; el host se resuelve con `dns.lookup` y se rechaza si **alguna** dirección resuelta es
-privada, de loopback, de enlace local o no enrutable (IPv4, IPv6 y las mapeadas); `redirect: "manual"`,
+privada, de loopback, de enlace local o no enrutable (IPv4, IPv6 y las que embeben una IPv4: mapeadas
+`::ffff:…` en cualquier notación, 6to4 `2002::/16` y NAT64 `64:ff9b::/96`); `redirect: "manual"`,
 así que una redirección se rechaza nombrando el destino; `AbortSignal.timeout`; corte por bytes leídos;
 solo `text/html` y `text/plain`; y extracción de texto con una función pura y probada.
 
 **Consecuencias.**
 
+- **La comprobación de dirección privada expande la IPv6 a sus 16 bytes**, no mira solo el primer
+  hextet ni casa con una regex de la forma con puntos. La pasada de `@guardarrailes` del cierre de fase
+  encontró que `::ffff:7f00:1` (127.0.0.1 en hex) esquivaba el filtro; el arreglo es una función pura
+  con sus tests (`url-guards.ts`, `parseIpv6` + `isPrivateIpv6`).
 - **Queda el DNS rebinding**, y decirlo es parte de la entrega: entre nuestra resolución y la que hace
-  `fetch` por su cuenta, un DNS hostil puede cambiar la respuesta. Cerrarlo exige fijar la IP y pasar
-  la cabecera `Host` a mano. Sin autenticación, quien lo explotaría es el propio usuario contra su
-  propia máquina, así que se documenta en `NOTES.md` en vez de arreglarse.
+  `fetch` por su cuenta, un DNS hostil puede cambiar la respuesta. Cerrarlo bien exige fijar la IP
+  resuelta en la conexión (un dispatcher de undici o un cliente HTTP nuevo) y pasar la cabecera `Host` a
+  mano; sobre una beta y para un riesgo que, sin autenticación, es el propio usuario contra su máquina,
+  no compensa. Se documenta en `NOTES.md`.
 - La extracción de texto no es un parser de HTML y con markup roto puede colar texto que no es
   contenido. El fragmento se enseña antes de aceptarlo, así que el fallo es visible y reversible.
 - Muchas páginas reales redirigen (de `example.com` a `www.example.com`, de HTTP a HTTPS). El alumno

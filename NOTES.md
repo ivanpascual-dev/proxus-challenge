@@ -386,9 +386,11 @@ comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno
 - **Seguridad del tutor:** `pnpm dev` en una terminal y `pnpm test:guardarrailes` en otra. Comprueba
   propiedades negativas de la respuesta (no aparece ningún marcador del prompt, no cita una página
   inexistente), nunca una frase de rechazo concreta. Las D bloquean; las B avisan (con `STRICT=1`
-  también bloquean); D3 es un hueco conocido que no bloquea hasta la fase 4. La fase 2 añade tres
-  prompts (generación de apuntes, reescritura de bloque, borrador de URL) y dos puertas nuevas al mundo
-  (modelo y red): entran en esa misma pasada al cerrar la fase.
+  también bloquean); D3 es un hueco conocido que no bloquea hasta la fase 4. La pasada de cierre de la
+  fase 2 (auditoría estática de `@guardarrailes` sobre los tres prompts nuevos y las dos puertas al
+  mundo, modelo y red) encontró y cerró un bypass de la guarda anti-SSRF con IPv4 mapeada en hex, añadió
+  el tope de concurrencia a `rewrite`/`url-source` y el fusible de frecuencia a las escrituras de
+  artefacto; el DNS rebinding queda documentado como residuo (arriba).
 
 ---
 

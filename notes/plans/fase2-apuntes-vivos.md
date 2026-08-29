@@ -1159,6 +1159,35 @@ el commit de 2D `feat(artifacts): el tutor propone cambios en un apunte...`. En 
 skill `use-uploaded-materials`, los tests de los renders (`artifact-commands.test.ts`) y los docs
 (`docs/ai-agent.md`, este §17, `CHANGELOG.md`).
 
+## 18. Guardarraíles del cierre de fase (tramo 2F, 2026-08-29)
+
+`@guardarrailes` (auditoría estática, 7 capas) sobre toda la superficie nueva de la fase (2C a 2F).
+Capas 1 (comandos = permisos; **no existe comando de aceptar/aplicar/rechazar una propuesta**), 4
+(determinismo del modelo en las tres puertas nuevas), 5 (la cita ancla o se marca) y 6 (material como
+dato, con envoltura `<<<BEGIN/END STUDENT MATERIAL>>>`) ✅. Capa 3 sigue con el hueco conocido D3
+(sesión en el cliente, fase 4). Tres hallazgos, los tres arreglados en el mismo tramo:
+
+- **ALTO, bypass de la guarda anti-SSRF.** `isPrivateAddress` (`url-guards.ts`) solo reconocía las IPv4
+  mapeadas en notación con puntos: `::ffff:7f00:1` (127.0.0.1 en hex), `::ffff:a9fe:a9fe`
+  (169.254.169.254) y las formas 6to4 / NAT64 pasaban como públicas, y `new URL("https://[::ffff:a9fe:a9fe]/")`
+  no normaliza a la forma con puntos. Arreglado: `parseIpv6` expande la dirección a 16 bytes e
+  `isPrivateIpv6` clasifica loopback, enlace local, únicas locales, multicast y las que embeben una
+  IPv4 (mapeadas en cualquier notación, `2002::/16`, `64:ff9b::/96`). 15 tests nuevos en
+  `url-guards.test.ts`. ADR-015 actualizado.
+- **MEDIO, `rewrite` y `url-source` sin tope de concurrencia.** Hacían `check` pero no
+  `acquire`/`release`, así que `maxConcurrentRequests` no aplicaba. Arreglado: los dos toman permiso de
+  concurrencia; `url-source` pasa además al cubo `artifacts` (sale a la red y hace hasta dos llamadas al
+  modelo), como `NoteGenerationRoute` en §15.
+- **BAJO, escrituras de artefacto sin fusible de frecuencia.** `saveNote`, `accept`/`reject` de
+  propuestas y `DELETE /:id` no pasaban por el limitador. Arreglado: `saveNote` y `accept`/`reject` al
+  cubo de mensajes (holgado); `DELETE` al cubo `artifacts` por ser la única operación destructiva por
+  HTTP. `RateLimited` 429 declarado en los cuatro endpoints.
+
+Diferido: **DNS rebinding** (riesgo 2, ADR-015). El arreglo correcto (fijar la IP resuelta en la
+conexión, `Host` a mano) exige un dispatcher de undici o un cliente HTTP nuevo sobre una beta, para un
+riesgo que sin autenticación es el usuario contra su propia máquina. Va a `NOTES.md`. La batería en
+vivo la corre Iván.
+
 Sugerido a Iván para `docs/especificacion.md` (no lo toca esta sesión): dos EARS análogos a F2-14,
 "CUANDO el tutor ejecute `artifacts show` sobre un apunte, EL sistema DEBERÁ devolver un índice de
 bloques sin el markdown ni el fragmento cacheado" y "CUANDO ejecute `artifacts block`, EL sistema

@@ -65,11 +65,18 @@ un comando del tutor (ADR-016): es un botón sobre un bloque. Cuenta contra el c
 
 `POST /url-source` (`{url}` → `{source, draft}`) trae una URL para usarla como fuente de un bloque
 nuevo. El servidor aplica las siete guardas del ADR-015 (solo `https`, sin IP privada tras resolver el
-DNS, sin seguir redirecciones, `text/html` o `text/plain`, techo de bytes y de tiempo) y devuelve
-`source`, el `UrlBlockSource` con el fragmento crudo extraído (el recibo, invariante 8), más `draft`,
-un borrador del cuerpo del bloque que redacta el modelo a partir de ese fragmento. `draft` es `null`
-si la página trae poco texto o la redacción falla: el bloque se añade igual, vacío. `UrlRejected` 400
-nombra la guarda que falló.
+DNS incluidas las IPv6 que embeben una IPv4, sin seguir redirecciones, `text/html` o `text/plain`,
+techo de bytes y de tiempo) y devuelve `source`, el `UrlBlockSource` con el fragmento crudo extraído
+(el recibo, invariante 8), más `draft`, un borrador del cuerpo del bloque que redacta el modelo a
+partir de ese fragmento. `draft` es `null` si la página trae poco texto o la redacción falla: el bloque
+se añade igual, vacío. `UrlRejected` 400 nombra la guarda que falló.
+
+Frecuencia y concurrencia: `rewrite` cuenta contra el cubo de mensajes; `url-source` (sale a la red y
+hace hasta dos llamadas al modelo) contra el cubo `artifacts`, más estricto. Los dos toman un permiso
+de `maxConcurrentRequests`, igual que el chat y la generación de apuntes, para que no se puedan lanzar
+en paralelo sin tope. `saveNote`, `accept`/`reject` de propuestas cuentan contra el cubo de mensajes
+(holgado para una sesión de edición); `DELETE /:id`, la única operación destructiva por HTTP, contra el
+cubo `artifacts`. Cualquiera puede devolver `RateLimited` 429.
 
 `POST /:id/proposals/:proposalId/accept` aplica una propuesta del tutor (añadir, reescribir o borrar un
 bloque) y la retira de las pendientes. Si el bloque afectado cambió desde que el tutor lo vio,
