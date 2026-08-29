@@ -8,5 +8,6 @@ export * from "./errors/material-errors.ts";
 export * from "./limits.ts";
 export * from "./schemas/agent-message.ts";
 export * from "./schemas/artifact.ts";
+export * from "./schemas/note.ts";
 export * from "./schemas/material.ts";
 export * from "./schemas/material-index.ts";

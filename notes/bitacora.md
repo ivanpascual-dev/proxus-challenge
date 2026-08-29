@@ -199,3 +199,28 @@ volver a cumplir.
   a 404, `ArtifactTypeMismatch` a 409 y todo lo demás (fallo de disco, de serialización, de
   calificación) a `ArtifactStorageError` 500 con cuerpo y motivo. Es el molde para `saveNote` y los
   endpoints que vienen en 2B.
+
+## 2026-08-29 · Fase 2 · tramo 2A · el apunte por bloques
+
+El apunte pasa a ser una lista de bloques, pero el tramo se cerró más estrecho de lo que pinta el
+plan. Lo que la sesión siguiente (2B) no vería en el diff:
+
+- **Desviación (`CreateNoteArtifactInput` sigue con `markdown`):** crear un apunte lo arranca como un
+  único bloque del tutor (`makeArtifact`). La forma por bloques más la skill de generación es el paso
+  15 del plan (tramo 2B); en 2A no se tocó `artifacts create`.
+- **Desviación (`NoteService` reducido a `saveNote`):** el plan §4.5 lista cinco métodos. El resto
+  (reescritura, propuestas, resolución de fuentes) llega en 2B/2D. `NoteService` compone hoy solo
+  `ArtifactRepository`; le falta `MaterialRepository`, que entra cuando `resolveSources` deje de
+  devolver `excerpt: null`.
+- **Decisión sobre la marcha (errores de `shared` en las funciones puras):** `note-blocks.ts` usa
+  `NoteLimitExceeded` y `UnknownBlock` de `@proxus/shared` directamente, sin una capa de errores de
+  dominio aparte. Un error de contrato es aquí un error de dominio; duplicarlo no daba nada.
+- **Deuda (bloques con fuente de material se guardan con `excerpt: null`):** `resolveInputSource` deja
+  el fragmento cacheado sin rellenar; lo completará `resolveSources` en 2B leyendo el índice. Hasta
+  entonces F2-09 a F2-12 no se cumplen.
+- **Deuda (apuntes de `.data` en formato viejo):** los `.json` con `markdown` en vez de `blocks` ya no
+  decodifican. Los de prueba se borraron a mano (no los rastrea git). No hay migración: si aparece uno
+  viejo, el listado lo devuelve en `unreadable` con su motivo (F2-07), no lo convierte.
+- **Duda cerrada de refilón:** el esquema de artefactos sigue duplicado entre `shared` y
+  `server/domain` (deuda anterior, `architecture.md:288`). El mirror de los esquemas de note lo
+  hereda; lo tapa `note-schema.test.ts`, que decodifica un apunte con los dos esquemas y compara.

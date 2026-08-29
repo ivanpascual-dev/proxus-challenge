@@ -17,6 +17,7 @@ import {
   type Artifact,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
+import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -128,6 +129,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   "artifacts",
   Effect.fn(function* (handlers) {
     const artifacts = yield* ArtifactRepository;
+    const notes = yield* NoteService;
 
     return handlers
       .handle("list", ({ query }) => artifacts.listArtifacts({ kind: query.kind }).pipe(
@@ -162,7 +164,8 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
               return artifactStorageError(`No se pudo calificar el intento de ${params.id}`)(error);
           }
         })
-      ));
+      ))
+      .handle("saveNote", ({ params, payload }) => notes.saveNote(params.id, payload));
   })
 );
 

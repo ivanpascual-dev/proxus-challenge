@@ -9,9 +9,9 @@ import type {
   TestQuestion
 } from "@proxus/shared";
 import { useMemo, useState } from "react";
-import { Streamdown } from "streamdown";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, submitArtifactAttemptAction } from "../domain/artifacts/atoms.ts";
+import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
 
 type Answers = Record<string, string>;
 
@@ -32,9 +32,9 @@ function EmptyWorkspace() {
     <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       <div className="grid h-full place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-8 text-center">
         <div>
-          <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Practice workspace</p>
-          <h2 className="text-balance font-bold text-3xl text-heading">Select a note, quiz, or test from the sidebar.</h2>
-          <p className="mt-3 max-w-xl text-muted">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
+          <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Espacio de trabajo</p>
+          <h2 className="text-balance font-bold text-3xl text-heading">Elige unos apuntes, un quiz o un test en la barra lateral.</h2>
+          <p className="mt-3 max-w-xl text-muted">Los quizzes y los tests se resuelven aquí. El chat del tutor sigue disponible para pistas y explicaciones.</p>
         </div>
       </div>
     </main>
@@ -47,9 +47,9 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
   return (
     <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       {AsyncResult.matchWithError(artifact, {
-        onInitial: () => <p className="text-muted">Loading artifact…</p>,
-        onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
-        onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
+        onInitial: () => <p className="text-muted">Cargando el artefacto…</p>,
+        onError: (error) => <p className="text-danger-ink">No se pudo cargar el artefacto: {String(error)}</p>,
+        onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el artefacto: {String(defect)}</p>,
         onSuccess: ({ value }) => <ArtifactContent artifact={value} />
       })}
     </main>
@@ -59,23 +59,11 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
 function ArtifactContent({ artifact }: { readonly artifact: Artifact }) {
   switch (artifact.kind) {
     case "note":
-      return <NoteViewer artifact={artifact} />;
+      return <NoteWorkspace key={artifact.id} artifact={artifact} />;
     case "quiz":
     case "test":
       return <ExerciseSolver artifact={artifact} />;
   }
-}
-
-function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "note" }> }) {
-  return (
-    <article className="mx-auto max-w-4xl rounded-3xl border border-border bg-surface p-6 shadow-2xl">
-      <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Note</p>
-      <h2 className="mb-6 font-bold text-3xl text-heading">{artifact.title}</h2>
-      <div className="prose dark:prose-invert max-w-none">
-        <Streamdown>{artifact.markdown}</Streamdown>
-      </div>
-    </article>
-  );
 }
 
 function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "quiz" | "test" }> }) {

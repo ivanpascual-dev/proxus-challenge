@@ -21,6 +21,7 @@ import {
 import { GeminiModel } from "../../domain/agents/gemini.ts";
 import { TutorChatService, TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
+import { NoteServiceLive } from "../../domain/artifacts/note-service.ts";
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
 import { FileMaterialIndexRepository } from "../../infra/materials/file-material-index-repository.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
@@ -160,7 +161,8 @@ const Routes = Layer.mergeAll(ApiRoutes, DocsRoute, TutorStreamRoute, MaterialIn
 
 const DomainLive = Layer.mergeAll(
   TutorChatServiceLive,
-  GeminiModel
+  GeminiModel,
+  NoteServiceLive
 ).pipe(
   Layer.provideMerge(RateLimiterLive())
 );

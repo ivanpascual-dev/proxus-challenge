@@ -1,4 +1,4 @@
-import type { ArtifactKind, SubmitAttemptInput } from "@proxus/shared";
+import type { ArtifactKind, SaveNoteInput, SubmitAttemptInput } from "@proxus/shared";
 import { Effect } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { ApiClient } from "../../api-client/client.ts";
@@ -30,6 +30,16 @@ export const artifactQuery = Atom.family((id: string) =>
       ).pipe(Effect.withSpan("artifacts.get", { kind: "client" }))
     )
     .pipe(Atom.keepAlive, Atom.withReactivity({ artifacts: [id] }))
+);
+
+// Un solo endpoint de escritura para el apunte: editar, añadir, reordenar, borrar y marcar son la
+// misma operación (decisión 3 de la fase 2). Se manda la nota entera.
+export const saveNoteAction = apiRuntime.fn(
+  ({ id, input }: { readonly id: string; readonly input: SaveNoteInput }) =>
+    ApiClient.use((client) =>
+      client.artifacts.saveNote({ params: { id }, payload: input })
+    ).pipe(Effect.withSpan("artifacts.saveNote", { kind: "client" })),
+  { reactivityKeys: ["artifacts"] }
 );
 
 export const submitArtifactAttemptAction = apiRuntime.fn(

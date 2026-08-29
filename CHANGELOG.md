@@ -34,6 +34,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Techos del tutor visibles y en voz alta.** El cuadro del chat cuenta los caracteres contra el
   máximo. Pedir más páginas de la cuenta, un mensaje demasiado largo o demasiadas peticiones seguidas
   se rechaza nombrando el techo y lo que se pidió, nunca en silencio.
+- **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
+  un bloque propio: se escribe en markdown, se reordena arriba y abajo, se marca como importante, se
+  añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
+  guardar se bloquea si alguno se pasa. Al guardar se manda el apunte entero y gana el último que
+  guarda.
 - **Ficheros de apunte ilegibles a la vista.** Si un fichero de artefacto guardado no se puede
   decodificar, la barra lateral lista los demás y avisa del que falla con su motivo, en vez de
   quedarse sin barra lateral.
@@ -42,6 +47,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
+- **El espacio de trabajo de artefactos habla español.** Los textos de la zona de apuntes, quizzes y
+  tests (encabezados, estados de carga y de error) pasan de inglés a español.
 
 ### Corregido
 

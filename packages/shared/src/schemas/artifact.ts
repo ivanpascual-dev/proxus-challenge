@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { NoteBlock, NoteProposal } from "./note.ts";
 
 export const QuestionOption = Schema.Struct({
   id: Schema.String,
@@ -51,7 +52,8 @@ export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
   id: Schema.String,
   title: Schema.String,
-  markdown: Schema.String
+  blocks: Schema.Array(NoteBlock),
+  proposals: Schema.Array(NoteProposal)
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 

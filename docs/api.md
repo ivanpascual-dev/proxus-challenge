@@ -40,18 +40,25 @@ Los materiales representan PDFs disponibles para el tutor. El server puede rende
 GET /api/artifacts/
 GET /api/artifacts/:id
 POST /api/artifacts/:id/submit
+PUT /api/artifacts/:id/note
 ```
 
 `submit` crea y corrige un intento, devolviendo un attempt con estado `graded` cuando aplica.
 
+`PUT /:id/note` guarda el apunte entero: editar, añadir, reordenar, borrar y marcar un bloque son la
+misma operación y gana el último que guarda. El servidor genera el `id` de los bloques nuevos y
+rellena el fragmento cacheado de cada fuente; el cliente nunca lo manda.
+
 Ningún handler del grupo `artifacts` usa `Effect.orDie`: cada error va declarado en
-`packages/shared/src/errors/artifact-errors.ts` y mapeado a su estado HTTP (404, 409 o 500 con cuerpo
-y motivo). `GET /` devuelve también `unreadable`, la lista de ficheros de artefacto que no se
+`packages/shared/src/errors/artifact-errors.ts` y mapeado a su estado HTTP (404, 409, 400 o 500 con
+cuerpo y motivo). `GET /` devuelve también `unreadable`, la lista de ficheros de artefacto que no se
 pudieron decodificar, cada uno con su motivo, en vez de fallar entero.
 
 ## Tipos de artifact
 
-- `note`: contenido markdown.
+- `note`: lista ordenada de bloques, cada uno con autoría (`tutor` o `student`), marca de énfasis y
+  fuente opcional (un material con sus páginas o una URL). Lleva además las propuestas del tutor
+  pendientes de que el alumno las acepte o descarte.
 - `quiz`: preguntas cerradas.
 - `test`: preguntas cerradas o `short-answer`.
 

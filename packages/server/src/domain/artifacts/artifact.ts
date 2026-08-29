@@ -1,5 +1,81 @@
 import { Context, Data, Effect, Number as EffectNumber, Schema } from "effect";
 
+// Los esquemas del apunte por bloques. Mirror palabra por palabra de
+// `packages/shared/src/schemas/note.ts`: el servidor decodifica el fichero de disco con esta copia y
+// lo sirve con la de `shared` (architecture.md:288). Si se cambia una sin la otra, el typecheck no
+// avisa. Hay un test que decodifica un apunte con el esquema de `shared` para cerrar esa grieta.
+export const MaterialBlockSource = Schema.Struct({
+  type: Schema.Literal("material"),
+  materialId: Schema.String,
+  pages: Schema.Array(Schema.Number),
+  excerpt: Schema.NullOr(Schema.String),
+  excerptTruncated: Schema.Boolean,
+  transcribed: Schema.Boolean,
+  unanchoredReason: Schema.NullOr(Schema.String)
+});
+export type MaterialBlockSource = typeof MaterialBlockSource.Type;
+
+export const UrlBlockSource = Schema.Struct({
+  type: Schema.Literal("url"),
+  url: Schema.String,
+  fetchedAt: Schema.String,
+  title: Schema.String,
+  excerpt: Schema.String,
+  excerptTruncated: Schema.Boolean
+});
+export type UrlBlockSource = typeof UrlBlockSource.Type;
+
+export const BlockSource = Schema.Union([MaterialBlockSource, UrlBlockSource]);
+export type BlockSource = typeof BlockSource.Type;
+
+export const BlockAuthor = Schema.Union([Schema.Literal("tutor"), Schema.Literal("student")]);
+export type BlockAuthor = typeof BlockAuthor.Type;
+
+export const NoteBlock = Schema.Struct({
+  id: Schema.String,
+  markdown: Schema.String,
+  author: BlockAuthor,
+  emphasis: Schema.Boolean,
+  source: Schema.NullOr(BlockSource)
+});
+export type NoteBlock = typeof NoteBlock.Type;
+
+export const NoteProposalOperation = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("insert"), afterBlockId: Schema.NullOr(Schema.String), block: NoteBlock }),
+  Schema.Struct({ type: Schema.Literal("replace"), blockId: Schema.String, markdown: Schema.String, baseMarkdown: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("remove"), blockId: Schema.String, baseMarkdown: Schema.String })
+]);
+export type NoteProposalOperation = typeof NoteProposalOperation.Type;
+
+export const NoteProposal = Schema.Struct({
+  id: Schema.String,
+  createdAt: Schema.String,
+  rationale: Schema.String,
+  operation: NoteProposalOperation
+});
+export type NoteProposal = typeof NoteProposal.Type;
+
+export const NoteBlockInputSource = Schema.NullOr(Schema.Union([
+  Schema.Struct({ type: Schema.Literal("material"), materialId: Schema.String, pages: Schema.Array(Schema.Number) }),
+  UrlBlockSource
+]));
+export type NoteBlockInputSource = typeof NoteBlockInputSource.Type;
+
+export const NoteBlockInput = Schema.Struct({
+  id: Schema.optional(Schema.String),
+  markdown: Schema.String,
+  author: BlockAuthor,
+  emphasis: Schema.Boolean,
+  source: NoteBlockInputSource
+});
+export type NoteBlockInput = typeof NoteBlockInput.Type;
+
+export const SaveNoteInput = Schema.Struct({
+  title: Schema.String,
+  blocks: Schema.Array(NoteBlockInput)
+});
+export type SaveNoteInput = typeof SaveNoteInput.Type;
+
 export const QuestionOption = Schema.Struct({
   id: Schema.String,
   text: Schema.String
@@ -51,7 +127,8 @@ export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
   id: Schema.String,
   title: Schema.String,
-  markdown: Schema.String
+  blocks: Schema.Array(NoteBlock),
+  proposals: Schema.Array(NoteProposal)
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 
@@ -337,7 +414,21 @@ export const makeArtifact = (input: CreateArtifactInput): Artifact => {
   const id = crypto.randomUUID();
   switch (input.kind) {
     case "note":
-      return { ...input, id };
+      // Fase 2A: crear un apunte lo arranca como un único bloque del tutor. El paso 15 (tramo 2B)
+      // pasa `artifacts create` a aceptar la lista de bloques directamente.
+      return {
+        kind: "note",
+        id,
+        title: input.title,
+        blocks: [{
+          id: crypto.randomUUID(),
+          markdown: input.markdown,
+          author: "tutor",
+          emphasis: false,
+          source: null
+        }],
+        proposals: []
+      };
     case "quiz":
       return { ...input, id };
     case "test":
