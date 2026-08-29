@@ -42,6 +42,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Ficheros de apunte ilegibles a la vista.** Si un fichero de artefacto guardado no se puede
   decodificar, la barra lateral lista los demás y avisa del que falla con su motivo, en vez de
   quedarse sin barra lateral.
+- **Cada bloque del apunte enseña de dónde salió.** Un bloque que viene del material muestra sus
+  páginas, avisa si el texto lo transcribió el modelo, dice el motivo cuando la cita no se puede
+  comprobar contra el índice, y despliega la imagen de la página debajo del bloque.
 
 ### Cambiado
 

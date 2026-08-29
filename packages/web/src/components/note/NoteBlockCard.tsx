@@ -1,6 +1,7 @@
 import { LIMITS } from "@proxus/shared";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
+import { BlockCitation } from "./BlockCitation.tsx";
 import type { DraftBlock } from "./draft.ts";
 
 interface NoteBlockCardProps {
@@ -37,7 +38,8 @@ export function NoteBlockCard({
         <div className="flex items-center gap-2 text-muted text-sm">
           <span className="rounded-full bg-canvas px-2 py-0.5">{authorLabel(block.author)}</span>
           {block.emphasis && <span className="text-brand">★ Importante</span>}
-          {block.source !== null && <span>· con fuente</span>}
+          {block.source?.type === "material" && <span>· cita un material</span>}
+          {block.source?.type === "url" && <span>· cita una URL</span>}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -108,6 +110,18 @@ export function NoteBlockCard({
                 <Streamdown>{block.markdown}</Streamdown>
               </div>
             )}
+
+      {block.source?.type === "material" && <BlockCitation source={block.source} />}
+      {block.source?.type === "url" && (
+        <aside className="mt-3 rounded-2xl border border-border bg-canvas/60 p-3 text-sm">
+          <p className="font-semibold text-body">
+            <a href={block.source.url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+              {block.source.title || block.source.url}
+            </a>
+          </p>
+          <p className="mt-1 text-muted text-xs">Traído el {new Date(block.source.fetchedAt).toLocaleString("es")}</p>
+        </aside>
+      )}
     </section>
   );
 }
