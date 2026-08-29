@@ -42,6 +42,15 @@ export const saveNoteAction = apiRuntime.fn(
   { reactivityKeys: ["artifacts"] }
 );
 
+// Borrar un apunte para poder regenerarlo: un material tiene como mucho un apunte (fase 2, decisión 19).
+export const deleteArtifactAction = apiRuntime.fn(
+  (id: string) =>
+    ApiClient.use((client) =>
+      client.artifacts.deleteArtifact({ params: { id } })
+    ).pipe(Effect.withSpan("artifacts.deleteArtifact", { kind: "client" })),
+  { reactivityKeys: ["artifacts"] }
+);
+
 export const submitArtifactAttemptAction = apiRuntime.fn(
   (input: SubmitAttemptInput) =>
     ApiClient.use((client) => input.artifactKind === "quiz"

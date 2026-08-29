@@ -46,6 +46,7 @@ export function App() {
       {selectedArtifactId !== null && <ArtifactWorkspace artifactId={selectedArtifactId} />}
       {selectedMaterial !== undefined && (
         <MaterialPanel
+          key={selectedMaterial.id}
           materialId={selectedMaterial.id}
           indexState={selectedMaterial.indexState}
           title={selectedMaterial.title}

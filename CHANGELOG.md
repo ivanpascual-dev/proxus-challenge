@@ -45,6 +45,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Cada bloque del apunte enseña de dónde salió.** Un bloque que viene del material muestra sus
   páginas, avisa si el texto lo transcribió el modelo, dice el motivo cuando la cita no se puede
   comprobar contra el índice, y despliega la imagen de la página debajo del bloque.
+- **Apuntes dentro del material.** Un material indexado tiene una pestaña "Apuntes": si no los tiene,
+  un botón los genera mostrando el progreso tema a tema; si ya los tiene, se editan ahí mismo y hay
+  un botón para borrarlos y volver a generarlos.
 
 ### Cambiado
 
@@ -58,6 +61,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **El aviso de fichero de artefacto ilegible da un motivo en lenguaje humano** ("no tiene el formato
   de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
   detalle técnico va al log del servidor.
+- **Los apuntes viven en su material, no en la barra lateral.** La sección "Artifacts" de la barra
+  lateral pasa a llamarse "Quizzes y tests" y deja de listar los apuntes.
 
 ### Corregido
 

@@ -79,23 +79,26 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="font-semibold text-body text-sm uppercase tracking-widest">Artifacts</h2>
+          <h2 className="font-semibold text-body text-sm uppercase tracking-widest">Quizzes y tests</h2>
         </div>
         {AsyncResult.matchWithError(artifacts, {
           onInitial: () => <p className="text-muted">Loading artifacts…</p>,
           onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
           onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
-          onSuccess: ({ value }) => (
+          onSuccess: ({ value }) => {
+            // Los apuntes viven dentro de su material (fase 2, decisión 18): aquí solo quiz y test.
+            const exercises = value.artifacts.filter((artifact) => artifact.kind !== "note");
+            return (
             <>
-              {value.artifacts.length === 0
-                ? <p className="text-muted">No notes, quizzes, or tests yet.</p>
+              {exercises.length === 0
+                ? <p className="text-muted">No quizzes or tests yet.</p>
                 : (
                     <details className="rounded-2xl border border-border bg-surface">
                       <summary className="cursor-pointer px-4 py-3 font-medium text-heading marker:text-brand">
-                        {value.artifacts.length} artifact{value.artifacts.length === 1 ? "" : "s"}
+                        {exercises.length} {exercises.length === 1 ? "artifact" : "artifacts"}
                       </summary>
                       <ul className="grid gap-2 border-border border-t p-3">
-                        {value.artifacts.map((artifact) => (
+                        {exercises.map((artifact) => (
                           <li key={artifact.id}>
                             <button
                               className={`w-full rounded-xl p-3 text-left transition hover:border-brand hover:bg-canvas ${
@@ -129,7 +132,8 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
                 </div>
               )}
             </>
-          )
+          );
+          }
         })}
       </section>
     </aside>

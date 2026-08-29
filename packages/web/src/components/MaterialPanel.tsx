@@ -1,8 +1,11 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MaterialIndex } from "@proxus/shared";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
+import { artifactQuery, artifactsQuery, deleteArtifactAction } from "../domain/artifacts/atoms.ts";
 import { materialIndexQuery, materialPageKey, materialPageQuery, materialsQuery } from "../domain/materials/atoms.ts";
+import { streamGenerateNotes } from "../domain/artifacts/note-generation-stream.ts";
+import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
 import {
   LABEL_FONT_PX,
   LABEL_FONT_WEIGHT,
@@ -20,15 +23,15 @@ interface MaterialPanelProps {
   readonly pageCount: number;
 }
 
-type Tab = "pdf" | "mindmap";
+type Tab = "pdf" | "mindmap" | "notes";
 
 // Marca de procedencia de una página, tal como la pinta el visor.
 type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
 export function MaterialPanel({ materialId, indexState, title, pageCount }: MaterialPanelProps) {
+  const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
   const [pendingPage, setPendingPage] = useState<number | null>(null);
-  const indexed = indexState === "indexed";
 
   const openPageInPdf = (page: number) => {
     setTab("pdf");
@@ -49,6 +52,7 @@ export function MaterialPanel({ materialId, indexState, title, pageCount }: Mate
         <div className="mb-4 flex shrink-0 gap-2">
           <TabButton active={tab === "pdf"} onClick={() => setTab("pdf")}>PDF</TabButton>
           <TabButton active={tab === "mindmap"} onClick={() => setTab("mindmap")}>Mapa mental</TabButton>
+          <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Apuntes</TabButton>
         </div>
       )}
 
@@ -61,6 +65,12 @@ export function MaterialPanel({ materialId, indexState, title, pageCount }: Mate
       {indexed && (
         <div className={`min-h-0 flex-1 ${tab === "mindmap" ? "flex flex-col" : "hidden"}`}>
           <MindMapTab materialId={materialId} title={title} onOpenPage={openPageInPdf} />
+        </div>
+      )}
+
+      {indexed && (
+        <div className={`min-h-0 flex-1 overflow-y-auto ${tab === "notes" ? "block" : "hidden"}`}>
+          <NotesTab materialId={materialId} />
         </div>
       )}
     </main>
@@ -419,4 +429,128 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
       )}
     </div>
   );
+}
+
+// --- Pestaña de apuntes ---------------------------------------------------
+
+// El apunte vive dentro del material (fase 2, decisión 18). Si ya existe, se edita aquí; si no, un
+// botón lo genera llamando a POST /api/materials/:id/notes, que arma un bloque por tema del índice
+// (decisión 23). No pasa por el tutor.
+function NotesTab({ materialId }: { readonly materialId: string }) {
+  const artifacts = useAtomValue(artifactsQuery);
+
+  return AsyncResult.matchWithError(artifacts, {
+    onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
+    onError: (error) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(error)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onSuccess: ({ value }) => {
+      const summary = value.artifacts.find(
+        (artifact) => artifact.kind === "note" && artifact.materialId === materialId
+      );
+      return summary === undefined
+        ? <GenerateNoteCard materialId={materialId} />
+        : <ExistingNote noteId={summary.id} />;
+    }
+  });
+}
+
+function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
+  const refreshArtifacts = useAtomRefresh(artifactsQuery);
+
+  const run = async () => {
+    setRunning(true);
+    setError(undefined);
+    setProgress(undefined);
+    try {
+      for await (const event of streamGenerateNotes(materialId)) {
+        if (event.type === "progress") {
+          setProgress(event.message);
+        } else if (event.type === "failed") {
+          setError(event.message);
+        }
+      }
+      refreshArtifacts();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-10 text-center">
+      <div>
+        <h3 className="font-bold text-heading text-xl">Este material no tiene apuntes todavía.</h3>
+        <p className="mt-2 max-w-md text-muted">
+          Se arma un bloque por cada tema del índice del material, con la prosa redactada a partir de sus páginas. Puedes editarlos después.
+        </p>
+        <button
+          type="button"
+          className="mt-4 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => void run()}
+          disabled={running}
+        >
+          {running ? "Creando apuntes…" : "Crear apuntes"}
+        </button>
+        {running && (
+          <p className="mt-3 text-muted text-sm">{progress ?? "Leyendo el índice del material…"}</p>
+        )}
+        {error !== undefined && (
+          <p className="mt-3 text-danger-ink">No se pudieron crear los apuntes: {error}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExistingNote({ noteId }: { readonly noteId: string }) {
+  const note = useAtomValue(artifactQuery(noteId));
+  const deleteArtifact = useAtomSet(deleteArtifactAction, { mode: "promise" });
+  const refreshArtifacts = useAtomRefresh(artifactsQuery);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const onDelete = async () => {
+    if (deleting || !window.confirm("¿Borrar estos apuntes? Podrás volver a generarlos.")) {
+      return;
+    }
+    setDeleting(true);
+    setError(undefined);
+    try {
+      await deleteArtifact(noteId);
+      refreshArtifacts();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setDeleting(false);
+    }
+  };
+
+  return AsyncResult.matchWithError(note, {
+    onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
+    onError: (cause) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(cause)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onSuccess: ({ value }) => value.kind !== "note"
+      ? <p className="p-4 text-danger-ink">El artefacto {noteId} no es un apunte.</p>
+      : (
+          <div className="p-1">
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
+                onClick={() => void onDelete()}
+                disabled={deleting}
+              >
+                {deleting ? "Borrando…" : "Borrar apunte"}
+              </button>
+            </div>
+            {error !== undefined && (
+              <p className="mb-3 rounded-2xl border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+            )}
+            <NoteWorkspace key={value.id} artifact={value} />
+          </div>
+        )
+  });
 }

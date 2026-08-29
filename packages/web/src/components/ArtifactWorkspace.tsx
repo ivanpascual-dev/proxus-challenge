@@ -11,7 +11,6 @@ import type {
 import { useMemo, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, submitArtifactAttemptAction } from "../domain/artifacts/atoms.ts";
-import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
 
 type Answers = Record<string, string>;
 
@@ -33,8 +32,8 @@ function EmptyWorkspace() {
       <div className="grid h-full place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-8 text-center">
         <div>
           <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Espacio de trabajo</p>
-          <h2 className="text-balance font-bold text-3xl text-heading">Elige unos apuntes, un quiz o un test en la barra lateral.</h2>
-          <p className="mt-3 max-w-xl text-muted">Los quizzes y los tests se resuelven aquí. El chat del tutor sigue disponible para pistas y explicaciones.</p>
+          <h2 className="text-balance font-bold text-3xl text-heading">Elige un quiz o un test en la barra lateral.</h2>
+          <p className="mt-3 max-w-xl text-muted">Los quizzes y los tests se resuelven aquí. Los apuntes viven en la pestaña "Apuntes" de cada material.</p>
         </div>
       </div>
     </main>
@@ -59,7 +58,13 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
 function ArtifactContent({ artifact }: { readonly artifact: Artifact }) {
   switch (artifact.kind) {
     case "note":
-      return <NoteWorkspace key={artifact.id} artifact={artifact} />;
+      // Los apuntes se ven y se editan dentro de su material (fase 2, decisión 18); no se llega aquí
+      // por la barra lateral. Si se llega por un enlace viejo, se dice dónde están.
+      return (
+        <p className="text-muted">
+          Estos apuntes se ven desde la pestaña "Apuntes" de su material.
+        </p>
+      );
     case "quiz":
     case "test":
       return <ExerciseSolver artifact={artifact} />;
