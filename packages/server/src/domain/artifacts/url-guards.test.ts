@@ -64,6 +64,42 @@ for (const ip of publicV6) {
   });
 }
 
+// La IPv4 mapeada escrita en hexadecimal es la misma dirección que con puntos: `::ffff:7f00:1` es
+// 127.0.0.1. La guarda tiene que verlas iguales, o `https://[::ffff:a9fe:a9fe]/` esquiva el filtro.
+const privateV6Embedded = [
+  "::ffff:7f00:1", // 127.0.0.1
+  "::ffff:a9fe:a9fe", // 169.254.169.254 (metadatos de nube)
+  "::ffff:0a00:0001", // 10.0.0.1
+  "::ffff:c0a8:0101", // 192.168.1.1
+  "0:0:0:0:0:ffff:7f00:1", // la misma, sin comprimir
+  "0:0:0:0:0:0:0:1", // ::1 sin comprimir
+  "64:ff9b::7f00:1", // NAT64 de 127.0.0.1
+  "64:ff9b::a9fe:a9fe", // NAT64 de 169.254.169.254
+  "2002:7f00:1::1", // 6to4 de 127.0.0.1
+  "2002:a9fe:a9fe::1" // 6to4 de 169.254.169.254
+];
+for (const ip of privateV6Embedded) {
+  test(`isPrivateAddress: ${ip} es privada (IPv4 embebida)`, () => {
+    assert.equal(isPrivateAddress(ip), true);
+  });
+}
+
+const publicV6Embedded = ["::ffff:0808:0808", "64:ff9b::0808:0808", "2002:0808:0808::1"];
+for (const ip of publicV6Embedded) {
+  test(`isPrivateAddress: ${ip} es pública (IPv4 embebida pública)`, () => {
+    assert.equal(isPrivateAddress(ip), false);
+  });
+}
+
+test("isPrivateAddress: una IPv6 que no parsea se rechaza (fail closed)", () => {
+  assert.equal(isPrivateAddress("::ffff:zzzz"), true);
+  assert.equal(isPrivateAddress("1:2:3::4:5::6"), true);
+});
+
+test("isPrivateAddress: acepta el literal entre corchetes de una URL", () => {
+  assert.equal(isPrivateAddress("[::ffff:7f00:1]"), true);
+});
+
 test("checkContentType: text/html y text/plain pasan, con o sin charset (F2-24)", () => {
   assert.equal(checkContentType("text/html").ok, true);
   assert.equal(checkContentType("text/plain; charset=utf-8").ok, true);
