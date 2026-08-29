@@ -5,6 +5,7 @@ import {
   ArtifactNotFound as ApiArtifactNotFound,
   ArtifactStorageError as ApiArtifactStorageError,
   ArtifactTypeMismatch as ApiArtifactTypeMismatch,
+  BlockNotFound as ApiBlockNotFound,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
   MaterialStorageError as ApiMaterialStorageError,
@@ -18,6 +19,7 @@ import {
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
+import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -132,6 +134,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const artifacts = yield* ArtifactRepository;
     const notes = yield* NoteService;
+    const rateLimiter = yield* RateLimiter;
 
     return handlers
       .handle("list", ({ query }) => artifacts.listArtifacts({ kind: query.kind }).pipe(
@@ -168,6 +171,31 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         })
       ))
       .handle("saveNote", ({ params, payload }) => notes.saveNote(params.id, payload))
+      // Reescribe un bloque con una llamada al modelo (decisión 7): solo el texto del bloque y su
+      // fragmento cacheado (F2-17). No guarda: devuelve la propuesta y el alumno decide.
+      .handle("rewriteBlock", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+
+        const artifact = yield* artifacts.getArtifact(params.id).pipe(
+          Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+            ? artifactNotFound(params.id)
+            : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
+        );
+
+        const block = artifact.kind === "note"
+          ? artifact.blocks.find((candidate) => candidate.id === params.blockId)
+          : undefined;
+        if (block === undefined) {
+          return yield* new ApiBlockNotFound({
+            blockId: params.blockId,
+            message: `El apunte ${params.id} no tiene ningún bloque con id ${params.blockId}.`
+          });
+        }
+
+        const excerpt = block.source === null ? null : block.source.excerpt;
+        return yield* rewriteBlock({ markdown: block.markdown, excerpt }, payload.mode);
+      }))
       .handle("deleteArtifact", ({ params }) => artifacts.deleteArtifact(params.id).pipe(
         Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
           ? artifactNotFound(params.id)

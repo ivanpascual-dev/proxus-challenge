@@ -79,3 +79,21 @@ export const SaveNoteInput = Schema.Struct({
   blocks: Schema.Array(NoteBlockInput)
 });
 export type SaveNoteInput = typeof SaveNoteInput.Type;
+
+// Reescritura de un bloque (fase 2, tramo 2C). "clearer": el mismo contenido, más claro.
+// "deeper": el mismo tema con el detalle que la fuente tenga. La pide la interfaz a un endpoint
+// propio, no el tutor por el chat (decisión 7): es un botón sobre un bloque, no una conversación.
+export const RewriteMode = Schema.Union([Schema.Literal("clearer"), Schema.Literal("deeper")]);
+export type RewriteMode = typeof RewriteMode.Type;
+
+export const RewriteBlockInput = Schema.Struct({ mode: RewriteMode });
+export type RewriteBlockInput = typeof RewriteBlockInput.Type;
+
+// Lo que devuelve la reescritura: texto y nada más. No guarda (decisión 8): el alumno ve la
+// propuesta junto a su texto y decide. `usedSource` lo pone el servidor, no el modelo: es false
+// cuando el bloque no tenía fragmento cacheado (F2-19).
+export const RewrittenBlock = Schema.Struct({
+  markdown: Schema.String,
+  usedSource: Schema.Boolean
+});
+export type RewrittenBlock = typeof RewrittenBlock.Type;

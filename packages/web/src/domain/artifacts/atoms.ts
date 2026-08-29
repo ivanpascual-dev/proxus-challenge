@@ -1,4 +1,4 @@
-import type { ArtifactKind, SaveNoteInput, SubmitAttemptInput } from "@proxus/shared";
+import type { ArtifactKind, RewriteMode, SaveNoteInput, SubmitAttemptInput } from "@proxus/shared";
 import { Effect } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { ApiClient } from "../../api-client/client.ts";
@@ -49,6 +49,16 @@ export const deleteArtifactAction = apiRuntime.fn(
       client.artifacts.deleteArtifact({ params: { id } })
     ).pipe(Effect.withSpan("artifacts.deleteArtifact", { kind: "client" })),
   { reactivityKeys: ["artifacts"] }
+);
+
+// Reescribir un bloque: la interfaz lo pide, el modelo devuelve una propuesta y no se guarda nada
+// hasta que el alumno la acepta (fase 2, decisiones 7 y 8). Sin `reactivityKeys`: no toca el
+// artefacto guardado.
+export const rewriteBlockAction = apiRuntime.fn(
+  ({ id, blockId, mode }: { readonly id: string; readonly blockId: string; readonly mode: RewriteMode }) =>
+    ApiClient.use((client) =>
+      client.artifacts.rewriteBlock({ params: { id, blockId }, payload: { mode } })
+    ).pipe(Effect.withSpan("artifacts.rewriteBlock", { kind: "client" }))
 );
 
 export const submitArtifactAttemptAction = apiRuntime.fn(

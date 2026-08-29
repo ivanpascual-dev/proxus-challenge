@@ -124,6 +124,7 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
                   block={block}
                   index={index}
                   total={draft.blocks.length}
+                  artifactId={artifact.id}
                   onChangeMarkdown={(markdown) => patchBlock(block.key, { markdown })}
                   onToggleEmphasis={() => patchBlock(block.key, { emphasis: !block.emphasis })}
                   onMove={(direction) => update(move(draft.blocks, index, index + direction))}

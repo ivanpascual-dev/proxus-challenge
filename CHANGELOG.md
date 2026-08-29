@@ -48,6 +48,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Apuntes dentro del material.** Un material indexado tiene una pestaña "Apuntes": si no los tiene,
   un botón los genera mostrando el progreso tema a tema; si ya los tiene, se editan ahí mismo y hay
   un botón para borrarlos y volver a generarlos.
+- **Reescribir un bloque del apunte con el tutor.** Cada bloque tiene dos botones, "Más claro" y "Más
+  a fondo", que piden al tutor una reescritura hecha solo con ese bloque y su fragmento de origen. La
+  propuesta se enseña junto al texto actual y no se guarda hasta que se pulsa "Reemplazar el bloque";
+  si el bloque no tenía fragmento de origen, se avisa de que se reescribió sin fuente. Hay que guardar
+  el apunte una vez para poder reescribir sus bloques.
 
 ### Cambiado
 

@@ -12,6 +12,10 @@ Los apuntes (`note`) **no** los crea el tutor: se generan desde la pestaña "Apu
 piden, remite a esa pestaña. El porqué del límite está en el ADR-016: el tutor autora lo abierto
 (quiz, test); transformar un material en un activo estructurado es un servicio con ruta.
 
+Editar un apunte tampoco pasa por el tutor. Reescribir un bloque
+(`POST /api/artifacts/:id/blocks/:blockId/rewrite`) es un botón de la interfaz que llama al modelo con
+solo ese bloque y su fragmento; no hay comando del agente para ello.
+
 ## Archivos principales
 
 - `packages/server/src/domain/agents/academic-tutor.ts`

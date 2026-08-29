@@ -1,14 +1,17 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { Artifact, ArtifactAttempt, ArtifactListResponse, SubmitAttemptInput } from "../schemas/artifact.ts";
-import { SaveNoteInput } from "../schemas/note.ts";
+import { RewriteBlockInput, RewrittenBlock, SaveNoteInput } from "../schemas/note.ts";
 import {
   ArtifactNotFound,
   ArtifactStorageError,
   ArtifactTypeMismatch,
+  BlockNotFound,
   NoteLimitExceeded,
+  RewriteFailed,
   UnknownBlock
 } from "../errors/artifact-errors.ts";
+import { RateLimited } from "../errors/limit-exceeded.ts";
 
 const ArtifactKindQuery = Schema.Struct({
   kind: Schema.optional(Schema.Union([
@@ -60,6 +63,24 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
         NoteLimitExceeded.pipe(HttpApiSchema.status(400)),
         UnknownBlock.pipe(HttpApiSchema.status(400)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Reescribir un bloque: manda al modelo solo el texto del bloque y su fragmento cacheado
+    // (F2-17), devuelve la propuesta y no guarda nada (decisión 8). Cuenta contra el cubo de
+    // mensajes porque gasta una llamada al modelo.
+    HttpApiEndpoint.post("rewriteBlock", "/:id/blocks/:blockId/rewrite", {
+      params: {
+        id: Schema.String,
+        blockId: Schema.String
+      },
+      payload: RewriteBlockInput,
+      success: RewrittenBlock,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        BlockNotFound.pipe(HttpApiSchema.status(404)),
+        RewriteFailed.pipe(HttpApiSchema.status(502)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),

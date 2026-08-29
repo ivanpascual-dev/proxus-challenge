@@ -48,10 +48,17 @@ GET /api/artifacts/
 GET /api/artifacts/:id
 POST /api/artifacts/:id/submit
 PUT /api/artifacts/:id/note
+POST /api/artifacts/:id/blocks/:blockId/rewrite
 DELETE /api/artifacts/:id
 ```
 
 `submit` crea y corrige un intento, devolviendo un attempt con estado `graded` cuando aplica.
+
+`POST /:id/blocks/:blockId/rewrite` (`{mode: "clearer" | "deeper"}` → `{markdown, usedSource}`)
+reescribe un bloque con una llamada al modelo: solo el texto del bloque y su fragmento cacheado, sin
+releer el PDF. No guarda nada, devuelve la propuesta para que el alumno la acepte o la descarte. No es
+un comando del tutor (ADR-016): es un botón sobre un bloque. Cuenta contra el cubo de mensajes
+(`RateLimited` 429).
 
 `DELETE /:id` borra un artefacto (204). Sirve para rehacer los apuntes de un material: hay como mucho
 un apunte por material, así que regenerar exige borrar el que hay.
