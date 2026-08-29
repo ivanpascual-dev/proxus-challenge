@@ -76,3 +76,127 @@
     font: inherit;
   }
 }
+
+/* Editor de bloque (TipTap). No hay plugin de tipografía, así que el ritmo vertical y los formatos
+   del menú "/" se definen aquí, con los tokens del tema. */
+@layer components {
+  .tiptap-block {
+    color: var(--color-body);
+    font-size: 0.95rem;
+    line-height: 1.65;
+    min-height: 2.5rem;
+  }
+
+  .tiptap-block > * + * {
+    margin-top: 0.6em;
+  }
+
+  .tiptap-block h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--color-heading);
+  }
+
+  .tiptap-block h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+
+  .tiptap-block h4,
+  .tiptap-block h5,
+  .tiptap-block h6 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+
+  .tiptap-block h5,
+  .tiptap-block h6 {
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.85rem;
+  }
+
+  .tiptap-block ul,
+  .tiptap-block ol {
+    padding-left: 1.4rem;
+  }
+
+  .tiptap-block ul {
+    list-style: disc;
+  }
+
+  .tiptap-block ol {
+    list-style: decimal;
+  }
+
+  .tiptap-block blockquote {
+    border-left: 3px solid var(--color-border-strong);
+    padding-left: 0.9rem;
+    color: var(--color-muted);
+  }
+
+  .tiptap-block a {
+    color: var(--color-brand);
+    text-decoration: underline;
+  }
+
+  .tiptap-block code {
+    background: var(--color-surface-muted);
+    border-radius: 0.3rem;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.85em;
+  }
+
+  .tiptap-block pre {
+    background: var(--color-surface-muted);
+    border-radius: 0.6rem;
+    padding: 0.8rem 1rem;
+    overflow-x: auto;
+  }
+
+  .tiptap-block pre code {
+    background: none;
+    padding: 0;
+  }
+
+  /* Tabla GFM. `.tableWrapper` lo pone TipTap; le damos scroll horizontal para las tablas anchas. */
+  .tiptap-block .tableWrapper {
+    overflow-x: auto;
+  }
+
+  .tiptap-block table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .tiptap-block th,
+  .tiptap-block td {
+    border: 1px solid var(--color-border-strong);
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .tiptap-block th {
+    background: var(--color-surface-muted);
+    font-weight: 600;
+  }
+
+  /* Celda(s) bajo selección: clase de prosemirror-tables. */
+  .tiptap-block .selectedCell {
+    background: color-mix(in srgb, var(--color-brand) 15%, transparent);
+  }
+
+  /* Pista de "/" en cualquier párrafo vacío que tenga el foco (showOnlyCurrent, por defecto). */
+  .tiptap-block p.is-empty::before {
+    content: attr(data-placeholder);
+    color: var(--color-disabled);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}

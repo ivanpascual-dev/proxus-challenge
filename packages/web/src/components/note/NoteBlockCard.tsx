@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { rewriteBlockAction } from "../../domain/artifacts/atoms.ts";
 import { BlockCitation } from "./BlockCitation.tsx";
+import { BlockEditor } from "./BlockEditor.tsx";
 import type { DraftBlock } from "./draft.ts";
 
 interface NoteBlockCardProps {
@@ -34,7 +35,6 @@ export function NoteBlockCard({
   onMove,
   onDelete
 }: NoteBlockCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const overLimit = block.markdown.length > LIMITS.maxBlockCharacters;
 
   const rewrite = useAtomSet(rewriteBlockAction, { mode: "promise" });
@@ -115,13 +115,6 @@ export function NoteBlockCard({
           </button>
           <button
             type="button"
-            className="rounded-lg border border-border px-2 py-1 text-sm hover:border-brand"
-            onClick={() => setIsEditing((value) => !value)}
-          >
-            {isEditing ? "Hecho" : "Editar"}
-          </button>
-          <button
-            type="button"
             className="rounded-lg border border-danger/40 px-2 py-1 text-danger-ink text-sm hover:border-danger"
             onClick={onDelete}
           >
@@ -130,29 +123,14 @@ export function NoteBlockCard({
         </div>
       </div>
 
-      {isEditing
-        ? (
-            <div className="grid gap-1">
-              <textarea
-                className="min-h-32 w-full rounded-2xl border border-border-strong bg-canvas p-3 text-heading outline-none focus:border-brand"
-                value={block.markdown}
-                onChange={(event) => onChangeMarkdown(event.currentTarget.value)}
-                placeholder="Escribe el bloque en markdown…"
-              />
-              <span className={`self-end text-xs ${overLimit ? "text-danger-ink" : "text-muted"}`}>
-                {overLimit
-                  ? `${block.markdown.length} / ${LIMITS.maxBlockCharacters} caracteres: pasa del máximo`
-                  : `${block.markdown.length} / ${LIMITS.maxBlockCharacters}`}
-              </span>
-            </div>
-          )
-        : block.markdown.trim().length === 0
-          ? <p className="text-muted italic">Bloque vacío. Pulsa Editar para escribirlo.</p>
-          : (
-              <div className="prose dark:prose-invert max-w-none">
-                <Streamdown>{block.markdown}</Streamdown>
-              </div>
-            )}
+      <div className="grid gap-1">
+        <BlockEditor markdown={block.markdown} onChange={onChangeMarkdown} />
+        <span className={`self-end text-xs ${overLimit ? "text-danger-ink" : "text-muted"}`}>
+          {overLimit
+            ? `${block.markdown.length} / ${LIMITS.maxBlockCharacters} caracteres: pasa del máximo`
+            : `${block.markdown.length} / ${LIMITS.maxBlockCharacters}`}
+        </span>
+      </div>
 
       {block.source?.type === "material" && <BlockCitation source={block.source} />}
       {block.source?.type === "url" && (

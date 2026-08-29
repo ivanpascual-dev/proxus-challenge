@@ -230,6 +230,16 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   DEBERÁ volver a ofrecer la creación de apuntes.
 - **F2-39.** EL tutor NO DEBERÁ crear apuntes: `artifacts create` solo acepta quiz y test.
 
+#### El editor de bloque (tramo 2E)
+
+- **F2-40.** CUANDO el alumno edite un bloque del apunte, EL sistema DEBERÁ ofrecerle un editor de
+  texto enriquecido: seleccionar texto muestra una barra flotante (negrita, cursiva, enlace y
+  convertir el bloque en encabezado, lista, cita, código o tabla) y «/» al principio de una línea abre
+  un menú con esos mismos formatos.
+- **F2-41.** EL editor de bloque DEBERÁ guardar siempre markdown limpio, sin HTML incrustado: un
+  apunte editado, guardado y releído DEBERÁ conservar su markdown, y ningún formato que solo se pueda
+  representar con HTML DEBERÁ ofrecerse.
+
 ### Fase 3 · El test que enseña
 
 _Pendiente._

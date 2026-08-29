@@ -594,6 +594,15 @@ aceptas y pasa a ser un bloque. Editas un bloque y luego intentas aceptar una pr
 **Se ve:** escribes en un bloque como en Notion (`/` para insertar, seleccionas y sale la barra);
 guardas, recargas y el markdown está intacto.
 
+> **Actualizado sobre la marcha (2026-08-29).** TipTap está en la v3 (3.30.5), donde varios paquetes
+> del paso 26 cambiaron de sitio: `Placeholder` es `@tiptap/extensions/placeholder`, `Link` viene en
+> `@tiptap/starter-kit`, `BubbleMenu` es un componente de `@tiptap/react/menus`. La lista real:
+> `@tiptap/core`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `@tiptap/extensions`,
+> `@tiptap/extension-table` (tablas GFM), `@tiptap/suggestion`, `tiptap-markdown`. La barra flotante
+> añade "convertir en" (encabezados H2-H6, listas, cita, código, tabla) y hay una segunda barra para
+> la tabla. El editor guarda solo formatos que serializan a markdown limpio (ADR-017); el detalle en
+> `notes/bitacora.md`.
+
 ### Tramo 2F · Cierre
 
 28. Toda la interfaz a español: `Sidebar`, `Chat`, `ArtifactWorkspace` y el solucionador de ejercicios.

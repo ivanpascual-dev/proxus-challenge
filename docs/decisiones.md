@@ -746,3 +746,43 @@ llama a Gemini, no es un comando del tutor y nadie lo discute; generar apuntes e
 - **Queda una costura**: el servidor tiene dos caminos que llaman al modelo (el arnés del tutor y los
   servicios `IndexingService` / `NoteGenerationService`). Es deliberada y está aquí explicada; no se
   unifica en esta fase.
+
+## ADR-017 · El editor de bloque escribe markdown limpio; lo que no cabe en markdown se queda fuera
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-29
+
+**Contexto.** El tramo 2E cambia el `<textarea>` de markdown de cada bloque por un editor de texto
+enriquecido sobre TipTap: barra flotante al seleccionar y menú «/» estilo Notion. El bloque es la
+unidad que la reescritura manda al modelo y contra la que se compara el `baseMarkdown` de una
+propuesta del tutor (ADR-014); el render de la web es Streamdown sobre ese markdown. Si el editor
+guardara HTML, o markdown con HTML incrustado, esos tres mecanismos trabajarían sobre un texto que ya
+no es markdown limpio.
+
+**Opciones consideradas.**
+
+- **Plantilla oficial "Notion-like" de TipTap.** Descartada en el plan (§11.2): requiere plan de pago
+  y cuenta en TipTap Cloud, y este repo es local, sin nube ni cuentas.
+- **Un editor del documento entero (un TipTap por apunte).** Descartada: rompe el modelo de bloques,
+  donde fuente, autoría y énfasis van por bloque (ADR-013).
+- **Ofrecer todo lo que TipTap trae** (resaltado de color, celdas con formato rico, ecuaciones,
+  desplegables, menciones a bloques). Descartada: cada uno exige HTML en el markdown guardado o un
+  cambio del pipeline de render.
+
+**Decisión.** El editor por bloque (Vía 1 del plan §11.2) monta un TipTap sobre el markdown de *su*
+bloque; `tiptap-markdown` hace el viaje de ida y vuelta con `html: false`. Se ofrecen solo los
+formatos que serializan a markdown limpio: encabezados H2-H6, negrita, cursiva, enlace, listas, cita,
+bloque de código y tabla GFM (con fila de cabecera y celdas de un solo párrafo). Resaltado de color,
+ecuaciones, desplegables y menciones a bloques quedan fuera y se aplazan a la fase 5, cuando se
+valore si compensan tocar el contrato del bloque y el render.
+
+**Consecuencias.**
+
+- Lo que se guarda sigue siendo markdown; la reescritura de un bloque, la comparación de propuestas
+  (ADR-014) y el render no cambian.
+- Round-trip comprobado montando y volviendo a serializar los 28 bloques reales del corpus: 0
+  pérdidas de contenido. El `onUpdate` del editor ignora el update cuyo markdown coincide con el de
+  carga, para que la re-serialización del montaje no cuente como edición.
+- La tabla solo se edita dentro de los límites GFM: quitar fila o columna va siempre por el extremo,
+  para no borrar la fila de cabecera ni la primera columna (una tabla sin cabecera se serializaría
+  como HTML). El menú «/» está deshabilitado dentro de una tabla.

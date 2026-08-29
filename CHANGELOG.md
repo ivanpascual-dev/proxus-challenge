@@ -35,7 +35,7 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   máximo. Pedir más páginas de la cuenta, un mensaje demasiado largo o demasiadas peticiones seguidas
   se rechaza nombrando el techo y lo que se pidió, nunca en silencio.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
-  un bloque propio: se escribe en markdown, se reordena arriba y abajo, se marca como importante, se
+  un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
   guardar se bloquea si alguno se pasa. Al guardar se manda el apunte entero y gana el último que
   guarda.
@@ -82,6 +82,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **El tutor entiende "bloque" como bloque del apunte.** Al preguntarle por los bloques, el mapa
   mental o el apunte de un material, el tutor lee el apunte en vez de contar las secciones del PDF, y
   puede leer un bloque concreto para hablar de él.
+- **El bloque del apunte se escribe con formato, no en markdown a la vista.** Cada bloque se edita en
+  el sitio con un editor de texto enriquecido: al seleccionar texto sale una barra flotante (negrita,
+  cursiva, enlace y "convertir en" encabezado, lista, cita, código o tabla) y "/" al empezar una línea
+  abre un menú con esos formatos. Las tablas traen su propia barra para añadir y quitar filas y
+  columnas. Se van el botón "Editar/Hecho" y el recuadro de markdown; lo que se guarda sigue siendo el
+  mismo markdown limpio.
 
 ### Corregido
 

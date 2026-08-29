@@ -309,3 +309,27 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   con `artifacts block <id> <blockIds>`. Mismo reparto que `materials view` / `materials read`. Solo
   cambia el CLI del tutor; `GET /artifacts/:id` sigue devolviendo el apunte entero para la web. No
   llega a ADR: es coherente con ADR-016 (lo caro se lee a demanda) y no abre ninguna puerta nueva.
+
+## 2026-08-29 · Fase 2 · tramo 2E · el bloque se escribe con un editor enriquecido
+
+- **Desviación (paquetes de TipTap v2 → v3):** el plan §11.2 y el paso 26 listan
+  `@tiptap/extension-placeholder`, `@tiptap/extension-link` y `@tiptap/extension-bubble-menu`. En
+  TipTap v3 (3.30.5) eso cambió de sitio: `Placeholder` vive en `@tiptap/extensions/placeholder`,
+  `Link` ya viene en `@tiptap/starter-kit` (se configura ahí), `BubbleMenu` es un componente de
+  `@tiptap/react/menus`. Se añaden además `@tiptap/core`, `@tiptap/extension-table` (tablas GFM) y
+  `@tiptap/suggestion` (menú «/»). Plan amendado en el tramo 2E.
+- **Desviación (`breaks: true` en `Markdown.configure`):** sin ello, un salto de línea suelto del
+  markdown ya guardado (un `**Título**` en su línea seguido del texto) pegaba las palabras al
+  re-serializar. Con `breaks: true` el salto se mantiene.
+- **Desviación (`useEditorState` para la barra):** en v3 `shouldRerenderOnTransaction` es `false` por
+  defecto, así que el componente no se re-renderiza al mover la selección y los botones "activos" de
+  la barra se quedaban congelados. `useEditorState` con un `selector` sí reacciona.
+- **Decisión sobre la marcha (ADR-017):** el editor ofrece solo formatos que `tiptap-markdown`
+  serializa a markdown limpio (`html: false`). Resaltado de color, ecuaciones, desplegables y
+  menciones quedan fuera porque exigirían HTML en el texto guardado, que rompería la reescritura de
+  bloque y la comparación `baseMarkdown` de las propuestas (ADR-014). Contexto aquí, decisión en el
+  ADR-017.
+- **Comprobado (round-trip):** montar y volver a serializar los 28 bloques reales del corpus da 0
+  pérdidas de contenido. El `onUpdate` ignora el update cuyo markdown coincide con el de carga
+  (`canonical`), para que la re-serialización del montaje (o un re-montaje de StrictMode) no ensucie
+  el apunte.
