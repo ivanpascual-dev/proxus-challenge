@@ -10,6 +10,7 @@ import {
   ArtifactRepository,
   ArtifactTypeMismatch,
   AttemptNotFound,
+  type ArtifactListing,
   type ArtifactRepositoryError,
   type CreateArtifactInput,
   type ListArtifactsInput,
@@ -166,12 +167,14 @@ const InMemoryArtifactRepository = Layer.effect(
         })
       );
 
-    const listArtifacts = (input?: ListArtifactsInput): Effect.Effect<readonly Artifact[], ArtifactRepositoryError> =>
+    const listArtifacts = (input?: ListArtifactsInput): Effect.Effect<ArtifactListing, ArtifactRepositoryError> =>
       Ref.get(ref).pipe(
-        Effect.map((state) => input?.kind === undefined
-          ? state.artifacts
-          : state.artifacts.filter((artifact) => artifact.kind === input.kind)
-        )
+        Effect.map((state) => ({
+          artifacts: input?.kind === undefined
+            ? state.artifacts
+            : state.artifacts.filter((artifact) => artifact.kind === input.kind),
+          unreadable: []
+        }))
       );
 
     const submitAttempt = (input: SubmitAttemptInput): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>

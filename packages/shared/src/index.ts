@@ -2,6 +2,7 @@ export * from "./api/Api.ts";
 export * from "./api/artifacts.ts";
 export * from "./api/materials.ts";
 export * from "./api/tutor.ts";
+export * from "./errors/artifact-errors.ts";
 export * from "./errors/limit-exceeded.ts";
 export * from "./errors/material-errors.ts";
 export * from "./limits.ts";

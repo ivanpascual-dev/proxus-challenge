@@ -34,6 +34,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Techos del tutor visibles y en voz alta.** El cuadro del chat cuenta los caracteres contra el
   máximo. Pedir más páginas de la cuenta, un mensaje demasiado largo o demasiadas peticiones seguidas
   se rechaza nombrando el techo y lo que se pidió, nunca en silencio.
+- **Ficheros de apunte ilegibles a la vista.** Si un fichero de artefacto guardado no se puede
+  decodificar, la barra lateral lista los demás y avisa del que falla con su motivo, en vez de
+  quedarse sin barra lateral.
 
 ### Cambiado
 

@@ -191,3 +191,11 @@ volver a cumplir.
   que no fuera `"light"`/`"dark"` como "seguir al SO", así que no cambió.
 - **Nota para quien pruebe:** si ya se tocó el tema antes, `localStorage` tiene una elección explícita
   guardada; hay que elegir "Sistema" una vez para volver al comportamiento por defecto.
+
+## 2026-08-29 · Fase 2 · tramo 2A · hardening de los handlers de artefactos
+
+- **Decisión sobre la marcha (mapeo de `ArtifactRepositoryError` a HTTP):** al quitar los tres
+  `Effect.orDie` de `list`/`get`/`submit`, se fija el patrón para el grupo entero: `ArtifactNotFound`
+  a 404, `ArtifactTypeMismatch` a 409 y todo lo demás (fallo de disco, de serialización, de
+  calificación) a `ArtifactStorageError` 500 con cuerpo y motivo. Es el molde para `saveNote` y los
+  endpoints que vienen en 2B.

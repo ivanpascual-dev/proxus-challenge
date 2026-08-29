@@ -90,8 +90,17 @@ export const ArtifactSummary = Schema.Struct({
 });
 export type ArtifactSummary = typeof ArtifactSummary.Type;
 
+// Un fichero de artefacto que no se pudo decodificar. Se nombra, nunca se calla: callar cuál falla es
+// el fallo silencioso que prohíbe la invariante 3 (F2-07).
+export const UnreadableArtifact = Schema.Struct({
+  fileName: Schema.String,
+  reason: Schema.String
+});
+export type UnreadableArtifact = typeof UnreadableArtifact.Type;
+
 export const ArtifactListResponse = Schema.Struct({
-  artifacts: Schema.Array(ArtifactSummary)
+  artifacts: Schema.Array(ArtifactSummary),
+  unreadable: Schema.Array(UnreadableArtifact)
 });
 export type ArtifactListResponse = typeof ArtifactListResponse.Type;
 

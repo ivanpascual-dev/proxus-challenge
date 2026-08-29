@@ -109,15 +109,31 @@ export const FileArtifactRepository = {
       return artifact;
     });
 
+    // Recolecta por fichero: un JSON ilegible se anota con su motivo y se sigue, en vez de tumbar el
+    // listado entero y dejar a la web sin barra lateral (F2-07, invariante 3).
+    const describeReadError = (error: ArtifactRepositoryError): string => {
+      switch (error._tag) {
+        case "ArtifactNotFound":
+          return "el fichero desapareció durante el listado";
+        case "ArtifactRepositorySerializationError":
+          return `no se pudo decodificar: ${String(error.reason)}`;
+        default:
+          return `no se pudo leer: ${String("reason" in error ? error.reason : error._tag)}`;
+      }
+    };
+
     const listArtifacts = (input: ListArtifactsInput = {}) => Effect.gen(function* () {
-      const files = yield* listFiles(artifactsDirectory);
-      const artifacts = yield* Effect.all(
-        files.filter((file) => file.endsWith(".json")).map((file) => {
-          const artifactId = decodeURIComponent(file.replace(/\.json$/, ""));
-          return readArtifactFile(artifactId);
-        })
-      );
-      return artifacts.filter((artifact) => input.kind === undefined || artifact.kind === input.kind);
+      const files = (yield* listFiles(artifactsDirectory)).filter((file) => file.endsWith(".json"));
+      const [unreadable, artifacts] = yield* Effect.partition(files, (file) => {
+        const artifactId = decodeURIComponent(file.replace(/\.json$/, ""));
+        return readArtifactFile(artifactId).pipe(
+          Effect.mapError((error) => ({ fileName: file, reason: describeReadError(error) }))
+        );
+      });
+      return {
+        artifacts: artifacts.filter((artifact) => input.kind === undefined || artifact.kind === input.kind),
+        unreadable
+      };
     });
 
     const submitAttempt = (input: SubmitAttemptInput) => Effect.gen(function* () {

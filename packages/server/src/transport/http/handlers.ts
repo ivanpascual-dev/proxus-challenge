@@ -2,6 +2,9 @@ import { Effect, Layer, Option } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { HttpServerRequest } from "effect/unstable/http";
 import {
+  ArtifactNotFound as ApiArtifactNotFound,
+  ArtifactStorageError as ApiArtifactStorageError,
+  ArtifactTypeMismatch as ApiArtifactTypeMismatch,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
   MaterialStorageError as ApiMaterialStorageError,
@@ -9,7 +12,11 @@ import {
   ProxusApi
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
-import { ArtifactRepository, type Artifact } from "../../domain/artifacts/artifact.ts";
+import {
+  ArtifactRepository,
+  type Artifact,
+  type ArtifactRepositoryError
+} from "../../domain/artifacts/artifact.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -107,6 +114,15 @@ const artifactSummary = (artifact: Artifact) => ({
   title: artifact.title
 });
 
+// 500 con cuerpo y motivo, nunca un orDie mudo (invariante 6, F2-08).
+const artifactStorageError = (context: string) => (error: ArtifactRepositoryError) =>
+  new ApiArtifactStorageError({
+    message: `${context}: ${String("reason" in error ? error.reason : error._tag)}`
+  });
+
+const artifactNotFound = (id: string) =>
+  new ApiArtifactNotFound({ artifactId: id, message: `No hay ningún artefacto con id ${id}.` });
+
 export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
   "artifacts",
@@ -115,16 +131,37 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
 
     return handlers
       .handle("list", ({ query }) => artifacts.listArtifacts({ kind: query.kind }).pipe(
-        Effect.map((items) => ({ artifacts: items.map(artifactSummary) })),
-        Effect.orDie
+        Effect.map((listing) => ({
+          artifacts: listing.artifacts.map(artifactSummary),
+          unreadable: listing.unreadable.map((file) => ({ fileName: file.fileName, reason: file.reason }))
+        })),
+        Effect.mapError(artifactStorageError("No se pudo listar los artefactos"))
       ))
-      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(Effect.orDie))
+      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(
+        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+          ? artifactNotFound(params.id)
+          : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
+      ))
       .handle("submit", ({ params, payload }) => artifacts.submitAttempt({
         ...payload,
         artifactId: params.id
       }).pipe(
         Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
-        Effect.orDie
+        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactTypeMismatch | ApiArtifactStorageError => {
+          switch (error._tag) {
+            case "ArtifactNotFound":
+              return artifactNotFound(params.id);
+            case "ArtifactTypeMismatch":
+              return new ApiArtifactTypeMismatch({
+                artifactId: params.id,
+                expected: error.expected,
+                actual: error.actual,
+                message: `El artefacto ${params.id} es de tipo ${error.actual}; se esperaba ${error.expected}.`
+              });
+            default:
+              return artifactStorageError(`No se pudo calificar el intento de ${params.id}`)(error);
+          }
+        })
       ));
   })
 );

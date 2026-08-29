@@ -128,10 +128,15 @@ export const makeArtifactCommands = (
         )
       }, ({ kind }) =>
         repository.listArtifacts(kind === undefined ? {} : { kind }).pipe(
-          Effect.map((artifacts) => artifacts.length === 0
-            ? "No artifacts found."
-            : artifacts.map((artifact) => `- ${artifact.id}: ${artifact.title} (${artifact.kind})`).join("\n")
-          ),
+          Effect.map((listing) => {
+            const lines = listing.artifacts.length === 0
+              ? "No artifacts found."
+              : listing.artifacts.map((artifact) => `- ${artifact.id}: ${artifact.title} (${artifact.kind})`).join("\n");
+            const unreadable = listing.unreadable.length === 0
+              ? ""
+              : `\n\nUnreadable files (${listing.unreadable.length}): ${listing.unreadable.map((file) => `${file.fileName} (${file.reason})`).join(", ")}`;
+            return `${lines}${unreadable}`;
+          }),
           Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
         )
       )

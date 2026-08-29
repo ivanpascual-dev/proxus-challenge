@@ -85,33 +85,51 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
           onInitial: () => <p className="text-muted">Loading artifacts…</p>,
           onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
           onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
-          onSuccess: ({ value }) => value.artifacts.length === 0
-            ? <p className="text-muted">No notes, quizzes, or tests yet.</p>
-            : (
-                <details className="rounded-2xl border border-border bg-surface">
-                  <summary className="cursor-pointer px-4 py-3 font-medium text-heading marker:text-brand">
-                    {value.artifacts.length} artifact{value.artifacts.length === 1 ? "" : "s"}
-                  </summary>
-                  <ul className="grid gap-2 border-border border-t p-3">
-                    {value.artifacts.map((artifact) => (
-                      <li key={artifact.id}>
-                        <button
-                          className={`w-full rounded-xl p-3 text-left transition hover:border-brand hover:bg-canvas ${
-                            selectedArtifactId === artifact.id
-                              ? "border border-brand bg-brand-soft"
-                              : "border border-transparent bg-canvas/70"
-                          }`}
-                          type="button"
-                          onClick={() => onSelectArtifact(artifact.id)}
-                        >
-                          <strong className="block text-heading">{artifact.title}</strong>
-                          <span className="mt-1 block text-muted text-sm">{artifact.kind} · {artifact.id}</span>
-                        </button>
+          onSuccess: ({ value }) => (
+            <>
+              {value.artifacts.length === 0
+                ? <p className="text-muted">No notes, quizzes, or tests yet.</p>
+                : (
+                    <details className="rounded-2xl border border-border bg-surface">
+                      <summary className="cursor-pointer px-4 py-3 font-medium text-heading marker:text-brand">
+                        {value.artifacts.length} artifact{value.artifacts.length === 1 ? "" : "s"}
+                      </summary>
+                      <ul className="grid gap-2 border-border border-t p-3">
+                        {value.artifacts.map((artifact) => (
+                          <li key={artifact.id}>
+                            <button
+                              className={`w-full rounded-xl p-3 text-left transition hover:border-brand hover:bg-canvas ${
+                                selectedArtifactId === artifact.id
+                                  ? "border border-brand bg-brand-soft"
+                                  : "border border-transparent bg-canvas/70"
+                              }`}
+                              type="button"
+                              onClick={() => onSelectArtifact(artifact.id)}
+                            >
+                              <strong className="block text-heading">{artifact.title}</strong>
+                              <span className="mt-1 block text-muted text-sm">{artifact.kind} · {artifact.id}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+              {value.unreadable.length > 0 && (
+                <div className="mt-3 rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm">
+                  <p className="font-semibold text-warning-ink">
+                    {value.unreadable.length} fichero{value.unreadable.length === 1 ? "" : "s"} de artefacto no se pudo leer:
+                  </p>
+                  <ul className="mt-1 grid gap-1 text-warning-ink">
+                    {value.unreadable.map((file) => (
+                      <li key={file.fileName}>
+                        <code>{file.fileName}</code>: {file.reason}
                       </li>
                     ))}
                   </ul>
-                </details>
-              )
+                </div>
+              )}
+            </>
+          )
         })}
       </section>
     </aside>

@@ -44,6 +44,11 @@ POST /api/artifacts/:id/submit
 
 `submit` crea y corrige un intento, devolviendo un attempt con estado `graded` cuando aplica.
 
+Ningún handler del grupo `artifacts` usa `Effect.orDie`: cada error va declarado en
+`packages/shared/src/errors/artifact-errors.ts` y mapeado a su estado HTTP (404, 409 o 500 con cuerpo
+y motivo). `GET /` devuelve también `unreadable`, la lista de ficheros de artefacto que no se
+pudieron decodificar, cada uno con su motivo, en vez de fallar entero.
+
 ## Tipos de artifact
 
 - `note`: contenido markdown.

@@ -264,6 +264,18 @@ export const ListArtifactsInput = Schema.Struct({
 });
 export type ListArtifactsInput = typeof ListArtifactsInput.Type;
 
+// Un fichero de artefacto que no se pudo decodificar. El listado lo devuelve junto a los buenos:
+// callar cuál falla es el fallo silencioso que prohíbe la invariante 3 (F2-07).
+export interface UnreadableArtifactFile {
+  readonly fileName: string;
+  readonly reason: string;
+}
+
+export interface ArtifactListing {
+  readonly artifacts: readonly Artifact[];
+  readonly unreadable: readonly UnreadableArtifactFile[];
+}
+
 export class ArtifactNotFound extends Data.TaggedError("ArtifactNotFound")<{
   readonly artifactId: string;
 }> {}
@@ -309,7 +321,7 @@ export interface ArtifactRepository {
   readonly createArtifact: (input: CreateArtifactInput) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly saveArtifact: (artifact: Artifact) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getArtifact: (id: string) => Effect.Effect<Artifact, ArtifactRepositoryError>;
-  readonly listArtifacts: (input?: ListArtifactsInput) => Effect.Effect<readonly Artifact[], ArtifactRepositoryError>;
+  readonly listArtifacts: (input?: ListArtifactsInput) => Effect.Effect<ArtifactListing, ArtifactRepositoryError>;
   readonly submitAttempt: (input: SubmitAttemptInput) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly saveAttempt: (attempt: ArtifactAttempt) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getAttempt: (id: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
