@@ -232,7 +232,11 @@ const withCommandMetadata = <C extends Command>(
 export const tokenize = (input: string): Effect.Effect<readonly string[], CliError> =>
   Effect.gen(function* () {
     const tokens: string[] = [];
-    const tokenPattern = /\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|([^\s"']+))/gy;
+    // Semántica POSIX: dentro de comillas simples todo es literal (la barra invertida incluida), así
+    // que ese grupo captura hasta la siguiente comilla sin más. Solo las comillas dobles y lo suelto
+    // pasan por `unescapeToken`. El agente envuelve el JSON en comillas simples: si aquí se
+    // "desescapaba" un `\"` dentro de ellas, un valor con comillas rompía el JSON antes de parsearlo.
+    const tokenPattern = /\s*(?:"((?:\\.|[^"\\])*)"|'([^']*)'|([^\s"']+))/gy;
     let index = 0;
 
     while (index < input.length) {
@@ -247,7 +251,7 @@ export const tokenize = (input: string): Effect.Effect<readonly string[], CliErr
       }
 
       const [, doubleQuoted, singleQuoted, bare] = match;
-      tokens.push(unescapeToken(doubleQuoted ?? singleQuoted ?? bare ?? ""));
+      tokens.push(singleQuoted !== undefined ? singleQuoted : unescapeToken(doubleQuoted ?? bare ?? ""));
       index = tokenPattern.lastIndex;
     }
 
