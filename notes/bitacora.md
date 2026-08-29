@@ -333,3 +333,18 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   pérdidas de contenido. El `onUpdate` ignora el update cuyo markdown coincide con el de carga
   (`canonical`), para que la re-serialización del montaje (o un re-montaje de StrictMode) no ensucie
   el apunte.
+
+## 2026-08-29 · Fase 2 · tramo 2F · cierre
+
+- **Desviación (paso 29):** el plan pide separar "Apuntes, Quizzes y Tests" en la barra lateral con
+  `artifactsByKindQuery`. Los apuntes ya salieron de la barra lateral en §13.2 (viven en su material),
+  así que el paso queda en separar `quiz` y `test` en dos secciones. Se usa `artifactsByKindQuery`
+  como pedía el plan (hasta ahora sin usar por nadie, ver `packages/web/CLAUDE.md`).
+- **Decisión menor:** el aviso de ficheros de artefacto ilegibles se lee de `artifactsByKindQuery("quiz")`.
+  El servidor devuelve `unreadable` igual con cualquier `?kind=` (lista todos los ficheros, decodifica,
+  filtra por tipo: `file-artifact-repository.ts:132`), así que da igual de cuál de las dos secciones se
+  lea y no hace falta reintroducir la consulta completa.
+- **Español:** solo quedaban en inglés `Sidebar.tsx`, `Chat.tsx` y el solucionador de ejercicios de
+  `ArtifactWorkspace.tsx` (grep del resto de `packages/web/src`, todo lo demás ya estaba). Los valores
+  del contrato (`multiple-choice`, `true-false`, `short-answer`, `quiz`, `test`) no se traducen: se
+  mapean a etiquetas en español solo para mostrar.

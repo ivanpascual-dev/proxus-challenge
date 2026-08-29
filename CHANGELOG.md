@@ -69,16 +69,17 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
-- **El espacio de trabajo de artefactos habla español.** Los textos de la zona de apuntes, quizzes y
-  tests (encabezados, estados de carga y de error) pasan de inglés a español.
+- **Toda la interfaz habla español.** El chat (cabecera, sugerencias de inicio, botones, mensajes), la
+  barra lateral y el solucionador de quizzes y tests (enunciados, tipos de pregunta, correcciones,
+  botones) pasan de inglés a español, además de la zona de apuntes que ya lo estaba.
 - **El tutor ya no crea apuntes.** Los apuntes se generan desde la pestaña "Apuntes" de cada material,
   no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña. El tutor sigue creando
   quizzes y tests.
 - **El aviso de fichero de artefacto ilegible da un motivo en lenguaje humano** ("no tiene el formato
   de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
   detalle técnico va al log del servidor.
-- **Los apuntes viven en su material, no en la barra lateral.** La sección "Artifacts" de la barra
-  lateral pasa a llamarse "Quizzes y tests" y deja de listar los apuntes.
+- **Los apuntes viven en su material, no en la barra lateral.** La barra lateral deja de listar los
+  apuntes y separa lo que queda en dos secciones, "Quizzes" y "Tests", cada una con su propio contador.
 - **El tutor entiende "bloque" como bloque del apunte.** Al preguntarle por los bloques, el mapa
   mental o el apunte de un material, el tutor lee el apunte en vez de contar las secciones del PDF, y
   puede leer un bloque concreto para hablar de él.

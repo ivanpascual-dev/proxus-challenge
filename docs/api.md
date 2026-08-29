@@ -50,6 +50,8 @@ POST /api/artifacts/:id/submit
 PUT /api/artifacts/:id/note
 POST /api/artifacts/:id/blocks/:blockId/rewrite
 POST /api/artifacts/url-source
+POST /api/artifacts/:id/proposals/:proposalId/accept
+POST /api/artifacts/:id/proposals/:proposalId/reject
 DELETE /api/artifacts/:id
 ```
 
@@ -68,6 +70,12 @@ DNS, sin seguir redirecciones, `text/html` o `text/plain`, techo de bytes y de t
 un borrador del cuerpo del bloque que redacta el modelo a partir de ese fragmento. `draft` es `null`
 si la página trae poco texto o la redacción falla: el bloque se añade igual, vacío. `UrlRejected` 400
 nombra la guarda que falló.
+
+`POST /:id/proposals/:proposalId/accept` aplica una propuesta del tutor (añadir, reescribir o borrar un
+bloque) y la retira de las pendientes. Si el bloque afectado cambió desde que el tutor lo vio,
+`ProposalStale` 409 devuelve los dos textos y no aplica nada. `POST /:id/proposals/:proposalId/reject`
+retira la propuesta sin aplicarla. No hay endpoint ni comando del tutor para aceptar: solo el alumno,
+desde la pestaña "Apuntes" (invariante: el tutor propone, nunca aplica).
 
 `DELETE /:id` borra un artefacto (204). Sirve para rehacer los apuntes de un material: hay como mucho
 un apunte por material, así que regenerar exige borrar el que hay.

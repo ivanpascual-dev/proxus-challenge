@@ -75,7 +75,37 @@ qué página salía una afirmación. Sin techos, `materials view apuntes 1-1000`
 
 ### Citas verificables
 
-_Pendiente: fase 2._
+**Qué problema resuelve.** Un apunte era un `string` de markdown: se leía y se cerraba. No había forma
+de saber de qué página salió cada afirmación ni de abrir esa página. Y para que el tutor escribiera un
+apunte anclado a 20 páginas había que renderizarlas y mandarle 20 imágenes (~31.000 tokens de entrada;
+leer el texto ya indexado son ~11.000 y ya está pagado).
+
+**Qué se construyó.**
+
+- `materials read <materialId> <páginas>`: el tutor lee el texto ya indexado, agrupado por tema y con
+  su procedencia, sin renderizar nada. Tiene su propio techo de caracteres por turno
+  (`maxIndexTextCharactersPerTurn`) y, al alcanzarlo, para y nombra la última página servida frente al
+  total pedido (invariante 11: nunca recorte silencioso). El texto servido va entre marcadores
+  `<<<BEGIN/END STUDENT MATERIAL>>>` y declarado como dato, nunca instrucción.
+- Cada bloque del apunte lleva su fuente: un material con sus páginas, o una URL. El fragmento cacheado
+  del bloque (`excerpt`) lo copia el servidor del índice, nunca el modelo (invariante 8): reescribir un
+  bloque relee su fragmento, no el material entero.
+- Una cita que no ancla contra el índice (material inexistente, sin indexar, página fuera de rango,
+  página que falló al indexarse) no se descarta ni se publica como buena: se guarda con su
+  `unanchoredReason` y se ve marcada (invariante 3).
+- En la interfaz, pulsar la cita despliega la imagen de la página debajo del bloque, reusando
+  `materialPageQuery`. La verdad es la página, no el texto indexado.
+
+**Qué se descartó.**
+
+- **Que el fragmento cacheado viniese en el JSON del tutor.** Sería verificar la salida del modelo con
+  el modelo. Lo rellena y lo trunca el servidor.
+- **Seguir redirecciones al traer una URL.** Obliga a revalidar cada salto contra la lista de
+  direcciones privadas, y una revalidación olvidada es justo el agujero que se quería cerrar. Una
+  redirección se rechaza nombrando el destino.
+- **Un endpoint por operación** (editar, añadir, reordenar, borrar). Son la misma operación: un solo
+  `PUT /artifacts/:id/note` con la nota entera. Con un usuario, "el último que guarda manda" es correcto
+  y se explica en una frase.
 
 ### Perfil de estudio y práctica adaptativa
 
@@ -83,11 +113,78 @@ _Pendiente: fase 3._
 
 ### Errores tipados en el transporte
 
-_Pendiente: fase 2._
+**Qué problema resuelve.** Los tres handlers del grupo `artifacts` usaban `Effect.orDie`, así que un
+artefacto inexistente devolvía 500 en vez de 404. Y el listado usaba `Effect.all`: un solo JSON
+ilegible en `.data` tumbaba la respuesta entera y la web se quedaba sin barra lateral.
+
+**Qué se construyó.**
+
+- Los doce errores de artefacto declarados en `packages/shared/src/errors/artifact-errors.ts`, cada uno
+  con su mensaje en español y su estado HTTP (404, 409, 400, 502, 429, 500). Ningún handler del grupo
+  usa `orDie` (invariante 6): un 500 que podía ser "no encontrado" es un fallo silencioso con abrigo
+  ruidoso.
+- El listado recolecta por fichero: los que decodifican van en `artifacts`, los que no en `unreadable`
+  con un motivo corto en lenguaje humano (el detalle técnico va al log del servidor). La barra lateral
+  lista los buenos y nombra los malos, en vez de no pintar nada (invariante 3).
+
+**Qué se descartó.**
+
+- **Unificar el esquema de artefactos**, hoy duplicado palabra por palabra entre
+  `shared/src/schemas/artifact.ts` y `server/src/domain/artifacts/artifact.ts`. El typecheck no detecta
+  que solo se cambie uno. Es refactor de otra fase; por ahora se cambian los dos a la vez y un test
+  decodifica un apunte guardado con el esquema de `shared`.
+- Registrada la trampa: el campo `error` de `HttpApiEndpoint` quiere un **array** de esquemas, no un
+  `Schema.Union`. Con union el servidor devuelve 500 en vez del estado declarado y el typecheck calla.
 
 ### Notas por bloques
 
-_Pendiente: fase 4._
+**Qué problema resuelve.** El apunte era `{kind, id, title, markdown}`: sin forma de corregir un
+párrafo que salió mal, de añadir lo que dijo el profesor y no está en el PDF, de reordenar, ni de
+saber de dónde salió cada cosa. Nacía en el chat pidiéndoselo al tutor con las palabras justas y salía
+en un único bloque plano.
+
+**Qué se construyó.**
+
+- El apunte es una lista ordenada de bloques y `markdown` desaparece del contrato (un `markdown` suelto
+  conviviendo con `blocks` son dos fuentes de verdad y la que no se actualiza miente en silencio). Cada
+  bloque tiene su markdown, su autoría (`tutor` o `student`), su marca de énfasis (señal separada,
+  nunca sumada a nada) y una fuente opcional.
+- El apunte nace atado a un material (`materialId`, 1:1) y se ve como una pestaña más dentro del
+  material (PDF · Mapa mental · Apuntes), no en una lista aparte. Un material tiene como mucho un
+  apunte; el segundo intento devuelve 409. Para rehacerlo: borrar y regenerar.
+- La generación sale del agente: un `NoteGenerationService` y una ruta `POST /api/materials/:id/notes`
+  con progreso NDJSON, igual que indexar. La estructura es determinista (un bloque por tema del índice,
+  en orden, encabezado según profundidad); la prosa la redacta el modelo desde el texto de las páginas
+  de ese tema. "Un bloque por tema" pasa de súplica en el prompt a código. El tutor pierde la autoría
+  de apuntes: `artifacts create` solo acepta quiz y test (ADR-016).
+- Cada bloque se edita en el sitio con un editor de texto enriquecido (TipTap): barra flotante al
+  seleccionar texto, menú «/» al empezar una línea. Guarda siempre markdown limpio, sin HTML: cualquier
+  formato que solo se represente con HTML no se ofrece, porque rompería la reescritura de bloque y la
+  comparación `baseMarkdown` de las propuestas (ADR-017).
+- Reescribir un bloque: los botones "Más claro" y "Más a fondo" mandan al modelo solo ese bloque y su
+  fragmento, devuelven una propuesta y no guardan nada hasta que el alumno pulsa "Reemplazar".
+- El tutor propone añadir, reescribir o borrar bloques; nunca aplica. La propuesta se guarda como
+  pendiente dentro del apunte. **No existe comando que acepte una propuesta**, así que ninguna inyección
+  consigue una aplicación. Una propuesta guarda el texto que el tutor vio (`baseMarkdown`); si el bloque
+  cambió desde entonces, aceptar devuelve 409 con los dos textos.
+- Añadir un bloque desde una URL: siete guardas en código (solo `https`, sin dirección privada tras
+  resolver el DNS, sin seguir redirecciones, `text/html` o `text/plain`, techo de bytes y de tiempo).
+  El fragmento crudo extraído es el recibo verificable; el borrador del bloque lo redacta el modelo.
+
+**Qué se descartó.**
+
+- **Un editor único de documento** que posea toda la nota, con los bloques derivados de sus
+  encabezados. Fuente, autoría y énfasis por bloque, más las propuestas que apuntan a un `blockId`,
+  obligaban a una pasada de diseño que no compensaba.
+- **BlockNote**, que es turnkey pero exporta a markdown con pérdidas: mal cuando el markdown es la
+  fuente de verdad y la reescritura compara `baseMarkdown`.
+- **El disparador de generación como comando del tutor.** Los comandos del `cli` no tienen canal de
+  dependencias para pasar `LanguageModel`, y generar el apunte no tiene ninguna decisión para el
+  modelo (entrada: solo `materialId`; forma: por código). Un LLM delante de un botón es un salto que
+  puede fallar sin aportar.
+- **Un apunte global de varios materiales.** Cada material, su apunte.
+- **Migrar las notas viejas de `.data`.** Son de prueba: se borran. Una migración sería código muerto
+  desde el primer día.
 
 ---
 
@@ -123,6 +220,42 @@ en `.env`. El servidor falla al arrancar si falta alguno, a propósito.
    nombrando el rango; un id que no existe responde 404. Nunca 500.
 8. `pnpm test` cubre las funciones puras: umbral de densidad (599 frente a 601), escala de renderizado,
    presupuesto de turno y limitador de frecuencia con reloj inyectado.
+
+### Recorrido de la fase 2
+
+Con un material ya indexado (paso 4 de arriba).
+
+1. **Generar el apunte.** Abre el material, pestaña "Apuntes", "Crear apuntes". El progreso avanza tema
+   a tema. Al acabar, el apunte tiene un bloque por cada tema del índice, en orden, con el nombre del
+   tema como encabezado. Pulsar "Crear apuntes" un segundo material distinto funciona; volver a
+   generar el mismo exige "Borrar apunte" primero.
+2. **Editar un bloque.** Escribe dentro de un bloque como en un editor normal: selecciona texto y sale
+   la barra flotante, escribe «/» al empezar una línea y sale el menú de formatos. Añade un bloque
+   tuyo, súbelo de sitio, márcalo como importante. "Guardar". Recarga: sigue igual, y el markdown está
+   limpio.
+3. **La cita.** Un bloque que viene del material muestra sus páginas. Púlsalas: la imagen de la página
+   se abre debajo del bloque, sin salir de los apuntes. Si alguna página la transcribió el modelo, lo
+   avisa.
+4. **Reescribir.** "Más claro" en un bloque con cita: sale la versión nueva junto a la actual y no se
+   guarda hasta "Reemplazar". En un bloque tuyo sin fuente, reescribe y dice que fue sin fuente.
+5. **Traer una URL.** "Añadir un bloque desde una URL" con `https://es.wikipedia.org/wiki/...`: entra
+   como bloque con su fragmento y un borrador. Con `https://127.0.0.1/x`, `https://[::1]/x` o
+   `http://example.com`: rechazado nombrando la dirección o el esquema, sin traer nada.
+6. **El tutor propone.** En el chat: "añade a los apuntes del material X un bloque sobre Y". Aparece en
+   la pestaña "Apuntes" como propuesta pendiente, con su motivo y un antes/después; no ha tocado ningún
+   bloque. Acéptala y pasa a ser un bloque. Pídele después "aplica esa propuesta": no puede, y lo
+   explica.
+7. **Propuesta caducada.** Propón un `replace`, edita ese bloque a mano y guarda, luego acepta la
+   propuesta: 409 con los dos textos, sin aplicar nada.
+8. **Errores del transporte.** `curl -i localhost:3000/api/artifacts/no-existe` responde 404 con
+   cuerpo y motivo, no 500. `echo 'roto' > packages/server/.data/artifacts/artifacts/roto.json` y
+   recarga: la barra lateral sigue listando los demás y nombra `roto.json`.
+9. **Interfaz.** Recorre las cuatro pantallas: "Apuntes" en la interfaz, `note` en el JSON, cero
+   inglés. La barra lateral separa "Quizzes" y "Tests".
+10. `pnpm test` cubre las funciones puras nuevas: los techos del apunte, el casado de bloques por id,
+    la construcción del fragmento desde el índice (seis casos), las guardas de URL (rangos privados
+    v4/v6/mapeadas, esquemas, content-type, `extractText`), aplicar y caducar propuestas, y la
+    generación determinista (un bloque por tema) con un índice de fixture y un modelo simulado.
 
 ---
 
@@ -171,6 +304,28 @@ modelo corre a temperatura baja y fija (`LIMITS.modelTemperature`) con techo de 
 (`LIMITS.maxModelOutputTokens`) y timeout (`LIMITS.modelCallTimeoutMs`). El agente solo ejecuta
 comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno.
 
+**Generación de apuntes (flujo de AI), fase 2.**
+
+- **Tiene que:** producir un bloque por cada tema del índice, en orden, con el `label` del tema como
+  encabezado; redactar la prosa de cada bloque solo desde el texto de las páginas de ese tema; poner la
+  cita de cada bloque desde el índice (`materialId` + páginas del tema), nunca desde el modelo;
+  comprobar que el material no tiene ya un apunte antes de gastar una sola llamada; emitir el progreso
+  tema a tema.
+- **Tiene prohibido:** traducir el vocabulario del material; escribir un bloque que mezcle dos temas;
+  que el modelo ponga o cambie una cita; dar por "creado" un apunte a medias si el modelo o el
+  almacenamiento fallan a mitad (se ve el error real, invariante 3).
+
+**Reescritura de bloque, borrador desde URL y propuestas del tutor (flujos de AI), fase 2.**
+
+- **Reescritura:** al modelo van solo el markdown del bloque y su fragmento cacheado, sin historial,
+  sin imágenes, sin el resto del apunte. Devuelve texto y no guarda nada; el alumno ve la propuesta
+  junto a su texto y decide.
+- **URL:** el fragmento crudo extraído no lo toca el modelo (es el recibo, invariante 8); el borrador
+  se redacta solo desde ese fragmento, declarado como dato entre marcadores. Si la redacción falla o
+  hay poco texto, el borrador es `null` y el bloque nace vacío: el fallo no se disfraza.
+- **Propuestas:** se guardan como pendientes y no tocan ningún bloque. No hay comando ni endpoint que
+  el agente pueda usar para aceptar, aplicar o rechazar una.
+
 ### Fallos conocidos
 
 - **Un `tool-result` fabricado por el cliente se acepta** y llega al prompt como salida de herramienta
@@ -195,20 +350,45 @@ comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno
   `tsconfig` base (el que extienden los paquetes), que no fija `jsx`, así que barría `packages/web` y
   reventaba con 206 errores de JSX desde el commit inicial. No hay ningún `.ts` en la raíz fuera de
   `packages/`, de modo que no cubría nada que `pnpm -r typecheck` (los 4 paquetes) no cubra ya.
+- **DNS rebinding al traer una URL (fase 2).** Se resuelve el host y después `fetch` lo vuelve a
+  resolver por su cuenta: entre las dos resoluciones, un DNS hostil puede cambiar la respuesta.
+  Arreglarlo bien exige fijar la IP y pasar la cabecera `Host` a mano; no se hace en esta fase. Sin
+  autenticación, quien lo explotaría es el propio usuario contra su propia máquina.
+- **`extractText` no es un parser de HTML (fase 2).** Con markup roto puede colar texto de un atributo
+  como si fuera contenido. El fragmento y el borrador se enseñan antes de que el alumno acepte, así que
+  el fallo es visible y reversible.
+- **Un material mal indexado produce apuntes pobres (fase 2).** El servicio redacta cada bloque desde
+  `index.pages[].text`; si la extracción falló (varias páginas con 30-670 caracteres), el bloque sale
+  flojo. Se arregla re-indexando ese material, no mirando el PDF durante la generación (multi-turno,
+  caro).
+- **El `PUT` de la nota entera crece con el apunte (fase 2).** Con `maxBlocksPerNote: 200` y
+  `maxBlockCharacters: 5_000`, el peor caso es ~1 MB por guardado. Aceptable en local; lo primero a
+  cambiar (a operaciones por bloque) si esto fuese a producción.
+- **`maxAgentSteps` subió de 8 a 12 (fase 2).** Da holgura al camino de quiz/test, no más seguridad:
+  cada paso extra reintroduce el texto no confiable del material en el contexto. Sigue siendo un techo
+  claro, lejos del `maxSteps: 10000` que preocupaba en ADR-007.
 
 ### Cómo lo evalúo
 
 - **Determinista, en tests (`pnpm test`):** el umbral de densidad (`classifyPage` con 599 y 601), la
   escala de renderizado, el saneador de jerarquía (`normalizeTopicHierarchy` con cada forma rota), el
-  presupuesto de turno y el limitador de frecuencia con reloj inyectado.
+  presupuesto de turno y el limitador de frecuencia con reloj inyectado. De la fase 2: los techos del
+  apunte con 1 por encima y 1 por debajo, el casado de bloques por id (conservado, nuevo, desconocido
+  rechazado), el fragmento desde el índice (los seis casos), las guardas de URL (cada rango privado
+  v4/v6/mapeadas, cada esquema, cada content-type, `extractText`), aplicar y caducar propuestas, y la
+  generación con índice de fixture y modelo simulado (exactamente un bloque por tema).
 - **A mano, contra el corpus real:** se indexa un material de cada tipo (diapositivas y A4) y se
-  comprueba la procedencia página a página y que ningún `label` de tema esté traducido.
+  comprueba la procedencia página a página y que ningún `label` de tema esté traducido. De la fase 2:
+  generar el apunte de un material de varios temas y comprobar un bloque por tema con su cita, abrir la
+  página desde la cita, y que una reescritura no se guarda hasta aceptarla.
 - **Coste y latencia:** `pnpm index:materials` imprime cuánto tardó y cuántas páginas fueron al modelo.
   El camino de extracción no cuesta ninguna llamada, y ese es el ahorro que se mide.
 - **Seguridad del tutor:** `pnpm dev` en una terminal y `pnpm test:guardarrailes` en otra. Comprueba
   propiedades negativas de la respuesta (no aparece ningún marcador del prompt, no cita una página
   inexistente), nunca una frase de rechazo concreta. Las D bloquean; las B avisan (con `STRICT=1`
-  también bloquean); D3 es un hueco conocido que no bloquea hasta la fase 4.
+  también bloquean); D3 es un hueco conocido que no bloquea hasta la fase 4. La fase 2 añade tres
+  prompts (generación de apuntes, reescritura de bloque, borrador de URL) y dos puertas nuevas al mundo
+  (modelo y red): entran en esa misma pasada al cerrar la fase.
 
 ---
 

@@ -49,6 +49,7 @@ Materiales:
 
 ```txt
 materials list
+materials read <materialId> <pages>
 materials view <materialId> <pages>
 ```
 
@@ -76,7 +77,11 @@ show` lo que `materials view` a `materials read`.
 alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Ver la skill
 `propose-note-changes`.
 
-`materials view` puede devolver imágenes de páginas para llamadas multimodales a Gemini.
+`materials read` devuelve el texto ya indexado, agrupado por tema y con su procedencia, sin gastar
+presupuesto de imágenes: es la primera opción para leer un material. Tiene su propio techo de
+caracteres por turno (`maxIndexTextCharactersPerTurn`) y, al alcanzarlo, para y nombra la última
+página servida frente al total pedido. `materials view` puede devolver imágenes de páginas para
+llamadas multimodales a Gemini, y se reserva para cuando el texto no basta (un diagrama, una fórmula).
 
 ## Flujo de chat
 
