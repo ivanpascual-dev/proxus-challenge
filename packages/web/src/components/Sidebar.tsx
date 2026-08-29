@@ -24,7 +24,7 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
           </div>
           <div>
             <strong className="block text-heading">Proxus Tutor</strong>
-            <span className="block text-muted text-sm">Academic assistant</span>
+            <span className="block text-muted text-sm">Asistente académico</span>
           </div>
         </div>
         <ThemeToggle />
@@ -32,18 +32,18 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="font-semibold text-body text-sm uppercase tracking-widest">Materials</h2>
+          <h2 className="font-semibold text-body text-sm uppercase tracking-widest">Materiales</h2>
         </div>
         {AsyncResult.matchWithError(materials, {
-          onInitial: () => <p className="text-muted">Loading materials…</p>,
+          onInitial: () => <p className="text-muted">Cargando materiales…</p>,
           onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
           onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
           onSuccess: ({ value }) => value.materials.length === 0
-            ? <p className="text-muted">No uploaded PDFs yet.</p>
+            ? <p className="text-muted">Aún no hay PDFs subidos.</p>
             : (
                 <details className="rounded-2xl border border-border bg-surface">
                   <summary className="cursor-pointer px-4 py-3 font-medium text-heading marker:text-brand">
-                    {value.materials.length} material{value.materials.length === 1 ? "" : "s"}
+                    {value.materials.length} {value.materials.length === 1 ? "material" : "materiales"}
                   </summary>
                   <ul className="grid gap-2 border-border border-t p-3">
                     {value.materials.map((material) => (
@@ -59,7 +59,7 @@ export function Sidebar({ selectedArtifactId, selectedMaterialId, onSelectArtifa
                         >
                           <strong className="block text-heading">{material.title}</strong>
                           <span className="mt-1 flex items-center gap-2 text-muted text-sm">
-                            <span>{material.pageCount} pages</span>
+                            <span>{material.pageCount} {material.pageCount === 1 ? "página" : "páginas"}</span>
                             <span
                               className={material.indexState === "indexed"
                                 ? "rounded-full bg-success/15 px-2 py-0.5 text-[0.7rem] text-success-ink"
