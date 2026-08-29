@@ -73,6 +73,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
         NoteLimitExceeded.pipe(HttpApiSchema.status(400)),
         UnknownBlock.pipe(HttpApiSchema.status(400)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
@@ -121,6 +122,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
         ProposalNotFound.pipe(HttpApiSchema.status(404)),
         ProposalStale.pipe(HttpApiSchema.status(409)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
@@ -134,6 +136,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactNotFound.pipe(HttpApiSchema.status(404)),
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
         ProposalNotFound.pipe(HttpApiSchema.status(404)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
@@ -146,6 +149,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
       success: HttpApiSchema.NoContent,
       error: [
         ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     })

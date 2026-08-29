@@ -171,49 +171,78 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
           }
         })
       ))
-      .handle("saveNote", ({ params, payload }) => notes.saveNote(params.id, payload))
+      // Escribe el apunte entero (hasta ~1 MB con los techos de bloque). No es una operación cara ni
+      // destructiva (el último que guarda manda, por diseño), pero pasa por el fusible de frecuencia
+      // para que no se pueda martillear: cubo de mensajes, holgado para una sesión de edición.
+      .handle("saveNote", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.saveNote(params.id, payload);
+      }))
       // Reescribe un bloque con una llamada al modelo (decisión 7): solo el texto del bloque y su
       // fragmento cacheado (F2-17). No guarda: devuelve la propuesta y el alumno decide.
       .handle("rewriteBlock", ({ params, payload }) => Effect.gen(function* () {
         const key = yield* clientKey;
+        // Gasta una llamada al modelo: cuenta contra el cubo de mensajes y toma un permiso de
+        // concurrencia, para que `maxConcurrentRequests` acote también estas puertas (igual que el
+        // chat y la generación de apuntes).
         yield* rateLimiter.check(key, "messages");
+        yield* rateLimiter.acquire(key);
 
-        const artifact = yield* artifacts.getArtifact(params.id).pipe(
-          Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
-            ? artifactNotFound(params.id)
-            : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
-        );
+        return yield* Effect.gen(function* () {
+          const artifact = yield* artifacts.getArtifact(params.id).pipe(
+            Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+              ? artifactNotFound(params.id)
+              : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
+          );
 
-        const block = artifact.kind === "note"
-          ? artifact.blocks.find((candidate) => candidate.id === params.blockId)
-          : undefined;
-        if (block === undefined) {
-          return yield* new ApiBlockNotFound({
-            blockId: params.blockId,
-            message: `El apunte ${params.id} no tiene ningún bloque con id ${params.blockId}.`
-          });
-        }
+          const block = artifact.kind === "note"
+            ? artifact.blocks.find((candidate) => candidate.id === params.blockId)
+            : undefined;
+          if (block === undefined) {
+            return yield* new ApiBlockNotFound({
+              blockId: params.blockId,
+              message: `El apunte ${params.id} no tiene ningún bloque con id ${params.blockId}.`
+            });
+          }
 
-        const excerpt = block.source === null ? null : block.source.excerpt;
-        return yield* rewriteBlock({ markdown: block.markdown, excerpt }, payload.mode);
+          const excerpt = block.source === null ? null : block.source.excerpt;
+          return yield* rewriteBlock({ markdown: block.markdown, excerpt }, payload.mode);
+        }).pipe(Effect.ensuring(rateLimiter.release(key)));
       }))
-      // Trae una URL como fuente. Las siete guardas viven en el dominio (`url-source`); aquí solo
-      // el fusible de frecuencia, porque sale a la red.
+      // Trae una URL. Las siete guardas viven en el dominio (`url-source`); aquí el fusible: sale a la
+      // red y hace hasta dos llamadas al modelo, así que cuenta contra el cubo `artifacts` (más
+      // estricto) y toma un permiso de concurrencia, igual que la generación de apuntes.
       .handle("fetchUrlSource", ({ payload }) => Effect.gen(function* () {
         const key = yield* clientKey;
-        yield* rateLimiter.check(key, "messages");
-        return yield* fetchUrlSource(payload.url);
+        yield* rateLimiter.check(key, "artifacts");
+        yield* rateLimiter.acquire(key);
+        return yield* fetchUrlSource(payload.url).pipe(Effect.ensuring(rateLimiter.release(key)));
       }))
       // El alumno acepta o descarta una propuesta del tutor (ADR-014). El servicio devuelve ya los
       // errores del contrato (`ProposalStale` 409 con los dos textos, F2-29), así que el handler no
       // mapea nada: no hay `orDie` que valga (invariante 6).
-      .handle("acceptProposal", ({ params }) => notes.acceptProposal(params.id, params.proposalId))
-      .handle("rejectProposal", ({ params }) => notes.rejectProposal(params.id, params.proposalId))
-      .handle("deleteArtifact", ({ params }) => artifacts.deleteArtifact(params.id).pipe(
-        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
-          ? artifactNotFound(params.id)
-          : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))
-      ));
+      .handle("acceptProposal", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.acceptProposal(params.id, params.proposalId);
+      }))
+      .handle("rejectProposal", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.rejectProposal(params.id, params.proposalId);
+      }))
+      // Borrado: la única operación destructiva por HTTP de la fase 2. Cubo `artifacts` (más
+      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte.
+      .handle("deleteArtifact", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        return yield* artifacts.deleteArtifact(params.id).pipe(
+          Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+            ? artifactNotFound(params.id)
+            : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))
+        );
+      }));
   })
 );
 
