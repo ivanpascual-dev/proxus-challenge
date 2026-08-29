@@ -1117,3 +1117,40 @@ patrones existentes; el clic real lo prueba Iván.
 - **`extractText` no es un parser** (riesgo 3): sin arreglar, va a `NOTES.md`.
 - El prompt `URL_SUMMARY_PROMPT` es superficie nueva del modelo: entra en la pasada de
   `@guardarrailes` del cierre de fase (paso 32).
+
+## 17. Añadido a 2D: el tutor lee los bloques del apunte barato (tras probar el tutor, 2026-08-29)
+
+El tramo 2D (§7, §13) solo preveía `artifacts note propose`. Al probar el tutor con una traza de chat,
+Iván vio dos fallos que no cubría ningún tramo, y se arreglan como parte de 2D:
+
+1. **"Bloque" era ambiguo.** Preguntando "¿cuántos bloques hay?" el tutor contaba encabezados del PDF,
+   no bloques del apunte, y solo cambiaba al decir "mapa mental". Arreglo: sección nueva "The
+   material's study note" en la skill `use-uploaded-materials` (amplía §6.3): "block / blocks /
+   sub-blocks / the note / the mind map" se refieren al apunte y sus bloques, nunca a las secciones
+   del PDF. Flujo `artifacts list note` -> `artifacts show` (índice) -> `artifacts block` (texto).
+   `description` de la skill y numeración del workflow actualizadas.
+
+2. **`artifacts show` de un apunte era carísimo.** Volcaba el markdown entero de cada bloque más el
+   fragmento cacheado: ~15k tokens en un apunte real, que disparan el aviso de `maxHistoryCharacters`.
+   - `artifacts show` de un apunte pasa a devolver un **índice**: una línea por bloque (id, encabezado,
+     autor, énfasis, fuente `material p.2,3` / `url <host>` / `no source`, tamaño), más título,
+     `materialId`, nº de propuestas pendientes y la pista de cómo leer un bloque. Quiz y test sin
+     cambio (siguen en JSON).
+   - Comando nuevo **`artifacts block <artifactId> <blockIds>`**: el markdown completo de uno o varios
+     bloques (ids separados por coma), sin el `excerpt` cacheado. Es a `artifacts show` lo que
+     `materials view` a `materials read`.
+   - `artifacts list` añade `, material <id>` a la línea de cada apunte (el campo ya estaba en
+     `ArtifactSummary`, solo faltaba mostrarlo).
+   - Solo cambia el CLI del tutor. `GET /artifacts/:id` (lo que usa la web) sigue devolviendo el
+     apunte entero.
+
+**Cómo aterrizó:** el código (renders `renderArtifactListing` / `renderNoteOutline` / `renderNoteBlocks`,
+comando `block`, línea de `create-study-artifacts`, párrafos de `propose-note-changes`) se absorbió en
+el commit de 2D `feat(artifacts): el tutor propone cambios en un apunte...`. En un commit aparte van la
+skill `use-uploaded-materials`, los tests de los renders (`artifact-commands.test.ts`) y los docs
+(`docs/ai-agent.md`, este §17, `CHANGELOG.md`).
+
+Sugerido a Iván para `docs/especificacion.md` (no lo toca esta sesión): dos EARS análogos a F2-14,
+"CUANDO el tutor ejecute `artifacts show` sobre un apunte, EL sistema DEBERÁ devolver un índice de
+bloques sin el markdown ni el fragmento cacheado" y "CUANDO ejecute `artifacts block`, EL sistema
+DEBERÁ devolver el markdown completo de los bloques pedidos sin el fragmento cacheado".

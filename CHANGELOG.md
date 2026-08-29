@@ -79,6 +79,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   detalle técnico va al log del servidor.
 - **Los apuntes viven en su material, no en la barra lateral.** La sección "Artifacts" de la barra
   lateral pasa a llamarse "Quizzes y tests" y deja de listar los apuntes.
+- **El tutor entiende "bloque" como bloque del apunte.** Al preguntarle por los bloques, el mapa
+  mental o el apunte de un material, el tutor lee el apunte en vez de contar las secciones del PDF, y
+  puede leer un bloque concreto para hablar de él.
 
 ### Corregido
 

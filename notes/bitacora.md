@@ -290,3 +290,22 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   de un argumento JSON de una línea rompía el JSON en la práctica, y una paráfrasis mínima hacía nacer
   la propuesta ya caducada. El tutor manda solo `blockId` (y el texto nuevo si reescribe); un
   `blockId` que no está en el apunte se rechaza con `BlockNotFound`.
+
+## 2026-08-29 · Fase 2 · tramo 2D · el tutor lee los bloques del apunte
+
+- **Desviación (añadido no planificado a 2D):** el tramo 2D del plan (§7, §13) solo preveía
+  `artifacts note propose`. Probar el tutor con una traza que pasó Iván destapó dos cosas que ningún
+  tramo cubría; se arreglaron dentro del commit de 2D (el código) y aquí (la skill, los tests, los
+  docs). Recogido en §17 del plan.
+- **Causa raíz (contaba secciones del PDF, no bloques del apunte):** al preguntarle "¿cuántos bloques
+  hay?" el tutor listaba los encabezados del PDF y solo cambiaba de idea al decir "mapa mental"
+  explícito. No era comprensión: ninguna skill ataba la palabra "bloque" al apunte. Arreglo: sección
+  nueva "The material's study note" en `use-uploaded-materials`, donde "block / the note / the mind
+  map" son el apunte y sus bloques, nunca las secciones del PDF.
+- **Decisión sobre la marcha (índice + `artifacts block`, no volcado):** `artifacts show` de un apunte
+  real son ~15k tokens (markdown entero de cada bloque + fragmento cacheado) y disparan el aviso de
+  `maxHistoryCharacters` en un turno. `artifacts show` de un apunte pasa a devolver un índice (una
+  línea por bloque: id, encabezado, autor, énfasis, fuente, tamaño) y el texto se pide bloque a bloque
+  con `artifacts block <id> <blockIds>`. Mismo reparto que `materials view` / `materials read`. Solo
+  cambia el CLI del tutor; `GET /artifacts/:id` sigue devolviendo el apunte entero para la web. No
+  llega a ADR: es coherente con ADR-016 (lo caro se lee a demanda) y no abre ninguna puerta nueva.

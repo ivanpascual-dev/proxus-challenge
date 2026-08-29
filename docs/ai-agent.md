@@ -57,6 +57,7 @@ Artifacts:
 ```txt
 artifacts list
 artifacts show <artifactId>
+artifacts block <artifactId> <blockIds>
 artifacts create '<json>'
 artifacts submit '<json>'
 artifacts attempts [artifactId]
@@ -65,6 +66,11 @@ artifacts note propose <artifactId> '<json>'
 ```
 
 `artifacts create` solo acepta `quiz` y `test`. Los apuntes se generan fuera del tutor (ver arriba).
+
+`artifacts show` de un apunte devuelve un índice de bloques (id, encabezado, autor, énfasis, fuente,
+tamaño), no el texto; quiz y test se siguen mostrando como JSON. `artifacts block` da el markdown
+completo de los bloques pedidos (ids separados por coma), sin el fragmento cacheado. Es a `artifacts
+show` lo que `materials view` a `materials read`.
 
 `artifacts note propose` deja una propuesta pendiente (añadir, reescribir o borrar un bloque) que el
 alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Ver la skill
