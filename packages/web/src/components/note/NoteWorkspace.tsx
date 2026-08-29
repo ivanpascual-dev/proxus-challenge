@@ -1,9 +1,10 @@
 import { useAtomSet } from "@effect/atom-react";
 import { LIMITS, type Artifact, type UrlSourceResult } from "@proxus/shared";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { saveNoteAction } from "../../domain/artifacts/atoms.ts";
 import { AddFromUrl } from "./AddFromUrl.tsx";
 import { NoteBlockCard } from "./NoteBlockCard.tsx";
+import { ProposalCard } from "./ProposalCard.tsx";
 import {
   draftFromArtifact,
   draftToSaveInput,
@@ -34,6 +35,15 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const save = useAtomSet(saveNoteAction, { mode: "promise" });
+
+  // Cuando el artefacto cambia por debajo (aceptar o descartar una propuesta refresca el apunte) y
+  // no hay cambios sin guardar, se recarga el borrador para reflejar el bloque nuevo. Con cambios
+  // sin guardar no se toca: aceptar una propuesta está bloqueado en ese caso.
+  useEffect(() => {
+    if (!dirty) {
+      setDraft(draftFromArtifact(artifact));
+    }
+  }, [artifact, dirty]);
 
   const overLimitCount = useMemo(
     () => draft.blocks.filter((block) => block.markdown.length > LIMITS.maxBlockCharacters).length,
@@ -113,6 +123,25 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
           {draft.title.length} / {LIMITS.maxNoteTitleCharacters}
         </p>
       </header>
+
+      {artifact.proposals.length > 0 && (
+        <div className="mb-5 grid gap-3">
+          <p className="text-muted text-xs">
+            {artifact.proposals.length === 1
+              ? "El tutor ha propuesto un cambio. Tú decides si se aplica."
+              : `El tutor ha propuesto ${artifact.proposals.length} cambios. Tú decides cuáles se aplican.`}
+          </p>
+          {artifact.proposals.map((proposal) => (
+            <ProposalCard
+              key={proposal.id}
+              artifactId={artifact.id}
+              proposal={proposal}
+              blocks={artifact.blocks}
+              blocked={dirty}
+            />
+          ))}
+        </div>
+      )}
 
       {draft.blocks.length === 0
         ? (

@@ -70,6 +70,25 @@ export const fetchUrlSourceAction = apiRuntime.fn(
     ).pipe(Effect.withSpan("artifacts.fetchUrlSource", { kind: "client" }))
 );
 
+// Aceptar o descartar una propuesta del tutor (ADR-014). El servidor es la fuente de verdad: aplica
+// la propuesta y, si el bloque cambió desde que el tutor lo vio, responde 409 (F2-29). Invalida el
+// artefacto para que la vista refleje el bloque nuevo y la propuesta retirada.
+export const acceptProposalAction = apiRuntime.fn(
+  ({ id, proposalId }: { readonly id: string; readonly proposalId: string }) =>
+    ApiClient.use((client) =>
+      client.artifacts.acceptProposal({ params: { id, proposalId } })
+    ).pipe(Effect.withSpan("artifacts.acceptProposal", { kind: "client" })),
+  { reactivityKeys: ["artifacts"] }
+);
+
+export const rejectProposalAction = apiRuntime.fn(
+  ({ id, proposalId }: { readonly id: string; readonly proposalId: string }) =>
+    ApiClient.use((client) =>
+      client.artifacts.rejectProposal({ params: { id, proposalId } })
+    ).pipe(Effect.withSpan("artifacts.rejectProposal", { kind: "client" })),
+  { reactivityKeys: ["artifacts"] }
+);
+
 export const submitArtifactAttemptAction = apiRuntime.fn(
   (input: SubmitAttemptInput) =>
     ApiClient.use((client) => input.artifactKind === "quiz"

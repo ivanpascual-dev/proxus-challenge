@@ -53,6 +53,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   propuesta se enseña junto al texto actual y no se guarda hasta que se pulsa "Reemplazar el bloque";
   si el bloque no tenía fragmento de origen, se avisa de que se reescribió sin fuente. Hay que guardar
   el apunte una vez para poder reescribir sus bloques.
+- **El tutor propone cambios en los bloques del apunte.** Cuando se le pide añadir, reescribir o
+  borrar un bloque, el tutor no lo toca: deja una propuesta pendiente. La pestaña "Apuntes" del
+  material las lista con su motivo y un antes/después, y cada una se acepta (pasa a ser un bloque) o
+  se descarta. Aparecen en cuanto el tutor las hace, se le pidan desde el chat o desde la pestaña. Si
+  el bloque cambió desde que el tutor lo vio, la propuesta se marca como caducada, enseña los dos
+  textos y no deja aceptarla. Aceptar está bloqueado mientras haya cambios del apunte sin guardar.
 - **Añadir un bloque del apunte desde una URL.** Un botón "Añadir un bloque desde una URL" pide una
   dirección `https`, el servidor descarga la página (rechazando en voz alta las que apuntan a una red
   interna, redirigen, pesan de más, tardan de más o no son texto), guarda un fragmento de la página
