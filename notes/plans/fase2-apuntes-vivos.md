@@ -89,6 +89,27 @@ apunte: reescribir un bloque no relee el material, relee su fragmento.
     [`:121`](../../packages/server/src/transport/http/handlers.ts#L121) y
     [`:128`](../../packages/server/src/transport/http/handlers.ts#L128).
 
+> **Decisiones 17 a 21: segunda pasada del tramo 2B (Iván, 2026-08-29).** Detalle y diagnóstico en la
+> sección 12. Donde chocan con la decisión 15 de §11.4 o con el paso 17 de §7, mandan estas.
+
+17. **El apunte nace atado a un material: `NoteArtifact` y `CreateNoteArtifactInput` ganan `materialId`,
+    relación 1:1.** Se acepta perder el apunte multi-material y el apunte suelto (hoy no existen). El
+    apunte deja de ser un artefacto de propósito general y pasa a ser "los apuntes de este material".
+18. **El apunte se ve dentro del material, como una pestaña más (PDF · Mapa mental · Apuntes).** La
+    barra lateral deja de listar los `note`; sigue listando quiz y test. El alumno estudia un material
+    y sus apuntes juntos; una lista plana aparte los separa.
+19. **Un material tiene como mucho un apunte.** El segundo `artifacts create` de tipo note sobre el
+    mismo `materialId` se rechaza con 409 (`MaterialAlreadyHasNote`); el checklist del chat no lista
+    los materiales que ya tienen apunte. Para rehacerlo: `DELETE /artifacts/:id` y volver a generar.
+    Regenerar sin querer no debe pisar lo que el alumno ya editó a mano.
+20. **Los dos accesos de §11.4 ejecutan y generan, no rellenan el campo del chat, y no enseñan al
+    usuario lo que hace el agente** (ni el prompt, ni los pasos) cuando la generación no es una
+    conversación. La forma exacta de cada acceso, en §12.2.
+21. **El apunte global de varios materiales queda descartado, no aparcado** (Iván). Cada material, su
+    apunte. Sustituye al "se anota como candidata" del final de §11.4.
+22. **`maxAgentSteps` sube de 8 a 12** (Iván, 2026-08-29): holgura para el camino de generación, no
+    más seguridad. Toca `limits.ts` y obliga a re-lanzar `@guardarrailes`. Detalle y coste en §12.3.
+
 ---
 
 ## 3. Estado de partida verificado
@@ -408,6 +429,11 @@ la lista de tareas.
 4. `api/artifacts.ts`: los cinco endpoints nuevos y los errores en los tres existentes.
 5. `limits.ts`: los cinco techos de la sección 4.2.
 
+> **Segunda pasada (§12):** `schemas/artifact.ts` `NoteArtifact` y `ArtifactSummary` ganan `materialId`;
+> `api/artifacts.ts` gana `deleteArtifact` (`DELETE /:id`, 204); `limits.ts` sube `maxAgentSteps` a 12.
+> `CreateNoteArtifactInput` (dominio) gana `materialId` y `MaterialAlreadyHasNote` es un error de
+> dominio, no de `shared` (§12.4).
+
 ---
 
 ## 6. Texto canónico
@@ -520,14 +546,16 @@ guardas y al recargar sigue ahí.
     regla de "un bloque por tema del índice, resumen en prosa" (feedback de Iván, §11).
 16. Web: `BlockCitation` con las páginas, la marca de transcripción, el motivo cuando no ancla, y el
     desplegable con la imagen de la página.
-17. Web: accesos para generar apuntes (§11.4). Botón en `Chat.tsx` (estado vacío y cabecera) y botón
-    "Crear apuntes" en `MaterialPanel.tsx`. Los dos **rellenan el campo del chat** con un prompt
-    visible y editable, con su chip de contexto cuando nombran un material (invariante 9); no envían
-    solos. Sin backend nuevo: es el endpoint del chat que ya existe.
+17. **Sustituido por la sección 12** (decisiones 17 a 21). En resumen: `materialId` en el contrato del
+    apunte y su `create`; `MaterialAlreadyHasNote` y `DELETE /artifacts/:id`; pestaña "Apuntes" dentro
+    de `MaterialPanel` con `NoteWorkspace` y "Borrar apunte"; `Chat.tsx` con el panel de checklist
+    (`NotesFromMaterialsPanel`) que genera en serie y en silencio; `Sidebar` y `ArtifactWorkspace`
+    dejan de tratar `note`; `generate-notes.ts` reescrito. El detalle, fichero a fichero, en §12.4.
 
 **Se ve:** le pides al tutor unos apuntes de un material indexado y cada bloque dice de qué páginas
-sale; pulsas la cita y se abre la página debajo del bloque. Desde el PDF, "Crear apuntes" te deja el
-prompt escrito en el chat con el material como chip, y tú lo envías.
+sale; pulsas la cita y se abre la página debajo del bloque. Desde el PDF, "Crear apuntes" genera el
+apunte de ese material y lo abre en su pestaña. Desde el chat, el botón abre un checklist de
+materiales, marcas los que quieras y aparece un apunte por cada uno, sin pasar por la conversación.
 
 ### Tramo 2C · Reescribir y traer de fuera
 
@@ -742,5 +770,298 @@ Sin endpoint nuevo ni operación de modelo invocada por código: es el `POST /tu
 existe y el `artifacts create` por bloques del paso 15. La calidad del apunte la sostiene la skill
 §6.2 (un bloque por tema, resumen en prosa), no estos botones.
 
-**Fuera de esto:** unos apuntes globales de todos los materiales a la vez (idea C). Se anota como
-candidata; su coste en tokens y el troceo en varias pasadas la hacen un tramo propio, no un paso.
+**Fuera de esto:** unos apuntes globales de todos los materiales a la vez (idea C). ~~Se anota como
+candidata~~ **Descartada** (decisión 21).
+
+---
+
+## 12. Segunda pasada del tramo 2B: los apuntes viven en el material (Iván, 2026-08-29)
+
+Iván probó el paso 17 (los dos botones que rellenaban el campo del chat) y lo rechazó: quiere que
+generen de verdad, que el del chat deje elegir materiales, y que el apunte viva en el material, no en
+una lista aparte. Y la nota seguía saliendo en un bloque plano. Cierra las decisiones 17 a 21 de §2.
+
+### 12.1 Diagnóstico: por qué la nota salía en un bloque
+
+Comprobado, **no es el código de creación**: `artifacts create`, `note-service.resolveSources` y el
+guardado manejan N bloques
+([`artifact-commands.ts:184`](../../packages/server/src/domain/agents/academic-tutor/artifact-commands.ts#L184),
+[`note-service.ts:60`](../../packages/server/src/domain/artifacts/note-service.ts#L60)). El agente no
+llega a generar más de uno, y se suman cuatro causas:
+
+1. **`LIMITS.maxAgentSteps: 8` es techo de seguridad (F1-01), no un default.** El camino
+   `load_skill`×2 + `materials list` + `materials read` + `artifacts create` gasta 5 pasos; el modelo
+   corre a cerrar con un único `artifacts create` que aplasta todo en un bloque.
+2. **La skill trae un solo ejemplo y es de un bloque**
+   ([`create-study-artifacts.ts:42`](../../packages/server/src/domain/agents/academic-tutor/skills/create-study-artifacts.ts#L42)):
+   el modelo imita la forma que ve.
+3. **Todo va en un `artifacts create` con un JSON gigante** emitido de una vez.
+4. **El prompt genérico no nombra material:** fuerza un `materials list` y una elección, otro paso.
+
+### 12.2 Los dos accesos, forma exacta (decisión 20)
+
+Ninguno rellena el campo del chat. Ninguno enseña el prompt ni los pasos del agente.
+
+- **Chat (`Chat.tsx`):** un botón "Generar apuntes" abre `NotesFromMaterialsPanel` (nuevo), un panel
+  con la lista de **materiales indexados que aún no tienen apunte**, checkbox por material y un "todos".
+  Al confirmar, lanza el agente **una vez por material seleccionado, en serie**. Silencioso: spinner en
+  el panel, sin volcar nada en la conversación. Al terminar: si fue un material, abre su pestaña
+  Apuntes; si fueron varios, un aviso "N apuntes creados". Los cuatro estados en el panel.
+- **Panel del material (`MaterialPanel.tsx`):** la pestaña "Apuntes". Si el material no tiene apunte,
+  un botón "Crear apuntes" (ejecución silenciosa, spinner; al acabar, la pestaña muestra el apunte).
+  Si ya lo tiene, la pestaña muestra el `NoteWorkspace` y un "Borrar apunte".
+
+### 12.3 Arreglo del bloque único (va en 2B)
+
+- **El prompt lo construye la interfaz** nombrando el material (id, título, número de páginas) y
+  ordenando: leer con `materials read` en tramos de `maxIndexTextPagesPerRead`, y escribir **un bloque
+  por tema del índice, nunca dos temas en un bloque**. **No enumera los temas** en el prompt: el agente
+  los ve al leer (`materials read` ya agrupa por tema), y así no se le mete contexto derivado que la
+  generación silenciosa no puede enseñar ni retirar (invariante 9). Riesgo en §10.
+- **La skill `create-study-artifacts` cambia su ejemplo** a uno de 2-3 bloques con encabezado por tema
+  y añade la regla "nunca metas dos temas en un bloque". Se reescribe el ejemplo de §6.2, no la prosa.
+  El texto de la skill está hoy en inglés (override de Iván en 2B); el ejemplo pasa a, literal:
+
+  ```
+  One block per topic in the material's index, in order, the topic name as the block heading. Never
+  put two topics in one block. Each block is a dense prose summary of that topic.
+
+  - artifacts create '{"kind":"note","title":"Sets","materialId":"sets","blocks":[
+      {"markdown":"## Definition\nA set is a well-defined collection of distinct elements...","author":"tutor","emphasis":false,"source":{"type":"material","materialId":"sets","pages":[2,3]}},
+      {"markdown":"## Operations\nUnion, intersection and difference combine sets...","author":"tutor","emphasis":false,"source":{"type":"material","materialId":"sets","pages":[4,5]}}
+    ]}'
+  ```
+
+- **`maxAgentSteps` sube de 8 a 12** (decisión de Iván, 2026-08-29). No da más seguridad (cada paso
+  extra reintroduce el texto no confiable del material en el contexto: más superficie de inyección y
+  más coste por generación), da **holgura**: el camino de generación son 5-6 pasos y a 8 no quedaba
+  margen para un material grande o para que el modelo explore. 12 sigue siendo un techo claro, lejos de
+  lo que preocupaba en ADR-007 (`maxSteps: 10000`). Cambia el valor en `packages/shared/src/limits.ts`;
+  la batería de guardarraíles lee el techo de `LIMITS` (no hay número escrito a mano: `test-guardarrailes.mjs:93`
+  hace `LIMITS.maxAgentSteps + 1`) y F1-01 está redactado en símbolos, así que solo hay que
+  **re-lanzar `@guardarrailes`** en el cierre y revisar la prosa ilustrativa de ADR-007 ("8 pasos por
+  turno").
+- **No** se añade comando incremental. Si tras probar el agente sigue colapsando bloques con 12 pasos,
+  se reevalúa: pistas de temas en el prompt, o un `artifacts note add-block`. Subir más el techo no es
+  la salida.
+
+### 12.4 Qué cambia respecto al plan original, fichero a fichero
+
+**`packages/shared` (primero, rompe los dos lados):**
+
+| Fichero | Cambio |
+| --- | --- |
+| `schemas/artifact.ts` | `NoteArtifact` gana `materialId: Schema.String`; `ArtifactSummary` gana `materialId: Schema.optional(Schema.String)` (solo lo llevan los apuntes) |
+| `api/artifacts.ts` | `HttpApiEndpoint.delete("deleteArtifact", "/:id")`: éxito `HttpApiSchema.NoContent` (204); errores `ArtifactNotFound` 404, `ArtifactStorageError` 500. Se copia el patrón de `get` |
+| `limits.ts` | `maxAgentSteps: 8` → `12` (decisión 22) |
+
+`artifacts create` **no es un endpoint HTTP**: la nota se crea solo por el CLI del tutor. Así que
+`MaterialAlreadyHasNote` **no va a `shared/errors/artifact-errors.ts`** (sin handler que lo mapee sería
+código muerto): vive en el dominio, `server/src/domain/artifacts/artifact.ts`, como un
+`Data.TaggedError` más de `ArtifactRepositoryError`, lo devuelve el repositorio y lo renderiza el
+comando. `CreateNoteArtifactInput` también vive solo en el dominio (no hay `CreateArtifactInput` en
+`shared`), así que su `materialId` se añade allí.
+
+**`packages/server`:**
+
+| Fichero | Cambio |
+| --- | --- |
+| `domain/artifacts/artifact.ts` (el duplicado) | espejar `materialId`, `MaterialAlreadyHasNote`; puerto `deleteArtifact(id)`; `makeArtifact` lleva `materialId` a la nota |
+| `infra/artifacts/file-artifact-repository.ts` | `createArtifact` rechaza si ya hay una nota con ese `materialId`; `deleteArtifact`; los `ArtifactSummary` del listado llevan `materialId` |
+| `transport/http/handlers.ts` | handler de `DELETE /artifacts/:id`, sin `orDie` |
+| `domain/agents/academic-tutor/artifact-commands.ts` | `renderArtifactError` cubre `MaterialAlreadyHasNote`; el ejemplo de `create` lleva `"materialId"` |
+| `domain/agents/academic-tutor/skills/create-study-artifacts.ts` | ejemplo multi-bloque con `materialId` y la regla de "un tema por bloque" (§6.2) |
+
+**`packages/web`:**
+
+| Fichero | Cambio |
+| --- | --- |
+| `domain/artifacts/atoms.ts` | `deleteNoteAction` (`reactivityKeys: ["artifacts"]`); los summaries ya traen `materialId` |
+| `domain/tutor/generate-notes.ts` | fuera `genericNotesPrompt`; `notesPromptForMaterial(title, id, pageCount)` reescrito según §12.3 |
+| `components/note/NotesFromMaterialsPanel.tsx` (nuevo) | el checklist del chat, con sus cuatro estados y la ejecución en serie |
+| `components/MaterialPanel.tsx` | pestaña "Apuntes": `NoteWorkspace` del apunte del material + "Borrar apunte", o botón "Crear apuntes". Fuera el `<details>` "Ver lo que se le pide al tutor" y la lista de pasos |
+| `components/Chat.tsx` | los dos botones `setInput` → uno que abre `NotesFromMaterialsPanel`; fuera el import de `genericNotesPrompt` |
+| `components/ArtifactWorkspace.tsx` | deja de enrutar `note` (solo quiz y test) |
+| `components/Sidebar.tsx` | la sección de artefactos deja de listar `note` |
+| `App.tsx` | `onNotesCreated(materialId)` selecciona el material y abre su pestaña Apuntes |
+
+### 12.5 EARS nuevos (en `docs/especificacion.md`, apartado Fase 2)
+
+F2-34 a F2-38 (redactados allí). Cubren: `materialId` obligatorio y un apunte por material con 409 al
+segundo; el apunte dentro de la vista del material y fuera de la barra lateral; generación sin volcar
+prompt ni pasos y un apunte por material seleccionado; el checklist sin materiales sin indexar ni con
+apunte; el borrado que devuelve la pestaña a "Crear apuntes".
+
+### 12.6 Cómo se prueba
+
+| Criterio | Procedimiento | Qué se tiene que ver |
+| --- | --- | --- |
+| F2-34 | `agent:tutor "crea apuntes del material <id>"` dos veces | La segunda vez, 409 nombrando el material; sigue habiendo un solo apunte |
+| F2-35 | Abrir un material con apunte | La pestaña "Apuntes" muestra el apunte; la barra lateral no lo lista |
+| F2-36 | Botón del chat, marcar 2 materiales, confirmar | Dos apuntes nuevos, uno por material; la conversación no cambia; no se ve el prompt |
+| F2-37 | Abrir el checklist con un material sin indexar y otro con apunte | Ninguno de los dos aparece |
+| F2-38 | "Borrar apunte" en la pestaña | El apunte desaparece y vuelve el botón "Crear apuntes" |
+| Bloques | `agent:tutor` genera un apunte de un material con 4+ temas | El apunte tiene un bloque por tema, con su encabezado, no uno solo |
+
+### 12.7 Riesgo nuevo
+
+**El "un bloque por tema" lo sostiene el prompt y la skill, no el código.** Con `maxAgentSteps: 12`
+(decisión 22) hay holgura, pero sigue siendo heurístico. Si el agente sigue colapsando bloques después
+de §12.3, el siguiente movimiento es `artifacts note add-block` (construir el apunte bloque a bloque),
+no subir más el techo. Se prueba a mano (última fila de §12.6) antes de dar 2B por bueno.
+
+---
+
+## 13. Tercera pasada del tramo 2B: la generación sale del agente (Iván, 2026-08-29)
+
+Iván probó §12 y lo rechazó: el apunte no aparecía, y de hecho el agente no llegaba a crear nada en
+`.data/artifacts`. Diagnóstico: la interfaz lanzaba el tutor, descartaba todo lo que devolvía y nunca
+comprobaba si salió un apunte, así que un fallo del agente (JSON frágil de una tacada, o quedarse sin
+pasos) se veía como "creado" sin nada detrás (viola invariante 3). El "un bloque por tema" apoyado
+solo en el prompt (§12.7) no se sostuvo. Decisión: **la generación deja de ser autoría del agente**.
+
+### 13.1 Decisiones cerradas (Iván, 2026-08-29), sustituyen a §12.2 y §12.3
+
+23. **`NoteGenerationService` en el dominio** (`server/src/domain/artifacts/note-generation-service.ts`,
+    nuevo, habla con el modelo como ya hace `IndexingServiceLive`). `forMaterial(materialId)` lee el
+    índice del material y produce un `NoteArtifact`: **un bloque por tema del índice, en orden**, la
+    etiqueta del tema como encabezado markdown (nivel por profundidad de `parentId`); el modelo
+    redacta la prosa de cada bloque a partir del texto de las páginas de ese tema
+    (`index.pages[].text`), temperatura baja. La cita de cada bloque sale del índice
+    (`{ type: "material", materialId, pages: topic.pages }`), **no del modelo**. Estructura
+    determinista, prosa del modelo. Motivo: "un bloque por tema" pasa de súplica a código; testeable
+    sin clave con un índice de fixture y un modelo simulado; regenerar es barato.
+24. **El disparador es una ruta directa, igual que la indexación.** `POST /api/materials/:id/notes`,
+    progreso NDJSON, sin agente en medio, mismo patrón que
+    [`server.ts:109`](../../packages/server/src/transport/http/server.ts#L109) (`MaterialIndexStreamRoute`).
+    El botón "Crear apuntes" de la pestaña la llama directa. No rompe ADR-004: la invariante 10 prohíbe
+    tools nuevas en el harness y convertir el `cli` en shell, no una ruta HTTP sobre un servicio del
+    dominio (que es lo que ya hace indexar, que tampoco es un comando del tutor).
+25. **El agente pierde la autoría de apuntes.** Se retira `kind:"note"` de `CreateArtifactInput` (y su
+    rama en `makeArtifact` y en el comando `artifacts create`) en `shared` y en el espejo del dominio.
+    El tutor ya no crea apuntes. `MaterialAlreadyHasNote` se mantiene: lo comprueba
+    `NoteGenerationService` **antes** de gastar llamadas al modelo, y el repositorio como defensa. Si
+    en fase 4 se quiere que el tutor cree apuntes desde el chat, será un comando `cli` fino sobre
+    `NoteGenerationService`, no autoría de JSON ("skill por artefacto").
+26. **Se quita el botón de generar apuntes del chat.** `NotesFromMaterialsPanel.tsx` se borra;
+    `Chat.tsx` y `App.tsx` vuelven a como estaban antes de §12 en esa parte (no había botón antes del
+    paso 17). Único punto de generación: la pestaña "Apuntes" del material. Anula la decisión 20 (los
+    "dos accesos") y la 21 pasa a ser trivial (no hay multi-material que descartar).
+27. **Punto 5 (autogenerar mapa mental + apuntes al subir PDFs) va a la hoja de ruta, con la subida de
+    ficheros (fase 4)**, no a esta fase. `NoteGenerationService` y su ruta se diseñan para que esa fase
+    solo tenga que encadenarlos al alta. "Mapa mental automático" = "indexar automático" (el mapa ya se
+    deriva del índice).
+28. **Los apuntes en formato viejo (sin `materialId`) se borran de `.data`.** El aviso de "fichero no
+    legible" (Sidebar y listado) deja de volcar el `SchemaError` crudo: dice el nombre del fichero y un
+    motivo corto en lenguaje humano. El detalle técnico va al log del servidor. Invariante 3 se cumple
+    igual: se nombra qué fichero falló, no se calla.
+
+### 13.2 Qué cambia respecto a §12, fichero a fichero
+
+**`packages/shared`:**
+
+| Fichero | Cambio |
+| --- | --- |
+| `schemas/artifact.ts` | `CreateArtifactInput` pierde la rama note: `Union([CreateQuizArtifactInput, CreateTestArtifactInput])`. `NoteArtifact` y `ArtifactSummary` mantienen `materialId` |
+| `schemas/note-generation.ts` (nuevo) | `NoteGenerationStreamEvent`: `progress` (topic actual, total), `done` (`{ note: ArtifactSummary }` o el id), `failed` (`message`). Espejo de `MaterialIndexStreamEvent` |
+| `limits.ts` | `maxAgentSteps: 12` se queda (ayuda a quiz/test); nada nuevo |
+
+**`packages/server`:**
+
+| Fichero | Cambio |
+| --- | --- |
+| `domain/artifacts/artifact.ts` (espejo) | `CreateArtifactInput` pierde la rama note; `makeArtifact` pierde el `case "note"`. `NoteArtifact` + `materialId`, `MaterialAlreadyHasNote`, puerto `deleteArtifact` se quedan |
+| `domain/artifacts/note-generation-service.ts` (nuevo) | `Context.Service` + `Layer`. `forMaterial(id, onProgress?)`. Lee `MaterialRepository.getIndex`, comprueba `MaterialAlreadyHasNote`, un bloque por tema, prosa del modelo, `NoteService.resolveSources` para el fragmento cacheado, `ArtifactRepository.saveArtifact` |
+| `domain/artifacts/note-service.ts` | `resolveSources` se reutiliza; `saveNote` se queda para el editor (2E) y las propuestas (2D) |
+| `infra/artifacts/file-artifact-repository.ts` | `createArtifact` ya no recibe note: fuera `ensureMaterialHasNoNote` de ahí (la comprobación se mueve al servicio). `deleteArtifact` se queda. El `reason` de `unreadable` pasa a un motivo corto |
+| `transport/http/server.ts` | `NoteGenerationStreamRoute` (`POST /api/materials/:id/notes`), en `Routes`; layer `NoteGenerationServiceLive` |
+| `transport/http/handlers.ts` | handler `deleteArtifact` se queda; `artifactSummary` con `materialId` se queda |
+| `domain/agents/academic-tutor/artifact-commands.ts` | `create` pierde el ejemplo y la decodificación de note; `renderArtifactError` pierde `MaterialAlreadyHasNote` (ya no alcanzable) |
+| `domain/agents/academic-tutor/skills/create-study-artifacts.ts` | el punto `note` pasa a informativo: "los apuntes los genera el usuario desde la pestaña Apuntes del material, no por esta skill" |
+
+**`packages/web`:**
+
+| Fichero | Cambio |
+| --- | --- |
+| `domain/tutor/generate-notes.ts` | se borra (era el prompt para el agente y `noteIdFromMessages`) |
+| `domain/artifacts/note-generation-stream.ts` (nuevo) | `streamGenerateNotes(materialId)`, espejo de `streamReindexMaterial` |
+| `domain/artifacts/atoms.ts` | `deleteArtifactAction` se queda |
+| `components/MaterialPanel.tsx` | `GenerateNoteCard` llama a `streamGenerateNotes`, no a `streamTutorMessage`; muestra el progreso; al `done` refresca y la pestaña muestra el apunte. `ExistingNote` igual |
+| `components/note/NotesFromMaterialsPanel.tsx` | se borra |
+| `components/Chat.tsx` | fuera el botón y el panel; vuelve a como estaba antes del paso 17 |
+| `components/App.tsx` | fuera `onNotesGenerated` / `openMaterialNotes` / `materialInitialTab`; `MaterialPanel` abre siempre en "pdf" |
+| `components/ArtifactWorkspace.tsx`, `Sidebar.tsx` | se quedan como en §12 (los apuntes no van a la barra lateral) |
+
+### 13.3 EARS (revisa §12.5 en `docs/especificacion.md`)
+
+- F2-34 (un apunte por material, 409 al segundo): se mantiene, pero el disparador es la ruta, no el
+  comando del tutor. El segundo intento devuelve 409 nombrando el material.
+- F2-35 (apunte en la vista del material, no en la barra lateral): igual.
+- F2-36 se reescribe: generar desde la pestaña "Apuntes" emite progreso por tema y al terminar el
+  apunte se ve en la pestaña; **un bloque por tema del índice** (esto ahora es determinista).
+- F2-37 (el selector no ofrece materiales sin indexar ni con apunte): se elimina, ya no hay selector.
+- F2-38 (borrar apunte → vuelve "Crear apuntes"): igual.
+
+### 13.4 Cómo se prueba
+
+| Criterio | Procedimiento | Qué se tiene que ver |
+| --- | --- | --- |
+| Bloques (determinista) | `NoteGenerationService.forMaterial` con un índice de fixture de 4 temas y modelo simulado, en `node:test` | El apunte tiene exactamente 4 bloques, uno por tema, en orden, con la cita de páginas del tema |
+| F2-34 | `POST /api/materials/:id/notes` dos veces | La segunda, 409 nombrando el material; sigue habiendo un solo apunte |
+| F2-36 | Pestaña "Apuntes" → "Crear apuntes" con un material indexado de varios temas | Progreso tema a tema; al acabar, el apunte con un bloque por tema |
+| F2-38 | "Borrar apunte" | Desaparece y vuelve "Crear apuntes" |
+| Fallo visible | Cortar el modelo a mitad de generación | La pestaña muestra el error real, no "creado" en vacío |
+
+### 13.5 Riesgo nuevo
+
+**Un material mal indexado (texto pobre) produce apuntes pobres.** El servicio redacta desde
+`index.pages[].text`; si la extracción falló (visto: un material con 30-670 caracteres en varias
+páginas), el bloque sale flojo. No se arregla mirando el PDF en la generación (multi-turno, caro): se
+arregla re-indexando ese material. El progreso NDJSON debería avisar cuando un tema tiene poco texto.
+
+---
+
+## 14. Cuarta pasada: la generación se queda fuera del agente, y se documenta (Iván, 2026-08-29)
+
+Iván probó §13 (approach A: `NoteGenerationService` + ruta `POST /api/materials/:id/notes`) con clave
+real y lo dio por bueno en resultado. Se reabrió si el disparador debía ser un comando del tutor
+(ADR-004) en vez de una ruta. Se trazó el arnés y se descartó pasarlo al agente:
+
+- **Técnico:** los comandos del `cli` son `Effect<unknown, CliError>` sin canal de dependencias
+  ([`harness/cli.ts:198`](../../packages/server/src/domain/agents/harness/cli.ts#L198)); pasar
+  `LanguageModel` a un comando obliga a enhebrarlo por los tres sitios que construyen el arnés.
+- **De fondo:** generar el apunte no tiene decisión para el modelo (forma por código, entrada solo
+  `materialId`). Un LLM delante de un botón es un salto que puede fallar sin aportar.
+- **Fase 4:** al subir ficheros, la cadena indexar + generar apuntes se encadena en el handler de
+  subida; un comando del tutor obligaría a arrancar un turno de agente por material.
+
+**Decisión (Iván):** approach A se queda **sin cambios de código**. Se añade el **ADR-016** que fija el
+límite ("el tutor autora lo abierto; transformar un material es un servicio con ruta") y se sincronizan
+[`docs/ai-agent.md`](../../docs/ai-agent.md) y, al cierre de fase, `NOTES.md`. La decisión 24 de §13.1
+queda confirmada con este razonamiento; deja de estar en duda.
+
+---
+
+## 15. Guardarraíles del cierre de 2B (2026-08-29)
+
+`@guardarrailes` (auditoría estática, 7 capas) + batería en vivo (Iván): **ninguna barrera
+determinista nueva rota**. Batería: D1-D5 pasan (D3 hueco conocido, ADR-008 barrera 3, fase 4), B
+heurísticas como se esperaba (B4 "no nombra sus tools" es hardening de comportamiento de fase 4). Tres
+hallazgos MEDIO sobre superficie **nueva** de 2B, dos arreglados y uno diferido:
+
+- **`materials read` entregaba texto del PDF sin envoltura de "datos, no instrucciones".** Arreglado:
+  `renderIndexRead` envuelve el texto servido en marcadores `<<<BEGIN/END STUDENT MATERIAL>>>` con una
+  línea explícita; la skill `use-uploaded-materials` lo advierte; test nuevo en `index-read.test.ts`.
+  Reduce la inyección indirecta, no la elimina (ADR-008, capa 6).
+- **`POST /api/materials/:id/notes` sin tope de concurrencia ni cubo de artefactos.** Arreglado:
+  `check(key, "artifacts")` (más estricto que `messages`) + `acquire`/`release` como el chat. El
+  deadline global se deja fuera a propósito: el timeout por llamada (`modelCallTimeoutMs`, 60 s) más
+  la concurrencia (3) y la ventana de artefactos (5 / 10 min) ya acotan el peor caso; añadir
+  `Effect.timeout` a media stream sobre una API beta no compensa.
+- **Las preguntas de quiz/test que autora el tutor no llevan cita ni tema (invariante 2).** Diferido:
+  es preexistente (fase 1) y la hoja de ruta ya lo pone en **fase 3** ("toda pregunta anclada",
+  `hoja-de-ruta.md:104`). No es superficie de 2B.
+
+BAJO: el `maxAgentSteps: 8` obsoleto se corrigió en la tabla de ADR-007 y en `academic-tutor.ts` (ruta
+CLI, ahora lee `LIMITS.maxAgentSteps`). El `Effect.orDie` del handler `chat` no-stream sigue siendo
+deuda preexistente (invariante 6), se arregla cuando se toque esa ruta.
