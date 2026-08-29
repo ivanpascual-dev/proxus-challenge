@@ -3,11 +3,16 @@ import { LIMITS } from "@proxus/shared";
 export interface TurnBudgetState {
   readonly pagesLeft: number;
   readonly bytesLeft: number;
+  // Caracteres de texto indexado que le quedan al turno para `materials read`. Vive aquí, en el mismo
+  // estado de turno que las páginas y los bytes de imagen, porque es el mismo tipo de techo: por
+  // turno, no por llamada (invariante 11).
+  readonly indexCharactersLeft: number;
 }
 
 export const initialTurnBudgetState: TurnBudgetState = {
   pagesLeft: LIMITS.maxPagesPerTurn,
-  bytesLeft: LIMITS.maxTurnImageBytes
+  bytesLeft: LIMITS.maxTurnImageBytes,
+  indexCharactersLeft: LIMITS.maxIndexTextCharactersPerTurn
 };
 
 export interface PlanRenderResult {
@@ -49,11 +54,64 @@ export const planRender = (
     served += 1;
   }
 
-  const nextState = { pagesLeft, bytesLeft };
+  const nextState: TurnBudgetState = { ...state, pagesLeft, bytesLeft };
   const total = pageSizes.length;
   if (served === total) {
     return { served, nextState, notice: null };
   }
 
   return { served, nextState, notice: explainStop(served, total, nextState) };
+};
+
+export interface IndexPageCost {
+  readonly page: number;
+  readonly characters: number;
+}
+
+export interface PlanIndexReadResult {
+  readonly served: number;
+  readonly lastServedPage: number | null;
+  readonly nextState: TurnBudgetState;
+  readonly notice: string | null;
+}
+
+// El aviso de `materials read` cuando el techo de caracteres de texto indexado por turno para la
+// lectura. Es texto de cara al modelo (resultado de herramienta), en inglés como el resto de la
+// salida del CLI del tutor. F2-15 pide que nombre la última página servida y el total pedido.
+export const explainIndexStop = (lastServedPage: number | null, totalRequested: number): string =>
+  lastServedPage === null
+    ? `Stopped before reading any of the ${totalRequested} requested pages: the per-turn limit of ${LIMITS.maxIndexTextCharactersPerTurn} indexed-text characters would be exceeded.`
+    : `Read up to page ${lastServedPage} of the ${totalRequested} requested pages: reached the per-turn limit of ${LIMITS.maxIndexTextCharactersPerTurn} indexed-text characters.`;
+
+// Puro y testeable. Gemelo de `planRender` para `materials read`: decide cuántas páginas de texto
+// indexado caben en lo que le queda al turno. Página entera o nada, nunca media página en silencio
+// (invariante 11).
+export const planIndexRead = (
+  state: TurnBudgetState,
+  pageCosts: readonly IndexPageCost[]
+): PlanIndexReadResult => {
+  let indexCharactersLeft = state.indexCharactersLeft;
+  let served = 0;
+  let lastServedPage: number | null = null;
+
+  for (const cost of pageCosts) {
+    if (cost.characters > indexCharactersLeft) {
+      break;
+    }
+    indexCharactersLeft -= cost.characters;
+    served += 1;
+    lastServedPage = cost.page;
+  }
+
+  const nextState: TurnBudgetState = { ...state, indexCharactersLeft };
+  if (served === pageCosts.length) {
+    return { served, lastServedPage, nextState, notice: null };
+  }
+
+  return {
+    served,
+    lastServedPage,
+    nextState,
+    notice: explainIndexStop(lastServedPage, pageCosts.length)
+  };
 };
