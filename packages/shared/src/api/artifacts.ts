@@ -1,7 +1,13 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { Artifact, ArtifactAttempt, ArtifactListResponse, SubmitAttemptInput } from "../schemas/artifact.ts";
-import { RewriteBlockInput, RewrittenBlock, SaveNoteInput } from "../schemas/note.ts";
+import {
+  FetchUrlSourceInput,
+  RewriteBlockInput,
+  RewrittenBlock,
+  SaveNoteInput,
+  UrlSourceResult
+} from "../schemas/note.ts";
 import {
   ArtifactNotFound,
   ArtifactStorageError,
@@ -9,7 +15,9 @@ import {
   BlockNotFound,
   NoteLimitExceeded,
   RewriteFailed,
-  UnknownBlock
+  UnknownBlock,
+  UrlFetchFailed,
+  UrlRejected
 } from "../errors/artifact-errors.ts";
 import { RateLimited } from "../errors/limit-exceeded.ts";
 
@@ -82,6 +90,17 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         RewriteFailed.pipe(HttpApiSchema.status(502)),
         RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Traer una URL como fuente de un bloque. Las siete guardas de §4.7 viven en el servidor;
+    // `UrlRejected` nombra la que falló. Redirección: se rechaza, no se sigue (decisión 9).
+    HttpApiEndpoint.post("fetchUrlSource", "/url-source", {
+      payload: FetchUrlSourceInput,
+      success: UrlSourceResult,
+      error: [
+        UrlRejected.pipe(HttpApiSchema.status(400)),
+        UrlFetchFailed.pipe(HttpApiSchema.status(502)),
+        RateLimited.pipe(HttpApiSchema.status(429))
       ]
     }),
     // Borrar un apunte para poder regenerarlo: un material tiene como mucho un apunte (fase 2,

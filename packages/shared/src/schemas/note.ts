@@ -97,3 +97,19 @@ export const RewrittenBlock = Schema.Struct({
   usedSource: Schema.Boolean
 });
 export type RewrittenBlock = typeof RewrittenBlock.Type;
+
+// Traer una URL como fuente de un bloque (fase 2, tramo 2C). El servidor aplica las siete guardas
+// de §4.7 y devuelve el `UrlBlockSource` con su fragmento extraído.
+export const FetchUrlSourceInput = Schema.Struct({ url: Schema.String });
+export type FetchUrlSourceInput = typeof FetchUrlSourceInput.Type;
+
+// El resultado de traer una URL: la fuente (con el fragmento crudo, que es el recibo verificable de
+// lo que decía la página, invariante 8) y un `draft` que redacta el modelo a partir de ese texto,
+// para rellenar el cuerpo del bloque. Igual que la generación de apuntes: el fragmento es el recibo,
+// la prosa es del modelo. `draft` es null si la redacción falló: el bloque se añade igual con el
+// cuerpo vacío (invariante 3: no se disfraza el fallo con un texto neutro).
+export const UrlSourceResult = Schema.Struct({
+  source: UrlBlockSource,
+  draft: Schema.NullOr(Schema.String)
+});
+export type UrlSourceResult = typeof UrlSourceResult.Type;

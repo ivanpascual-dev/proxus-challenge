@@ -254,3 +254,23 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
 - **Limpieza:** se retiró el parámetro `noteService` que la segunda pasada había enhebrado hasta
   `makeArtifactCommands` sin llegar a usarlo (era para `artifacts note propose`, tramo 2D). Cuando 2D
   lo necesite, se vuelve a cablear.
+
+## 2026-08-29 · Fase 2 · tramo 2C · reescribir un bloque y traer una URL
+
+- **Desviación (la URL devuelve también un borrador):** el plan §4.7 decía que
+  `POST /artifacts/url-source` devolviera un `UrlBlockSource` pelado. Iván pidió sobre la marcha que el
+  servidor redacte además un borrador del cuerpo del bloque, así que devuelve
+  `UrlSourceResult = { source, draft }`. El `excerpt` de `source` es el fragmento crudo de la página y
+  **el modelo no lo toca**: es el recibo verificable (invariante 8), igual que en la generación de
+  apuntes (§13). El `draft` es una segunda llamada al modelo sobre ese fragmento; si falla o la página
+  trae poco texto, `draft: null` y el bloque nace vacío con `author: "student"` (invariante 3, no se
+  disfraza el fallo). Queda recogido en el plan §16.2 y en F2-25b.
+- **Desviación (500 en `rewrite` que el plan no listaba):** `rewriteBlock` lee el artefacto del disco,
+  así que declara `ArtifactStorageError` 500 como cualquier otro handler de lectura; `Effect.orDie`
+  está prohibido (invariante 6).
+- **Deuda (DNS rebinding, riesgo 2):** entre nuestra resolución con `dns.lookup` y la que hace `fetch`
+  por su cuenta hay una ventana. Sin cerrar; va a `NOTES.md`. Se desbloquea fijando la IP resuelta y
+  pasando la cabecera `Host` a mano.
+- **Deuda (`extractText` no es un parser de HTML, riesgo 3):** con markup roto puede colar texto que no
+  es contenido. El fragmento se enseña antes de aceptarlo, así que es visible. Sin cerrar; va a
+  `NOTES.md`.

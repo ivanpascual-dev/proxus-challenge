@@ -49,6 +49,7 @@ GET /api/artifacts/:id
 POST /api/artifacts/:id/submit
 PUT /api/artifacts/:id/note
 POST /api/artifacts/:id/blocks/:blockId/rewrite
+POST /api/artifacts/url-source
 DELETE /api/artifacts/:id
 ```
 
@@ -59,6 +60,14 @@ reescribe un bloque con una llamada al modelo: solo el texto del bloque y su fra
 releer el PDF. No guarda nada, devuelve la propuesta para que el alumno la acepte o la descarte. No es
 un comando del tutor (ADR-016): es un botón sobre un bloque. Cuenta contra el cubo de mensajes
 (`RateLimited` 429).
+
+`POST /url-source` (`{url}` → `{source, draft}`) trae una URL para usarla como fuente de un bloque
+nuevo. El servidor aplica las siete guardas del ADR-015 (solo `https`, sin IP privada tras resolver el
+DNS, sin seguir redirecciones, `text/html` o `text/plain`, techo de bytes y de tiempo) y devuelve
+`source`, el `UrlBlockSource` con el fragmento crudo extraído (el recibo, invariante 8), más `draft`,
+un borrador del cuerpo del bloque que redacta el modelo a partir de ese fragmento. `draft` es `null`
+si la página trae poco texto o la redacción falla: el bloque se añade igual, vacío. `UrlRejected` 400
+nombra la guarda que falló.
 
 `DELETE /:id` borra un artefacto (204). Sirve para rehacer los apuntes de un material: hay como mucho
 un apunte por material, así que regenerar exige borrar el que hay.

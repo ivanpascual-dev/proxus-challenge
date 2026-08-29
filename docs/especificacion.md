@@ -183,6 +183,9 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   rechazarla nombrando el tipo recibido.
 - **F2-25.** CUANDO una URL se traiga con éxito, EL bloque resultante DEBERÁ guardar la URL, la fecha de
   la descarga y el fragmento extraído, y la interfaz DEBERÁ mostrarlos.
+- **F2-25b.** CUANDO una URL se traiga con éxito, EL sistema DEBERÁ redactar con el modelo un borrador
+  del cuerpo del bloque a partir del fragmento extraído, sin alterar ese fragmento; SI la redacción
+  falla o la página trae poco texto, ENTONCES EL bloque DEBERÁ nacer vacío y la interfaz DEBERÁ decirlo.
 
 #### Propuestas del tutor
 

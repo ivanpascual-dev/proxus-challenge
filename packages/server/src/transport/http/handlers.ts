@@ -20,6 +20,7 @@ import {
 } from "../../domain/artifacts/artifact.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
+import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -195,6 +196,13 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
 
         const excerpt = block.source === null ? null : block.source.excerpt;
         return yield* rewriteBlock({ markdown: block.markdown, excerpt }, payload.mode);
+      }))
+      // Trae una URL como fuente. Las siete guardas viven en el dominio (`url-source`); aquí solo
+      // el fusible de frecuencia, porque sale a la red.
+      .handle("fetchUrlSource", ({ payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* fetchUrlSource(payload.url);
       }))
       .handle("deleteArtifact", ({ params }) => artifacts.deleteArtifact(params.id).pipe(
         Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"

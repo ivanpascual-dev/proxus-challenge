@@ -53,6 +53,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   propuesta se enseña junto al texto actual y no se guarda hasta que se pulsa "Reemplazar el bloque";
   si el bloque no tenía fragmento de origen, se avisa de que se reescribió sin fuente. Hay que guardar
   el apunte una vez para poder reescribir sus bloques.
+- **Añadir un bloque del apunte desde una URL.** Un botón "Añadir un bloque desde una URL" pide una
+  dirección `https`, el servidor descarga la página (rechazando en voz alta las que apuntan a una red
+  interna, redirigen, pesan de más, tardan de más o no son texto), guarda un fragmento de la página
+  como fuente y redacta un borrador del bloque. Antes de añadirlo se ven el borrador y el fragmento
+  extraído; si no se pudo redactar el borrador, el bloque se añade vacío con el fragmento como fuente.
 
 ### Cambiado
 

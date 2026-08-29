@@ -1065,3 +1065,55 @@ hallazgos MEDIO sobre superficie **nueva** de 2B, dos arreglados y uno diferido:
 BAJO: el `maxAgentSteps: 8` obsoleto se corrigió en la tabla de ADR-007 y en `academic-tutor.ts` (ruta
 CLI, ahora lee `LIMITS.maxAgentSteps`). El `Effect.orDie` del handler `chat` no-stream sigue siendo
 deuda preexistente (invariante 6), se arregla cuando se toque esa ruta.
+
+---
+
+## 16. Tramo 2C construido (2026-08-29)
+
+Se ejecutó como el plan (decisión de Iván: "2C como está, luego 2D"), con **un añadido sobre §4.7**:
+al traer una URL, el servidor también redacta un borrador del bloque.
+
+### 16.1 Lo que dice el plan, tal cual
+
+- **Reescritura:** endpoint `POST /artifacts/:id/blocks/:blockId/rewrite` (`{mode: "clearer" | "deeper"}`
+  → `{markdown, usedSource}`), prompt de §6.1 literal en `rewrite-block-prompts.ts`, una llamada al
+  modelo con solo el bloque y su fragmento, no guarda (F2-17/18/19). Se reafirmó la decisión 7 frente
+  a la duda de Iván de si era una skill del tutor: es un botón, no una conversación (ADR-016).
+- **URL:** `url-guards.ts` puro (esquema, rangos privados v4/v6/mapeadas, tipo de contenido,
+  `extractText`) con 38 tests; `url-source.ts` con DNS + `fetch(redirect:"manual")` + techo de bytes y
+  de tiempo. Redirección: rechazada, no seguida (F2-20 a F2-25).
+- **Rate limit:** ambos endpoints pasan por `rateLimiter.check(key, "messages")`. Se añadió
+  `ArtifactStorageError` 500 a `rewrite` (el plan no lo listaba; todo handler tiene esa vía de lectura
+  y `orDie` está prohibido, invariante 6).
+
+### 16.2 El añadido: borrador del bloque desde la URL (decisión de Iván, 2026-08-29)
+
+`POST /artifacts/url-source` deja de devolver `UrlBlockSource` y devuelve
+`UrlSourceResult = { source, draft }`:
+
+- `source` es el `UrlBlockSource` de siempre, con el **fragmento crudo** (`excerpt`). Es el recibo
+  verificable de lo que decía la página (invariante 8): se queda tal cual, el modelo no lo toca.
+- `draft` lo redacta el modelo a partir de ese fragmento (`URL_SUMMARY_PROMPT`, con el texto de la web
+  entre marcadores `<<<BEGIN/END WEB PAGE>>>` y declarado como dato, ADR-008 capa 6). Rellena el cuerpo
+  del bloque nuevo, con `author: "tutor"`. Si la redacción falla o la página trae poco texto, `draft`
+  es `null` y el bloque nace vacío con `author: "student"` (invariante 3: no se disfraza el fallo).
+
+Es el mismo patrón que la generación de apuntes (§13): el fragmento es el recibo, la prosa es del
+modelo. Mete una segunda llamada al modelo en la ruta de la URL, ya acotada por el mismo
+`rateLimiter.check`.
+
+### 16.3 Verificado en vivo (curl, clave real)
+
+F2-20 a F2-25 cada uno con su caso (esquema, `127.0.0.1` / `192.168.1.1` / `[::1]` / `localhost` /
+`169.254.169.254`, fichero de 6 MB, `delay/8s`, `google.com` que redirige, `application/json` e
+`image/x-icon`, `example.com` y Wikipedia con éxito). Reescritura contra un bloque real: 200 con
+`{markdown, usedSource:true}`, el fichero en disco no cambia; 404 para bloque y artefacto inexistentes;
+429 al pasarse de frecuencia. La interfaz (botones de reescribir, `AddFromUrl`) compila y sigue los
+patrones existentes; el clic real lo prueba Iván.
+
+### 16.4 Pendiente de 2C
+
+- **DNS rebinding** (riesgo 2): sin arreglar, va a `NOTES.md`.
+- **`extractText` no es un parser** (riesgo 3): sin arreglar, va a `NOTES.md`.
+- El prompt `URL_SUMMARY_PROMPT` es superficie nueva del modelo: entra en la pasada de
+  `@guardarrailes` del cierre de fase (paso 32).

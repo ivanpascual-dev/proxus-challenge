@@ -61,6 +61,15 @@ export const rewriteBlockAction = apiRuntime.fn(
     ).pipe(Effect.withSpan("artifacts.rewriteBlock", { kind: "client" }))
 );
 
+// Traer una URL como fuente. El servidor aplica las siete guardas y devuelve el fragmento ya
+// extraído; el alumno lo revisa antes de añadirlo como bloque. Sin `reactivityKeys`.
+export const fetchUrlSourceAction = apiRuntime.fn(
+  (url: string) =>
+    ApiClient.use((client) =>
+      client.artifacts.fetchUrlSource({ payload: { url } })
+    ).pipe(Effect.withSpan("artifacts.fetchUrlSource", { kind: "client" }))
+);
+
 export const submitArtifactAttemptAction = apiRuntime.fn(
   (input: SubmitAttemptInput) =>
     ApiClient.use((client) => input.artifactKind === "quiz"

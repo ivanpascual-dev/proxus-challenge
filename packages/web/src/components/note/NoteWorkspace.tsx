@@ -1,7 +1,8 @@
 import { useAtomSet } from "@effect/atom-react";
-import { LIMITS, type Artifact } from "@proxus/shared";
+import { LIMITS, type Artifact, type UrlSourceResult } from "@proxus/shared";
 import { useMemo, useState } from "react";
 import { saveNoteAction } from "../../domain/artifacts/atoms.ts";
+import { AddFromUrl } from "./AddFromUrl.tsx";
 import { NoteBlockCard } from "./NoteBlockCard.tsx";
 import {
   draftFromArtifact,
@@ -63,6 +64,19 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
     update([...draft.blocks, block]);
   };
 
+  const addBlockFromUrl = ({ source, draft: body }: UrlSourceResult) => {
+    const block: DraftBlock = {
+      key: nextKey(),
+      id: undefined,
+      markdown: body ?? "",
+      // Si el modelo redactó el borrador, la autoría es del tutor; si no, el bloque nace vacío y es tuyo.
+      author: body !== null ? "tutor" : "student",
+      emphasis: false,
+      source
+    };
+    update([...draft.blocks, block]);
+  };
+
   const onSave = async () => {
     if (!canSave) {
       return;
@@ -102,18 +116,21 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
 
       {draft.blocks.length === 0
         ? (
-            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-10 text-center">
-              <div>
-                <h3 className="font-bold text-heading text-xl">Estos apuntes no tienen bloques todavía.</h3>
-                <p className="mt-2 text-muted">Añade el primero para empezar a escribir.</p>
-                <button
-                  type="button"
-                  className="mt-4 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
-                  onClick={addBlock}
-                >
-                  Añadir bloque
-                </button>
+            <div className="grid gap-4">
+              <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-10 text-center">
+                <div>
+                  <h3 className="font-bold text-heading text-xl">Estos apuntes no tienen bloques todavía.</h3>
+                  <p className="mt-2 text-muted">Añade el primero para empezar a escribir.</p>
+                  <button
+                    type="button"
+                    className="mt-4 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
+                    onClick={addBlock}
+                  >
+                    Añadir bloque
+                  </button>
+                </div>
               </div>
+              <AddFromUrl onAdd={addBlockFromUrl} />
             </div>
           )
         : (
@@ -138,6 +155,7 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
               >
                 + Añadir bloque
               </button>
+              <AddFromUrl onAdd={addBlockFromUrl} />
             </div>
           )}
 
