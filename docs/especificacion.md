@@ -190,7 +190,10 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 #### Propuestas del tutor
 
 - **F2-26.** CUANDO el tutor proponga añadir, reescribir o borrar un bloque, EL sistema DEBERÁ guardarlo
-  como propuesta pendiente y NO DEBERÁ alterar ningún bloque del apunte.
+  como propuesta pendiente y NO DEBERÁ alterar ningún bloque del apunte. Para una reescritura o un
+  borrado EL sistema DEBERÁ registrar por su cuenta el texto que el bloque tiene en ese momento (el
+  tutor solo aporta el `blockId` y, si reescribe, el texto nuevo), y SI el `blockId` no existe en el
+  apunte DEBERÁ rechazar la propuesta.
 - **F2-27.** EL sistema NO DEBERÁ exponer al agente ningún comando que acepte, aplique o rechace una
   propuesta.
 - **F2-28.** CUANDO el alumno acepte una propuesta, EL sistema DEBERÁ aplicarla y retirarla de las

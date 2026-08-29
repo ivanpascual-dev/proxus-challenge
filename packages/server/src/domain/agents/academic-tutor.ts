@@ -14,6 +14,7 @@ import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts"
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
 import { makeArtifactCommands } from "./academic-tutor/artifact-commands.ts";
+import { make as makeNoteService } from "../artifacts/note-service.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills/index.ts";
 import { initialTurnBudgetState, type TurnBudgetState } from "../limits/turn-budget.ts";
 import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limiter.ts";
@@ -32,7 +33,12 @@ Be precise, pedagogical, and honest about what you can infer from the available 
   skills: AcademicTutorSkills,
   commands: [
     makeMaterialCommands(materialRepository, budgetRef),
-    makeArtifactCommands(artifactRepository, rateLimiter, clientKey)
+    makeArtifactCommands(
+      artifactRepository,
+      makeNoteService(artifactRepository, materialRepository),
+      rateLimiter,
+      clientKey
+    )
   ]
 });
 

@@ -204,6 +204,11 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         yield* rateLimiter.check(key, "messages");
         return yield* fetchUrlSource(payload.url);
       }))
+      // El alumno acepta o descarta una propuesta del tutor (ADR-014). El servicio devuelve ya los
+      // errores del contrato (`ProposalStale` 409 con los dos textos, F2-29), así que el handler no
+      // mapea nada: no hay `orDie` que valga (invariante 6).
+      .handle("acceptProposal", ({ params }) => notes.acceptProposal(params.id, params.proposalId))
+      .handle("rejectProposal", ({ params }) => notes.rejectProposal(params.id, params.proposalId))
       .handle("deleteArtifact", ({ params }) => artifacts.deleteArtifact(params.id).pipe(
         Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
           ? artifactNotFound(params.id)

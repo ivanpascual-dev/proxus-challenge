@@ -633,6 +633,15 @@ acepte, aplique o rechace una propuesta** (ADR-008, barrera 4: lo que no debe ha
 propuesta de reescritura o de borrado guarda `baseMarkdown`, el texto que el tutor vio; si al aceptar
 el bloque ya no coincide, se rechaza con 409 y se enseñan los dos textos.
 
+**Enmienda (2026-08-29).** `baseMarkdown` lo rellena el servidor con el texto actual del bloque en el
+momento de proponer, no lo aporta el tutor. El comando `artifacts note propose` para `replace` y
+`remove` recibe solo el `blockId` (y el texto nuevo si reescribe); un `blockId` que no está en el
+apunte se rechaza con `BlockNotFound`. Dos motivos: (1) obligar al modelo a reproducir un bloque de
+varios párrafos, palabra por palabra, dentro de un argumento JSON de una línea rompía el JSON en la
+práctica y la propuesta no se guardaba; (2) si el modelo parafraseaba mínimamente ese texto, la
+propuesta nacía caducada. La detección de caducada (F2-29) no cambia: sigue comparando el
+`baseMarkdown` guardado con el texto del bloque al aceptar.
+
 **Consecuencias.**
 
 - La peor inyección desde un PDF consigue que aparezca una propuesta que el alumno ve y descarta. No

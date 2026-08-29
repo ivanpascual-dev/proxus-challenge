@@ -274,3 +274,19 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
 - **Deuda (`extractText` no es un parser de HTML, riesgo 3):** con markup roto puede colar texto que no
   es contenido. El fragmento se enseña antes de aceptarlo, así que es visible. Sin cerrar; va a
   `NOTES.md`.
+
+## 2026-08-29 · Fase 2 · tramo 2D · el tutor propone cambios en el apunte
+
+- **Causa raíz (`artifacts note propose` fallaba siempre desde el chat):** el síntoma era `JSON.parse`
+  reventando con `Expected ',' or '}' ... at position 36`, y parecía cosa del modelo escapando mal el
+  JSON. Era el tokenizador de `harness/cli.ts`: aplicaba el desescapado de comillas dobles también
+  dentro de comillas simples, así que el `\"` correcto del modelo se convertía en `"` y rompía el JSON
+  antes de `JSON.parse`. Ahora las comillas simples son literales (semántica POSIX); solo las dobles y
+  los tokens sueltos pasan por `unescapeToken`. Antes no había ningún test del tokenizador.
+- **Decisión sobre la marcha (enmienda a ADR-014, ya en `docs/decisiones.md` y `docs/especificacion.md`
+  F2-26):** el `baseMarkdown` de una propuesta de `replace` o `remove` lo rellena el servidor con el
+  texto actual del bloque, no lo aporta el tutor (el plan §4.9 lo pedía en el JSON). Nació del fallo
+  de arriba: obligar al modelo a reproducir un bloque de varios párrafos palabra por palabra dentro
+  de un argumento JSON de una línea rompía el JSON en la práctica, y una paráfrasis mínima hacía nacer
+  la propuesta ya caducada. El tutor manda solo `blockId` (y el texto nuevo si reescribe); un
+  `blockId` que no está en el apunte se rechaza con `BlockNotFound`.

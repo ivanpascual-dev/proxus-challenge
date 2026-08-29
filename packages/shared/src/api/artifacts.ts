@@ -14,6 +14,8 @@ import {
   ArtifactTypeMismatch,
   BlockNotFound,
   NoteLimitExceeded,
+  ProposalNotFound,
+  ProposalStale,
   RewriteFailed,
   UnknownBlock,
   UrlFetchFailed,
@@ -101,6 +103,38 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         UrlRejected.pipe(HttpApiSchema.status(400)),
         UrlFetchFailed.pipe(HttpApiSchema.status(502)),
         RateLimited.pipe(HttpApiSchema.status(429))
+      ]
+    }),
+    // El tutor propone (insert, replace, remove) con `artifacts note propose`; nunca aplica. El
+    // alumno acepta o descarta desde la interfaz (ADR-014). La confirmación está en el código de la
+    // forma más fuerte: el agente no tiene ningún comando que acepte una propuesta (F2-27).
+    // Al aceptar, si el bloque cambió desde que el tutor lo vio, `ProposalStale` 409 con los dos
+    // textos (F2-29).
+    HttpApiEndpoint.post("acceptProposal", "/:id/proposals/:proposalId/accept", {
+      params: {
+        id: Schema.String,
+        proposalId: Schema.String
+      },
+      success: Artifact,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        ProposalNotFound.pipe(HttpApiSchema.status(404)),
+        ProposalStale.pipe(HttpApiSchema.status(409)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    HttpApiEndpoint.post("rejectProposal", "/:id/proposals/:proposalId/reject", {
+      params: {
+        id: Schema.String,
+        proposalId: Schema.String
+      },
+      success: Artifact,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        ProposalNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
     // Borrar un apunte para poder regenerarlo: un material tiene como mucho un apunte (fase 2,

@@ -27,6 +27,7 @@ Skills:
 
 - `packages/server/src/domain/agents/academic-tutor/skills/use-uploaded-materials.ts`
 - `packages/server/src/domain/agents/academic-tutor/skills/create-study-artifacts.ts`
+- `packages/server/src/domain/agents/academic-tutor/skills/propose-note-changes.ts`
 
 Commands:
 
@@ -60,9 +61,14 @@ artifacts create '<json>'
 artifacts submit '<json>'
 artifacts attempts [artifactId]
 artifacts grade <attemptId>
+artifacts note propose <artifactId> '<json>'
 ```
 
 `artifacts create` solo acepta `quiz` y `test`. Los apuntes se generan fuera del tutor (ver arriba).
+
+`artifacts note propose` deja una propuesta pendiente (añadir, reescribir o borrar un bloque) que el
+alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Ver la skill
+`propose-note-changes`.
 
 `materials view` puede devolver imágenes de páginas para llamadas multimodales a Gemini.
 
