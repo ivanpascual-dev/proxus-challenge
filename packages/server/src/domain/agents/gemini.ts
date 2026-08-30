@@ -213,7 +213,7 @@ export interface GeminiGenerationConfig {
 }
 
 const DEFAULT_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.modelTemperature };
-const JSON_GENERATION: GeminiGenerationConfig = { temperature: 0, responseMimeType: "application/json" };
+const JSON_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.jsonModelTemperature, responseMimeType: "application/json" };
 
 const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiGenerationConfig) => ({
   systemInstruction: promptSystemInstruction(options.prompt),

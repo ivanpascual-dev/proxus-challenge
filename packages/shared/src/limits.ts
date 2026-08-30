@@ -68,6 +68,7 @@ export const LIMITS = {
 
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
+  jsonModelTemperature: 0, // camino JSON (generación de preguntas y juez): 0 para corregir igual dos veces (ADR-008, capa 4)
   maxModelOutputTokens: 8_192,
 
   // Tiempo

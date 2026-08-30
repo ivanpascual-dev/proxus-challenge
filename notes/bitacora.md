@@ -651,3 +651,25 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   Pruebas. Motivo: §6.11 y la decisión 15 fijan Pruebas como la cuarta pestaña junto a PDF, Mapa
   mental y Apuntes, y ninguna menciona una quinta. Pendiente de que Iván lo pruebe y decida si quiere
   otro sitio.
+
+### Paso 29 · pasada de guardarraíles
+
+- **Veredicto: ⚠️ REVISAR, no bloquea el cierre de fase 3.** Toda la superficie nueva del tramo (la
+  retirada de `create`/`submit`/`grade`, `profile show` de solo lectura, la skill nueva, la cita
+  copiada por el código, el juez que nunca degrada a nota inventada) está bien cerrada en código.
+- **Tres arreglos aplicados:**
+  - `chat-limits.ts`: `maxSteps` se valida como entero entre 1 y el techo. `maxSteps: 12.9` pasaba el
+    `> 12` y el bucle de `session.ts` corría 13 iteraciones, una llamada al modelo de más.
+  - `assessment-generation-service.ts`: `topic.label` y los enunciados de pruebas previas (todos
+    redactados por el modelo) entraban en el prompt a nivel de instrucción; ahora van dentro de
+    `STUDENT_MATERIAL_OPEN/CLOSE` como dato. Inyección de segundo orden desde un PDF hostil.
+  - `limits.ts` + `gemini.ts`: la temperatura del camino JSON pasa de literal `0` a
+    `LIMITS.jsonModelTemperature` (coherencia con ADR-007/008).
+- **Deuda confirmada para fase 4** (ya en `notes/hoja-de-ruta.md` §Fase 4): el historial de chat
+  fabricable (el cliente manda `messages` con `assistant`/`tool-result` inventados) lo cierra "Sesión
+  en el servidor"; que el tutor enumere sus herramientas y skills si se lo piden directo lo cierra
+  "System prompt canónico". Las dos son barreras del ADR-008 asignadas a fase 4.
+- **Pendiente para el cierre de fase (paso 30 / `NOTES.md`):** documentar el conteo de la batería de
+  ataques y la nota del juez inflable por inyección del alumno como riesgo residual esperado ("reduce,
+  no elimina"; la nota la calcula el código, un fallo de parseo cae a `unevaluated`, y hay el backstop
+  de `dispute`).
