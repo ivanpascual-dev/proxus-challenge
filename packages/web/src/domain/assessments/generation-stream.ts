@@ -5,6 +5,7 @@ import {
   type GenerateAssessmentInput
 } from "@proxus/shared";
 import { apiClientConfig } from "../../api-client/config.ts";
+import { errorFromResponse } from "../../lib/stream-error.ts";
 
 const decodeEvent = Schema.decodeUnknownSync(Schema.fromJsonString(AssessmentGenerationStreamEvent));
 
@@ -27,17 +28,7 @@ export async function* streamGenerateAssessment(
 
   if (!response.ok) {
     // 400 (rango), 404 (material), 409 (tope) y 429 (frecuencia) llegan como JSON con `message`.
-    const raw = await response.text();
-    let message = raw;
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (parsed !== null && typeof parsed === "object" && "message" in parsed && typeof parsed.message === "string") {
-        message = parsed.message;
-      }
-    } catch {
-      // no era JSON: se usa el texto tal cual
-    }
-    throw new Error(message);
+    throw await errorFromResponse(response);
   }
   if (response.body === null) {
     throw new Error("La respuesta de generación de la prueba no trae cuerpo");

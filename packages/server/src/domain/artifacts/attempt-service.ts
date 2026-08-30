@@ -76,8 +76,11 @@ export interface AttemptService {
 
 export const AttemptService = Context.Service<AttemptService>("@proxus/server/artifacts/AttemptService");
 
-const storageError = (context: string) => (error: ArtifactRepositoryError) =>
-  new ApiArtifactStorageError({ message: `${context}: ${String("reason" in error ? error.reason : error._tag)}` });
+// El mensaje al usuario dice qué falló, no cómo: el motivo crudo (ruta, SchemaError, `_tag`) es fuga
+// de detalle interno y no le sirve de nada. El detalle técnico va al log del servidor; los listados
+// registran cada fichero ilegible (`file-artifact-repository.ts`).
+const storageError = (context: string) => (_error: ArtifactRepositoryError) =>
+  new ApiArtifactStorageError({ message: `${context}. Vuelve a intentarlo en un momento.` });
 
 // Proyección SIN clave de respuesta (decisión 9). Cada pregunta conserva su cita (toda pregunta
 // enseña su cita); se le quitan `correctOptionId`/`correctAnswer`/`expectedAnswer`, la rúbrica, la

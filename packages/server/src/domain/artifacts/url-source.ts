@@ -102,9 +102,9 @@ export const fetchUrlSource = (
     const host = url.hostname.replace(/^\[/, "").replace(/\]$/, "");
 
     const addresses = yield* resolveAddresses(host).pipe(
-      Effect.mapError((reason) => new UrlFetchFailed({
+      Effect.mapError(() => new UrlFetchFailed({
         url: rawUrl,
-        message: `No se pudo resolver el host "${host}": ${reason}.`
+        message: `No se pudo resolver el host "${host}". Comprueba que la URL es correcta.`
       }))
     );
 
@@ -126,7 +126,9 @@ export const fetchUrlSource = (
         const name = (error as { readonly name?: string }).name;
         return name === "TimeoutError" || name === "AbortError"
           ? timeoutRejected(rawUrl)
-          : new UrlFetchFailed({ url: rawUrl, message: `La descarga falló: ${String(error)}.` });
+          // El motivo de red crudo (ECONNREFUSED, la IP, el DNS) no viaja al usuario: es ruido y da
+          // pistas de la red interna. El detalle, al log del servidor.
+          : new UrlFetchFailed({ url: rawUrl, message: "La descarga falló: no se pudo conectar con el servidor de la URL." });
       }
     });
 
@@ -156,7 +158,7 @@ export const fetchUrlSource = (
             reason: `la respuesta pasa de ${LIMITS.maxExternalFetchBytes} bytes`,
             message: `URL rechazada: la respuesta pasa del techo de ${Math.round(LIMITS.maxExternalFetchBytes / 1_024)} KB.`
           })
-        : new UrlFetchFailed({ url: rawUrl, message: `No se pudo leer el cuerpo de la respuesta: ${reason}.` }))
+        : new UrlFetchFailed({ url: rawUrl, message: "No se pudo leer el contenido de la respuesta de la URL." }))
     );
 
     const { title, text } = extractText(body);

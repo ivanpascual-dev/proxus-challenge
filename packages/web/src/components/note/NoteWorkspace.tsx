@@ -12,6 +12,7 @@ import {
   type DraftBlock,
   type NoteDraft
 } from "./draft.ts";
+import { messageOf } from "../../lib/error-message.ts";
 
 type NoteArtifact = Extract<Artifact, { readonly kind: "note" }>;
 
@@ -100,7 +101,7 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
       }
       setDirty(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setIsSaving(false);
     }

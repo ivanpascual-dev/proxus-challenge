@@ -5,6 +5,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
+import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
 // como prop; la pestaña la convierte en la tarjeta de generación con su selector de preguntas.
@@ -79,8 +80,8 @@ export function AssessmentsTab({
 
       {AsyncResult.matchWithError(assessments, {
         onInitial: () => <p className="text-muted">Cargando las pruebas…</p>,
-        onError: (error) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {String(error)}</p>,
-        onDefect: (defect) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {String(defect)}</p>,
+        onError: (error) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {messageOf(error)}</p>,
+        onDefect: (defect) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => value.assessments.length === 0
           ? (
               <p className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
@@ -196,7 +197,7 @@ function GenerateCard({
         }
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setRunning(false);
     }

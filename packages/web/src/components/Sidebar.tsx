@@ -3,6 +3,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
+import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
 
 interface SidebarProps {
   readonly selectedMaterialId: string | null;
@@ -33,8 +34,8 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
         </div>
         {AsyncResult.matchWithError(materials, {
           onInitial: () => <p className="text-muted">Cargando materiales…</p>,
-          onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
-          onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
+          onError: (error) => <p className="text-danger-ink">{messageOf(error)}</p>,
+          onDefect: (defect) => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
           onSuccess: ({ value }) => value.materials.length === 0
             ? <p className="text-muted">Aún no hay PDFs subidos.</p>
             : (

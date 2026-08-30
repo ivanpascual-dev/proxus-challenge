@@ -97,6 +97,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   abre un menú con esos formatos. Las tablas traen su propia barra para añadir y quitar filas y
   columnas. Se van el botón "Editar/Hecho" y el recuadro de markdown; lo que se guarda sigue siendo el
   mismo markdown limpio.
+- **Ningún error en pantalla enseña detalle técnico.** Los mensajes de error de la aplicación dicen
+  qué ha fallado y qué se puede hacer, sin nombres de fichero, errores de esquema, `_tag` ni "revisa
+  el log". El detalle técnico va al log del servidor o a la consola del navegador.
 
 ### Corregido
 

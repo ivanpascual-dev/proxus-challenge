@@ -163,6 +163,15 @@ endpoint y los mapea. Los seis heredados se sustituyen en los endpoints que toqu
 está indexado", que es media línea de la evaluación ("manejo de errores"). Los `orDie` que queden fuera
 de nuestro camino se declaran como deuda conocida y no se disimulan.
 
+**Enmienda (2026-08-30).** Declarar el error no basta: el `message` que llega a la pantalla dice qué ha
+fallado y qué hacer, nunca cómo. El motivo crudo (un `SchemaError`, una ruta de fichero, un `_tag`, un
+`ECONNREFUSED`, "revisa el log") es ruido para quien lee y, en un fallo del servidor, fuga de detalle
+interno. Ese detalle se registra con `Effect.logWarning` en el punto donde se produce y no viaja en la
+respuesta. En la web, `messageOf(cause)` y `errorFromResponse(response)` (`packages/web/src/lib/`) son
+el único camino del error a la interfaz, y un `defect` se enseña siempre como texto genérico.
+Generaliza lo que el repo ya hacía en un solo sitio (`file-artifact-repository.ts`, "fase 2,
+decisión 28").
+
 ---
 
 ## ADR-006 · El contexto que recibe el agente es explícito y visible

@@ -465,3 +465,11 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   con `Effect.all`: un solo fichero con el esquema viejo (sin `mode`, anterior a la fase 3) tumbaba el
   listado entero. Ahora usa `Effect.partition` + `Effect.logWarning` y salta el fichero ilegible,
   igual que `listArtifacts`. Hay 3 ficheros de intento pre-fase-3 en `.data` que se pueden borrar.
+- **Decisión sobre la marcha (higiene de errores de cara al usuario):** ningún error en pantalla
+  enseña detalle técnico (`SchemaError`, ruta de fichero, `_tag`, `ECONNREFUSED`, "revisa el log"):
+  solo qué falló y qué hacer. El motivo crudo va a `Effect.logWarning` en el punto donde se produce.
+  Barrido en servidor (handlers, `server.ts`, streams de indexación / generación de prueba y apuntes /
+  reescritura, `url-source`) y en web (nuevos `lib/error-message.ts` y `lib/stream-error.ts` como
+  único camino del error a la interfaz; un `defect` siempre como texto genérico). Queda como enmienda
+  a ADR-005 (2026-08-30); generaliza el comentario "fase 2, decisión 28" de
+  `file-artifact-repository.ts`.

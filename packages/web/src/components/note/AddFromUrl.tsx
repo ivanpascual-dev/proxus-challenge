@@ -3,6 +3,7 @@ import { LIMITS, type UrlSourceResult } from "@proxus/shared";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { fetchUrlSourceAction } from "../../domain/artifacts/atoms.ts";
+import { messageOf } from "../../lib/error-message.ts";
 
 interface AddFromUrlProps {
   readonly onAdd: (result: UrlSourceResult) => void;
@@ -36,7 +37,7 @@ export function AddFromUrl({ onAdd }: AddFromUrlProps) {
     try {
       setPreview(await fetchSource(url.trim()));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setIsFetching(false);
     }

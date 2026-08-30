@@ -39,9 +39,10 @@ export const rewriteBlock = (
         { role: "user", content: userMessage(target, mode) }
       ]
     }).pipe(
-      Effect.mapError((error) => new RewriteFailed({
-        reason: String(error),
-        message: `La reescritura falló: el modelo no respondió (${String(error)}).`
+      Effect.tapError((error) => Effect.logWarning(`reescritura de bloque: el modelo falló: ${String(error)}`)),
+      Effect.mapError(() => new RewriteFailed({
+        reason: "el modelo no respondió",
+        message: "La reescritura falló: el modelo no respondió. Vuelve a intentarlo."
       }))
     );
 

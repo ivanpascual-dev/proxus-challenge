@@ -55,8 +55,8 @@ export const make = (
 ): NoteGenerationService => {
   const existingNoteFor = (materialId: string) =>
     repository.listArtifacts({ kind: "note" }).pipe(
-      Effect.mapError((error) => new NoteGenerationError({
-        reason: `no se pudo comprobar los apuntes existentes: ${error._tag}`
+      Effect.mapError(() => new NoteGenerationError({
+        reason: "no se pudo comprobar los apuntes existentes del material"
       })),
       Effect.map((listing) => listing.artifacts.find(
         (artifact): artifact is NoteArtifact => artifact.kind === "note" && artifact.materialId === materialId
@@ -83,8 +83,9 @@ export const make = (
         }
       ]
     }).pipe(
-      Effect.mapError((error) => new NoteGenerationError({
-        reason: `la redacción del tema "${topic.label}" falló: ${String(error)}`
+      Effect.tapError((error) => Effect.logWarning(`generación de apuntes: el modelo falló en el tema "${topic.label}": ${String(error)}`)),
+      Effect.mapError(() => new NoteGenerationError({
+        reason: `la redacción del tema "${topic.label}" falló: el modelo no respondió`
       }))
     );
 
@@ -102,13 +103,17 @@ export const make = (
 
     const material = yield* materials.get(materialId).pipe(
       Effect.catchTag("MaterialNotFound", () => new NoteGenerationError({ reason: `no hay ningún material con id ${materialId}` })),
-      Effect.catchTag("MaterialRepositoryError", (error) => new NoteGenerationError({ reason: `no se pudo leer el material: ${String(error.reason)}` }))
+      Effect.catchTag("MaterialRepositoryError", (error) =>
+      Effect.logWarning(`generación de apuntes: no se pudo leer el material ${materialId}: ${String(error.reason)}`).pipe(
+        Effect.andThen(new NoteGenerationError({ reason: "no se pudo cargar el material" }))))
     );
 
     const index: MaterialIndex = yield* materials.getIndex(materialId).pipe(
       Effect.catchTag("MaterialNotFound", () => new NoteGenerationError({ reason: `no hay ningún material con id ${materialId}` })),
       Effect.catchTag("MaterialNotIndexed", () => new NoteGenerationError({ reason: `el material ${materialId} no está indexado todavía` })),
-      Effect.catchTag("MaterialRepositoryError", (error) => new NoteGenerationError({ reason: `no se pudo leer el índice: ${String(error.reason)}` }))
+      Effect.catchTag("MaterialRepositoryError", (error) =>
+        Effect.logWarning(`generación de apuntes: no se pudo leer el índice de ${materialId}: ${String(error.reason)}`).pipe(
+          Effect.andThen(new NoteGenerationError({ reason: "no se pudo leer el índice del material" }))))
     );
 
     const topics = leafTopics(index.topics).slice(0, LIMITS.maxBlocksPerNote);
@@ -161,8 +166,9 @@ export const make = (
     };
 
     yield* repository.saveArtifact(note).pipe(
-      Effect.mapError((error) => new NoteGenerationError({
-        reason: `no se pudo guardar el apunte: ${String("reason" in error ? error.reason : error._tag)}`
+      Effect.tapError((error) => Effect.logWarning(`generación de apuntes: no se pudo guardar: ${String("reason" in error ? error.reason : error._tag)}`)),
+      Effect.mapError(() => new NoteGenerationError({
+        reason: "no se pudo guardar el apunte"
       }))
     );
 

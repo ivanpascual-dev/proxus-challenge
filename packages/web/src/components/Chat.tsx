@@ -7,6 +7,7 @@ import { invalidateArtifactsAction } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
+import { messageOf } from "../lib/error-message.ts";
 
 const starterPrompts = [
   "Lista mis materiales subidos",
@@ -67,7 +68,7 @@ export function Chat() {
 
       setInput("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setIsSending(false);
     }

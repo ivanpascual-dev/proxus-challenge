@@ -67,12 +67,21 @@ const notIndexed = (materialId: string) =>
     message: `El material ${materialId} no está indexado. Pulsa "Indexar" para construir su índice.`
   });
 
-// El almacenamiento falló al leer. 500, pero con cuerpo y motivo: nada de orDie mudo (invariante 6).
-const storageError = (materialId: string, reason: unknown) =>
+// El almacenamiento falló al leer. 500 con cuerpo (nada de orDie mudo, invariante 6), pero el
+// mensaje que ve el usuario dice qué falló, no cómo: el motivo técnico (SchemaError, ruta del
+// fichero, `_tag`) es fuga de detalle interno y no le sirve de nada. El detalle va al log del
+// servidor en el punto donde se produce (`file-*-repository.ts`, `logAndFailStorage`).
+const storageError = (materialId: string) =>
   new ApiMaterialStorageError({
     materialId,
-    message: `No se pudo leer el material ${materialId} del almacenamiento: ${String(reason)}`
+    message: `No se pudo cargar el material "${materialId}". Vuelve a intentarlo en un momento.`
   });
+
+// Deja el motivo técnico en el log del servidor y falla con el error limpio del contrato.
+const logAndFailStorage = (materialId: string, reason: unknown) =>
+  Effect.logWarning(`fallo de almacenamiento de materiales (${materialId}): ${String(reason)}`).pipe(
+    Effect.andThen(Effect.fail(storageError(materialId)))
+  );
 
 export const MaterialsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
@@ -90,14 +99,14 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
       // existe; la prueba anclada a un material sin índice es un caso del riesgo 5, no un error aquí.
       .handle("assessments", ({ params }) => Effect.gen(function* () {
         yield* materials.get(params.id).pipe(
-          Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
+          Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
           Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
         );
         const listing = yield* artifacts.listArtifacts().pipe(
-          Effect.mapError((error) => storageError(params.id, "reason" in error ? error.reason : error._tag))
+          Effect.mapError(() => storageError(params.id))
         );
         const attempts = yield* artifacts.listAttempts().pipe(
-          Effect.mapError((error) => storageError(params.id, "reason" in error ? error.reason : error._tag))
+          Effect.mapError(() => storageError(params.id))
         );
         const own = listing.artifacts.filter(
           (artifact): artifact is Extract<Artifact, { kind: "quiz" | "test" }> =>
@@ -114,7 +123,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
       ))
       .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
-        Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
+        Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
         Effect.catchTag("MaterialNotIndexed", () => Effect.fail(notIndexed(params.id)))
       ))
@@ -131,7 +140,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         const { image } = yield* materials.renderPage(params.id, params.page);
         return image;
       }).pipe(
-        Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
+        Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
       ));
   })
@@ -155,10 +164,12 @@ const artifactSummary = (artifact: Artifact) => ({
       })
 });
 
-// 500 con cuerpo y motivo, nunca un orDie mudo (invariante 6, F2-08).
-const artifactStorageError = (context: string) => (error: ArtifactRepositoryError) =>
+// 500 con cuerpo, nunca un orDie mudo (invariante 6, F2-08). El mensaje al usuario dice qué falló,
+// no cómo: el motivo crudo (ruta del fichero, SchemaError, `_tag`) es fuga de detalle interno. Los
+// listados registran cada fichero ilegible en el log del servidor (`file-artifact-repository.ts`).
+const artifactStorageError = (context: string) => (_error: ArtifactRepositoryError) =>
   new ApiArtifactStorageError({
-    message: `${context}: ${String("reason" in error ? error.reason : error._tag)}`
+    message: `${context}. Vuelve a intentarlo en un momento.`
   });
 
 const artifactNotFound = (id: string) =>

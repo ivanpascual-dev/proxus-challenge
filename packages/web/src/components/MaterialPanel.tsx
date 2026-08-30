@@ -16,6 +16,7 @@ import {
   type MindMapNode
 } from "../domain/materials/mindmap-layout.ts";
 import { streamReindexMaterial } from "../domain/materials/stream.ts";
+import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
 
 interface MaterialPanelProps {
   readonly materialId: string;
@@ -230,8 +231,8 @@ function PdfPageImage({ materialId, page }: { readonly materialId: string; reado
 
   return AsyncResult.matchWithError(image, {
     onInitial: () => <PagePlaceholder>Cargando la página {page}…</PagePlaceholder>,
-    onError: (error) => <PageError page={page} detail={String(error)} />,
-    onDefect: (defect) => <PageError page={page} detail={String(defect)} />,
+    onError: (error) => <PageError page={page} detail={messageOf(error)} />,
+    onDefect: (defect) => <PageError page={page} detail={DEFECT_MESSAGE} />,
     onSuccess: ({ value }) => (
       <img src={value.data} alt={`Página ${page}`} className="w-full rounded-lg border border-border" loading="lazy" />
     )
@@ -267,8 +268,8 @@ function MindMapTab({
 
   return AsyncResult.matchWithError(index, {
     onInitial: () => <p className="text-muted">Cargando el mapa…</p>,
-    onError: (error) => <p className="text-danger-ink">No se pudo cargar el índice: {String(error)}</p>,
-    onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el índice: {String(defect)}</p>,
+    onError: (error) => <p className="text-danger-ink">No se pudo cargar el índice: {messageOf(error)}</p>,
+    onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el índice: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => value.topics.length === 0
       ? <p className="text-muted">El modelo no detectó temas en este material.</p>
       : <MindMap index={value} title={title} onOpenPage={onOpenPage} onGenerateControl={onGenerateControl} />
@@ -440,7 +441,7 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
       }
       refreshMaterials();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setRunning(false);
     }
@@ -485,8 +486,8 @@ function NotesTab({ materialId }: { readonly materialId: string }) {
 
   return AsyncResult.matchWithError(artifacts, {
     onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
-    onError: (error) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(error)}</p>,
-    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onError: (error) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {messageOf(error)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => {
       const summary = value.artifacts.find(
         (artifact) => artifact.kind === "note" && artifact.materialId === materialId
@@ -518,7 +519,7 @@ function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
       }
       refreshArtifacts();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setRunning(false);
     }
@@ -567,15 +568,15 @@ function ExistingNote({ noteId }: { readonly noteId: string }) {
       await deleteArtifact(noteId);
       refreshArtifacts();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
       setDeleting(false);
     }
   };
 
   return AsyncResult.matchWithError(note, {
     onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
-    onError: (cause) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(cause)}</p>,
-    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onError: (cause) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {messageOf(cause)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => value.kind !== "note"
       ? <p className="p-4 text-danger-ink">El artefacto {noteId} no es un apunte.</p>
       : (

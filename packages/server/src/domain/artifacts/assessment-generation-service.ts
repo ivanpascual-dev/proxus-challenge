@@ -127,12 +127,15 @@ export const make = (
     materials.getIndex(materialId).pipe(
       Effect.catchTag("MaterialNotFound", () => new AssessmentGenerationError({ reason: `no hay ningún material con id ${materialId}` })),
       Effect.catchTag("MaterialNotIndexed", () => new AssessmentGenerationError({ reason: `el material ${materialId} no está indexado todavía` })),
-      Effect.catchTag("MaterialRepositoryError", (error) => new AssessmentGenerationError({ reason: `no se pudo leer el índice: ${String(error.reason)}` }))
+      Effect.catchTag("MaterialRepositoryError", (error) =>
+        Effect.logWarning(`generación de prueba: no se pudo leer el índice de ${materialId}: ${String(error.reason)}`).pipe(
+          Effect.andThen(new AssessmentGenerationError({ reason: "no se pudo leer el índice del material" }))
+        ))
     );
 
   const existingAssessments = (materialId: string) =>
     repository.listArtifacts().pipe(
-      Effect.mapError((error) => new AssessmentGenerationError({ reason: `no se pudo listar las pruebas: ${error._tag}` })),
+      Effect.mapError(() => new AssessmentGenerationError({ reason: "no se pudo listar las pruebas del material" })),
       Effect.map((listing) =>
         listing.artifacts.filter(
           (artifact): artifact is QuizArtifact | TestArtifact =>
@@ -143,7 +146,7 @@ export const make = (
 
   const noteFor = (materialId: string) =>
     repository.listArtifacts({ kind: "note" }).pipe(
-      Effect.mapError((error) => new AssessmentGenerationError({ reason: `no se pudo leer el apunte: ${error._tag}` })),
+      Effect.mapError(() => new AssessmentGenerationError({ reason: "no se pudo leer el apunte del material" })),
       Effect.map((listing) =>
         listing.artifacts.find(
           (artifact): artifact is NoteArtifact => artifact.kind === "note" && artifact.materialId === materialId
@@ -161,7 +164,9 @@ export const make = (
             case "MaterialNotIndexed":
               return Effect.succeed(Option.some<GenerationRejection>({ status: 409, message: `El material ${materialId} no está indexado todavía. Indéxalo antes de generar una prueba.` }));
             default:
-              return Effect.succeed(Option.some<GenerationRejection>({ status: 500, message: `No se pudo leer el material: ${String(error.reason)}` }));
+              return Effect.logWarning(`precheck de generación: no se pudo leer el índice de ${materialId}: ${String(error.reason)}`).pipe(
+                Effect.as(Option.some<GenerationRejection>({ status: 500, message: "No se pudo cargar el material. Vuelve a intentarlo en un momento." }))
+              );
           }
         },
         onSuccess: (index) =>
@@ -256,8 +261,9 @@ export const make = (
           }
         ]
       }).pipe(
-        Effect.mapError((error) => new AssessmentGenerationError({
-          reason: `la generación del tema "${topic.label}" falló: ${String(error)}`
+        Effect.tapError((error) => Effect.logWarning(`generación de prueba: el modelo falló en el tema "${topic.label}": ${String(error)}`)),
+        Effect.mapError(() => new AssessmentGenerationError({
+          reason: `la generación del tema "${topic.label}" falló: el modelo no respondió`
         }))
       );
 
@@ -305,7 +311,10 @@ export const make = (
 
       const material = yield* materials.get(materialId).pipe(
         Effect.catchTag("MaterialNotFound", () => new AssessmentGenerationError({ reason: `no hay ningún material con id ${materialId}` })),
-        Effect.catchTag("MaterialRepositoryError", (error) => new AssessmentGenerationError({ reason: `no se pudo leer el material: ${String(error.reason)}` }))
+        Effect.catchTag("MaterialRepositoryError", (error) =>
+          Effect.logWarning(`generación de prueba: no se pudo leer el material ${materialId}: ${String(error.reason)}`).pipe(
+            Effect.andThen(new AssessmentGenerationError({ reason: "no se pudo cargar el material" }))
+          ))
       );
       const index = yield* readIndex(materialId);
 
@@ -428,8 +437,9 @@ export const make = (
           };
 
       yield* repository.saveArtifact(artifact as Artifact).pipe(
-        Effect.mapError((error) => new AssessmentGenerationError({
-          reason: `no se pudo guardar la prueba: ${String("reason" in error ? error.reason : error._tag)}`
+        Effect.tapError((error) => Effect.logWarning(`generación de prueba: no se pudo guardar: ${String("reason" in error ? error.reason : error._tag)}`)),
+        Effect.mapError(() => new AssessmentGenerationError({
+          reason: "no se pudo guardar la prueba"
         }))
       );
 

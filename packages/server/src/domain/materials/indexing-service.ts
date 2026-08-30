@@ -71,7 +71,8 @@ export const IndexingServiceLive = Layer.effect(
       yield* emit({ page, pageCount: input.pageCount, message: `página ${page} de ${input.pageCount}: extrayendo texto` });
 
       const extracted = yield* pdf.extractText({ path: input.path, page }).pipe(
-        Effect.mapError((error): UnindexedPage => ({ page, reason: `no se pudo extraer el texto: ${String(error.reason)}` }))
+        Effect.tapError((error) => Effect.logWarning(`indexación: no se pudo extraer el texto de la página ${page}: ${String(error.reason)}`)),
+        Effect.mapError((): UnindexedPage => ({ page, reason: "no se pudo extraer el texto de esta página" }))
       );
 
       const provenance = classifyPage(extracted);
@@ -82,7 +83,8 @@ export const IndexingServiceLive = Layer.effect(
       yield* emit({ page, pageCount: input.pageCount, message: `página ${page} de ${input.pageCount}: transcribiendo con el modelo` });
 
       const image = yield* pdf.renderPage({ path: input.path, page }).pipe(
-        Effect.mapError((error): UnindexedPage => ({ page, reason: `no se pudo renderizar para transcribir: ${String(error.reason)}` }))
+        Effect.tapError((error) => Effect.logWarning(`indexación: no se pudo renderizar la página ${page}: ${String(error.reason)}`)),
+        Effect.mapError((): UnindexedPage => ({ page, reason: "no se pudo preparar esta página para transcribirla" }))
       );
 
       const response = yield* LanguageModel.generateText({
@@ -91,7 +93,8 @@ export const IndexingServiceLive = Layer.effect(
           { role: "user", content: [imagePart(page, image)] }
         ]
       }).pipe(
-        Effect.mapError((error): UnindexedPage => ({ page, reason: `la transcripción falló: ${String(error)}` }))
+        Effect.tapError((error) => Effect.logWarning(`indexación: la transcripción de la página ${page} falló: ${String(error)}`)),
+        Effect.mapError((): UnindexedPage => ({ page, reason: "el modelo no pudo transcribir esta página" }))
       );
 
       return yield* Effect.try({
@@ -102,7 +105,7 @@ export const IndexingServiceLive = Layer.effect(
           // de una página en blanco (invariante 3).
           return indexedEntry(page, "transcribed", truncate(parsed.isBlank ? "" : parsed.text));
         },
-        catch: (error): UnindexedPage => ({ page, reason: `la transcripción no se pudo parsear: ${String(error)}` })
+        catch: (): UnindexedPage => ({ page, reason: "la transcripción del modelo no se pudo interpretar" })
       });
     });
 
@@ -167,14 +170,15 @@ export const IndexingServiceLive = Layer.effect(
           { role: "user", content: body }
         ]
       }).pipe(
-        Effect.mapError((error) => new IndexingError({ reason: `la llamada de temas falló: ${String(error)}` }))
+        Effect.tapError((error) => Effect.logWarning(`indexación: la llamada de temas al modelo falló: ${String(error)}`)),
+        Effect.mapError(() => new IndexingError({ reason: "el modelo no respondió al detectar los temas" }))
       );
 
       return yield* Effect.try({
         try: () =>
           normalizeTopicHierarchy(parseTopics(response.text), pageCount)
             .slice(0, LIMITS.maxTopicsPerMaterial),
-        catch: (error) => new IndexingError({ reason: `los temas no se pudieron parsear: ${String(error)}` })
+        catch: () => new IndexingError({ reason: "la respuesta del modelo con los temas no se pudo interpretar" })
       });
     });
 

@@ -18,6 +18,7 @@ import {
   submitAttemptAction
 } from "../../domain/assessments/atoms.ts";
 import { QuestionSourceLine } from "./QuestionSourceLine.tsx";
+import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
 
 const questionTypeLabels = {
   "multiple-choice": "respuesta única",
@@ -60,8 +61,8 @@ export function AssessmentSolver({
       </div>
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando la prueba…</p>,
-        onError: (error) => <p className="text-danger-ink">No se pudo cargar la prueba: {String(error)}</p>,
-        onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar la prueba: {String(defect)}</p>,
+        onError: (error) => <p className="text-danger-ink">No se pudo cargar la prueba: {messageOf(error)}</p>,
+        onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar la prueba: {DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} />
       })}
     </div>
@@ -101,7 +102,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió un intento en curso.");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setStarting(false);
     }
@@ -117,7 +118,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
     } catch (cause) {
       setHintErrors((current) => ({
         ...current,
-        [questionId]: cause instanceof Error ? cause.message : String(cause)
+        [questionId]: messageOf(cause)
       }));
     }
   };
@@ -140,7 +141,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió el intento corregido.");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setSubmitting(false);
     }
@@ -156,7 +157,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setAttempt(result);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     }
   };
 

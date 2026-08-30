@@ -112,7 +112,8 @@ const reindexErrorMessage = (
     case "MaterialIndexingFailed":
       return error.reason;
     case "MaterialRepositoryError":
-      return `Error al leer el material: ${String(error.reason)}`;
+      // El motivo crudo (ruta, error de disco) no le sirve al usuario y es detalle interno.
+      return "No se pudo cargar el material. Vuelve a intentarlo en un momento.";
   }
 };
 
