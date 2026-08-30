@@ -1,8 +1,9 @@
-// El adaptador de Gemini (domain/agents/gemini.ts) no manda generationConfig, así que no hay modo
+// El adaptador de Gemini (domain/agents/gemini.ts) manda `generationConfig` con temperatura y tope
+// de salida, pero NO `responseMimeType` ni `responseSchema` (gemini.ts:206-215), así que no hay modo
 // JSON forzado: la respuesta puede venir con una valla de markdown o con texto alrededor. Este
 // parseo es defensivo. Si no se puede sacar un objeto, lanza, y quien llama declara el fallo
 // (failedPages para una página, IndexingError para la llamada de temas). Nunca devuelve un valor
-// neutro (invariante 3).
+// neutro (invariante 3). El modo JSON forzado llega en el tramo 3B (§6.7.1) como una segunda capa.
 
 export const parseModelJson = (raw: string): unknown => {
   const withoutFences = raw.replace(/```(?:json)?/gi, "").trim();
