@@ -5,6 +5,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
+import { AttemptHistory } from "./AttemptHistory.tsx";
 import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
@@ -14,7 +15,10 @@ export interface PendingControl {
   readonly topicLabel: string;
 }
 
-type View = { readonly kind: "list" } | { readonly kind: "solve"; readonly id: string; readonly title: string };
+type View =
+  | { readonly kind: "list" }
+  | { readonly kind: "solve"; readonly id: string; readonly title: string }
+  | { readonly kind: "history"; readonly id: string; readonly title: string };
 
 type GenTarget =
   | { readonly kind: "test" }
@@ -56,6 +60,16 @@ export function AssessmentsTab({
   if (view.kind === "solve") {
     return (
       <AssessmentSolver
+        artifactId={view.id}
+        title={view.title}
+        onExit={() => setView({ kind: "list" })}
+      />
+    );
+  }
+
+  if (view.kind === "history") {
+    return (
+      <AttemptHistory
         artifactId={view.id}
         title={view.title}
         onExit={() => setView({ kind: "list" })}
@@ -108,6 +122,7 @@ export function AssessmentsTab({
                     entry={entry}
                     onOpen={() => setView({ kind: "solve", id: entry.id, title: entry.title })}
                     onStartExam={() => onStartExam(entry.id, entry.title)}
+                    onHistory={() => setView({ kind: "history", id: entry.id, title: entry.title })}
                   />
                 ))}
               </ul>
@@ -120,11 +135,13 @@ export function AssessmentsTab({
 function AssessmentRow({
   entry,
   onOpen,
-  onStartExam
+  onStartExam,
+  onHistory
 }: {
   readonly entry: AssessmentListEntry;
   readonly onOpen: () => void;
   readonly onStartExam: () => void;
+  readonly onHistory: () => void;
 }) {
   const isRealExam = entry.kind === "test" && entry.mode === "exam";
 
@@ -141,25 +158,36 @@ function AssessmentRow({
             {entry.scope.topicLabel} · {entry.questionCount} {entry.questionCount === 1 ? "pregunta" : "preguntas"}
           </p>
         </div>
-        {isRealExam
-          ? (
-              <button
-                type="button"
-                className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
-                onClick={onStartExam}
-              >
-                Empezar el examen
-              </button>
-            )
-          : (
-              <button
-                type="button"
-                className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-                onClick={onOpen}
-              >
-                {entry.kind === "quiz" ? "Practicar" : "Abrir"}
-              </button>
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          {entry.lastAttempt !== null && (
+            <button
+              type="button"
+              className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+              onClick={onHistory}
+            >
+              Ver intentos
+            </button>
+          )}
+          {isRealExam
+            ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
+                  onClick={onStartExam}
+                >
+                  Empezar el examen
+                </button>
+              )
+            : (
+                <button
+                  type="button"
+                  className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+                  onClick={onOpen}
+                >
+                  {entry.kind === "quiz" ? "Practicar" : "Abrir"}
+                </button>
+              )}
+        </div>
       </div>
       <p className="mt-2 text-muted text-sm">
         {entry.lastAttempt === null

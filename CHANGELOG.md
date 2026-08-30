@@ -84,6 +84,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   mientras dure. El reloj se para al cerrar la pestaña y se retoma donde se dejó; al agotarse, el
   examen se entrega solo. Recargar o cerrar la página con un examen abierto pide confirmación, y al
   volver a abrir la aplicación un diálogo ofrece volver al examen a medias o cancelarlo.
+- **Historial de intentos de una prueba.** Cada prueba con al menos un intento tiene "Ver intentos":
+  la lista de todos ellos por fecha, con su modo y su resultado. Un intento corregido se reabre entero
+  con las preguntas, lo que respondió el alumno, la corrección de cada una con su cita, y el "Esto sí
+  lo dije" de las de desarrollo. Un intento cancelado o caducado no se corrige: enseña por qué se
+  cerró y, si el examen se interrumpió, cuántas veces y en qué franjas.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del

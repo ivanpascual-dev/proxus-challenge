@@ -410,3 +410,23 @@ export function buildAnswers(
 export function countUnanswered(questions: readonly SolvableQuestion[], answers: LocalAnswers): number {
   return questions.length - buildAnswers(questions, answers).length;
 }
+
+// El camino inverso de `buildAnswers`: las respuestas ya guardadas de un intento vuelven a la forma
+// local que `QuestionCard` pinta. Lo usa el historial para reabrir un intento corregido.
+export function answersFromStored(stored: readonly TestAnswer[]): LocalAnswers {
+  const choice: Record<string, string> = {};
+  const multi: Record<string, readonly string[]> = {};
+  const text: Record<string, string> = {};
+  for (const answer of stored) {
+    if (answer.questionType === "multiple-choice") {
+      choice[answer.questionId] = answer.selectedOptionId;
+    } else if (answer.questionType === "true-false") {
+      choice[answer.questionId] = answer.answer ? "true" : "false";
+    } else if (answer.questionType === "multiple-response") {
+      multi[answer.questionId] = answer.selectedOptionIds;
+    } else {
+      text[answer.questionId] = answer.answer;
+    }
+  }
+  return { choice, multi, text };
+}

@@ -400,6 +400,14 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   puede retomar, de que el reloj solo corre mientras esté dentro, y de que las interrupciones quedan
   registradas.
 
+#### El historial de intentos
+
+- **F3-39e.** LA pestaña "Pruebas" DEBERÁ ofrecer el historial de toda prueba que tenga al menos un
+  intento, listándolos por fecha con su modo y su estado. UN intento corregido DEBERÁ poder reabrirse
+  entero con las respuestas del alumno y sus correcciones; UNO abandonado DEBERÁ mostrar su motivo de
+  cierre y sus interrupciones y NO DEBERÁ corregirse; UNO en curso NO DEBERÁ poder abrirse desde el
+  historial.
+
 #### Tamaño de la prueba y techos de acumulación
 
 - **F3-40.** CUANDO el alumno genere una prueba, EL sistema DEBERÁ dejarle elegir cuántas preguntas
