@@ -92,9 +92,10 @@ deja de leerse. Una entrada por sesión, no por commit.
 
 ### 5 · Redactar el mensaje
 
-**Conventional Commits, en inglés e imperativo.** No es una imposición nuestra: es hacia donde va el
-propio repo. El historial es inglés imperativo (`Add React tutor app`, `Fix Vite API proxy collision`)
-y el commit más reciente del autor ya lleva prefijo (`docs: add getting started guide`).
+**Conventional Commits, en español e imperativo.** El historial reciente ya va en español
+(`docs: planificar fase 3 + escribir sus especificaciones`, `fix(shared,server,web): rechaza con 409
+el segundo apunte de un material antes de abrir el stream`). Minúscula tras los dos puntos, sin punto
+final.
 
 Tipos: `feat` · `fix` · `refactor` · `docs` · `chore` · `test` · `perf`.
 
