@@ -75,6 +75,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   penalización, con las pistas a mano, el material consultable en las otras pestañas y la corrección al
   entregar (nota sobre 10, puntuación bruta y corrección pregunta a pregunta con su cita). Cada
   pregunta de desarrollo tiene "Esto sí lo dije" para retirar su corrección del perfil.
+- **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
+  del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
+  "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
+  navegador, no a la pantalla.
 
 ### Cambiado
 

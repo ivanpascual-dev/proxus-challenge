@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { Chat } from "./components/Chat.tsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { MaterialPanel } from "./components/MaterialPanel.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { materialsQuery } from "./domain/materials/atoms.ts";
@@ -26,20 +27,26 @@ export function App() {
           : "340px minmax(0, 1fr)"
       }}
     >
-      <Sidebar
-        selectedMaterialId={selectedMaterialId}
-        onSelectMaterial={setSelectedMaterialId}
-      />
-      {selectedMaterial !== undefined && (
-        <MaterialPanel
-          key={selectedMaterial.id}
-          materialId={selectedMaterial.id}
-          indexState={selectedMaterial.indexState}
-          title={selectedMaterial.title}
-          pageCount={selectedMaterial.pageCount}
+      {/* Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red. */}
+      <ErrorBoundary label="la lista de materiales">
+        <Sidebar
+          selectedMaterialId={selectedMaterialId}
+          onSelectMaterial={setSelectedMaterialId}
         />
+      </ErrorBoundary>
+      {selectedMaterial !== undefined && (
+        <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
+          <MaterialPanel
+            materialId={selectedMaterial.id}
+            indexState={selectedMaterial.indexState}
+            title={selectedMaterial.title}
+            pageCount={selectedMaterial.pageCount}
+          />
+        </ErrorBoundary>
       )}
-      <Chat />
+      <ErrorBoundary label="el chat">
+        <Chat />
+      </ErrorBoundary>
     </div>
   );
 }

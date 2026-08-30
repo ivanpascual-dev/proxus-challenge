@@ -542,6 +542,9 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   `null`, lanzaba, y como no hay ErrorBoundary la interfaz entera se quedaba en blanco. Se arregla
   leyendo el valor antes de `setAnswers`. El título de los apuntes (`NoteWorkspace`) tenía el patrón
   exacto, latente: renombrar unos apuntes lo habría disparado. Mismo arreglo en los dos sitios.
-- **Deuda (no hay ErrorBoundary):** cualquier excepción en render tumba toda la interfaz sin dejar
-  nada en pantalla. Lo desbloquea un ErrorBoundary raíz con mensaje genérico y recarga. Sin dueño de
-  paso todavía.
+- **Deuda saldada (ErrorBoundary):** `packages/web/src/components/ErrorBoundary.tsx` es ahora la red
+  de render. Envuelve `<App/>` en `main.tsx` y, por separado, `Sidebar`, `MaterialPanel` y `Chat` en
+  `App.tsx`, para que un panel que se caiga no se lleve a los otros dos. El `key={material.id}` del
+  `MaterialPanel` se mueve al boundary que lo envuelve: sigue forzando el remonte al cambiar de
+  material y de paso resetea el boundary. El detalle técnico va a `console.error` con el
+  `componentStack`, nunca a pantalla.
