@@ -4,7 +4,6 @@ import { HttpServerRequest } from "effect/unstable/http";
 import {
   ArtifactNotFound as ApiArtifactNotFound,
   ArtifactStorageError as ApiArtifactStorageError,
-  ArtifactTypeMismatch as ApiArtifactTypeMismatch,
   BlockNotFound as ApiBlockNotFound,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
@@ -186,27 +185,6 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
           ? artifactNotFound(params.id)
           : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
-      ))
-      .handle("submit", ({ params, payload }) => artifacts.submitAttempt({
-        ...payload,
-        artifactId: params.id
-      }).pipe(
-        Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
-        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactTypeMismatch | ApiArtifactStorageError => {
-          switch (error._tag) {
-            case "ArtifactNotFound":
-              return artifactNotFound(params.id);
-            case "ArtifactTypeMismatch":
-              return new ApiArtifactTypeMismatch({
-                artifactId: params.id,
-                expected: error.expected,
-                actual: error.actual,
-                message: `El artefacto ${params.id} es de tipo ${error.actual}; se esperaba ${error.expected}.`
-              });
-            default:
-              return artifactStorageError(`No se pudo calificar el intento de ${params.id}`)(error);
-          }
-        })
       ))
       // La prueba SIN clave de respuesta (decisión 9). Lo que se sirve mientras se resuelve.
       .handle("solvable", ({ params }) => attempts.solvable(params.id))

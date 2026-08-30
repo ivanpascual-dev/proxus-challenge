@@ -79,7 +79,7 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
   detalle técnico va al log del servidor.
 - **Los apuntes viven en su material, no en la barra lateral.** La barra lateral deja de listar los
-  apuntes y separa lo que queda en dos secciones, "Quizzes" y "Tests", cada una con su propio contador.
+  apuntes.
 - **El tutor entiende "bloque" como bloque del apunte.** Al preguntarle por los bloques, el mapa
   mental o el apunte de un material, el tutor lee el apunte en vez de contar las secciones del PDF, y
   puede leer un bloque concreto para hablar de él.
@@ -96,3 +96,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   las marcas de acierto usaban un color que sobre su fondo claro no llegaba al mínimo de contraste.
 
 ### Eliminado
+
+- **La barra lateral ya no resuelve quizzes ni tests.** Se van las secciones "Quizzes" y "Tests" y el
+  espacio de trabajo donde se respondían. La barra lateral se queda con los materiales y el aviso de
+  ficheros de artefacto ilegibles; las pruebas se generan y se resuelven en la pestaña "Pruebas" de
+  cada material.

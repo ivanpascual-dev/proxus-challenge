@@ -281,9 +281,9 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 
 #### Modo práctica
 
-- **F3-11.** CUANDO el alumno responda una pregunta en modo práctica, EL sistema DEBERÁ corregirla en el
-  momento, mostrar refuerzo si es correcta y la corrección con su explicación si no lo es, sin esperar a
-  que entregue la prueba.
+- **F3-11.** EN modo práctica EL sistema NO DEBERÁ poner reloj ni penalización, DEBERÁ servir las pistas, y
+  DEBERÁ dejar consultar el material y hablar con el tutor mientras se resuelve la prueba. La corrección
+  DEBERÁ salir al entregar, igual que en modo examen.
 - **F3-12.** MIENTRAS una prueba se está resolviendo, la representación que reciba el navegador NO DEBERÁ
   contener la opción correcta, la respuesta esperada, la rúbrica ni la explicación de ninguna pregunta.
 - **F3-13.** EN modo práctica EL sistema NO DEBERÁ aplicar ninguna penalización: la nota mostrada DEBERÁ

@@ -436,4 +436,18 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   quitado porque lo usa el solucionador viejo de `ArtifactWorkspace.tsx`. Hasta el paso 15 conviven
   el endpoint viejo (`/:id/submit`, con `makeInProgressAttempt` sintético) y el nuevo del ciclo de
   intento (`/:id/attempts/:attemptId/submit`); el paso 15 trae el `AssessmentSolver` nuevo y retira
-  el resto viejo.
+  el resto viejo. **Saldada en el paso 15:** se retira la ruta HTTP `submit` y su handler, y con ellos
+  `submitArtifactAttemptAction` en la web. El esquema `SubmitAttemptInput` y `repository.submitAttempt`
+  siguen vivos porque los usa el comando `artifacts submit` del tutor; se retiran en el paso 27 (3D).
+
+### Paso 15 · pestaña Pruebas y solucionador de práctica
+
+- **Desviación (F3-11 reescrito por decisión de Iván en esta sesión):** la práctica ya no corrige
+  pregunta a pregunta ni da "refuerzo inmediato al acertar". Corrige al entregar, igual que el examen;
+  lo que la distingue es quitar el reloj y la penalización y dar pistas + el material a la vista + el
+  chat del tutor abierto. Toca `docs/especificacion.md` (F3-11), el plan (tabla de términos §4, pasos
+  15, "Resolver" §6.11, fila QA "Modo práctica") y el `AssessmentSolver`. Recoger en el ADR de los
+  modos práctica/examen cuando se escriban los ADR de la fase 3 (plan §9).
+- **Deuda (`artifactsByKindQuery` queda sin usar):** la barra lateral pasa a `artifactsQuery` (ya no
+  lista quiz/test). El atom sigue exportado en `packages/web/src/domain/artifacts/atoms.ts`; lo usa (o
+  lo retira) el paso 29 del tramo 3D, cuando se decide qué queda de artefactos en la barra lateral.

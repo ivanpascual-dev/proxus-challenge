@@ -48,7 +48,6 @@ fallo de generación. También responde `429` si se supera la frecuencia.
 ```http
 GET /api/artifacts/
 GET /api/artifacts/:id
-POST /api/artifacts/:id/submit
 PUT /api/artifacts/:id/note
 POST /api/artifacts/:id/blocks/:blockId/rewrite
 POST /api/artifacts/url-source
@@ -57,7 +56,9 @@ POST /api/artifacts/:id/proposals/:proposalId/reject
 DELETE /api/artifacts/:id
 ```
 
-`submit` crea y corrige un intento, devolviendo un attempt con estado `graded` cuando aplica.
+Resolver una prueba (Control o Examen) va por el ciclo de vida del intento: `GET /:id/solvable` sirve
+las preguntas sin clave de respuesta y los endpoints bajo `/:id/attempts` crean, corrigen y cierran el
+intento. Se documentan enteros al cerrar la fase 3.
 
 `POST /:id/blocks/:blockId/rewrite` (`{mode: "clearer" | "deeper"}` → `{markdown, usedSource}`)
 reescribe un bloque con una llamada al modelo: solo el texto del bloque y su fragmento cacheado, sin
