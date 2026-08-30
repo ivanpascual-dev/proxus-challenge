@@ -642,3 +642,12 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   aterrizan las dos mitades del cambio, porque el `tsconfig` de `@proxus/server` incluye los
   `.eval.ts` y la firma de `makeAcademicTutorHarness` la tocan las dos. La skill sí va en un commit
   aparte (es texto, no ata el typecheck).
+
+### Paso 28 · la vista del perfil
+
+- **Desviación (el perfil se ve dentro de la pestaña Pruebas, no como pestaña propia):** el plan
+  (paso 28) solo pide "vista del perfil por material" sin decir dónde vive. Se coloca como bloque
+  desplegable ("Tu progreso en este material"), plegado por defecto, bajo la cabecera de la pestaña
+  Pruebas. Motivo: §6.11 y la decisión 15 fijan Pruebas como la cuarta pestaña junto a PDF, Mapa
+  mental y Apuntes, y ninguna menciona una quinta. Pendiente de que Iván lo pruebe y decida si quiere
+  otro sitio.

@@ -95,6 +95,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   entró ("porque fallaste este tema", "porque abriste una pista", "porque lo marcaste como
   importante"). Si no hay nada que repasar, el interruptor no se ofrece y en su lugar se explica
   cuándo se activará. En el Examen real el motivo de cada pregunta no se muestra.
+- **Tu progreso en el material.** La pestaña "Pruebas" tiene un bloque desplegable, plegado por
+  defecto, que muestra tema a tema lo que llevas de este material: aciertos, fallos, respuestas sin
+  evaluar o en blanco, pistas abiertas y la marca de "importante", cada señal por separado y sin
+  sumarlas. Es solo lectura y se pone al día al entregar o discrepar un intento.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del

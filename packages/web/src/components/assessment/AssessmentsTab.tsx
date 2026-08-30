@@ -7,6 +7,7 @@ import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
+import { StudyProfilePanel } from "./StudyProfilePanel.tsx";
 import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
@@ -91,6 +92,8 @@ export function AssessmentsTab({
           Examen del material
         </button>
       </div>
+
+      <StudyProfilePanel materialId={materialId} />
 
       {genTarget !== null && (
         <GenerateCard
