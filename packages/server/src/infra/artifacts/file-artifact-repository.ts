@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { LIMITS } from "@proxus/shared";
 import {
   Artifact,
   ArtifactAttempt,
@@ -11,14 +12,15 @@ import {
   CreateArtifactInput,
   ListArtifactsInput,
   SubmitAttemptInput,
-  gradeAttempt,
+  TooManyQuestions,
   makeArtifact,
-  makeUngradedAttempt,
+  makeInProgressAttempt,
   type Artifact as ArtifactType,
   type ArtifactAttempt as ArtifactAttemptType,
   type ArtifactRepository as ArtifactRepositoryType,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
+import { gradeInProgressAttempt } from "../../domain/artifacts/grading.ts";
 
 const ArtifactFromJson = Schema.fromJsonString(Artifact);
 const ArtifactAttemptFromJson = Schema.fromJsonString(ArtifactAttempt);
@@ -70,6 +72,17 @@ export const FileArtifactRepository = {
     });
 
     const writeArtifactFile = (artifact: ArtifactType): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
+      // Techo duro del contrato (invariante 11, §5.7): se rechaza en voz alta al guardar, nunca se
+      // recorta en silencio. `questionsPerQuiz`/`questionsPerTest` son los rangos que ve el alumno;
+      // esto es el fusible de detrás.
+      if (artifact.kind !== "note" && artifact.questions.length > LIMITS.maxQuestionsPerArtifact) {
+        return yield* new TooManyQuestions({
+          artifactId: artifact.id,
+          ceiling: LIMITS.maxQuestionsPerArtifact,
+          received: artifact.questions.length
+        });
+      }
+
       const encoded = yield* Schema.encodeUnknownEffect(Artifact)(artifact).pipe(
         Effect.mapError(mapSerializationError)
       );
@@ -161,7 +174,7 @@ export const FileArtifactRepository = {
         });
       }
 
-      const attempt = makeUngradedAttempt(input);
+      const attempt = makeInProgressAttempt(input);
       yield* writeAttemptFile(attempt);
       return attempt;
     });
@@ -179,8 +192,19 @@ export const FileArtifactRepository = {
 
     const gradeAttemptById = (attemptId: string) => Effect.gen(function* () {
       const attempt = yield* readAttemptFile(attemptId);
+      if (attempt.status !== "in-progress") {
+        // Ya cerrado (entregado o abandonado): se devuelve tal cual, no se vuelve a corregir.
+        return attempt;
+      }
       const artifact = yield* readArtifactFile(attempt.artifactId);
-      const graded = yield* gradeAttempt(artifact, attempt);
+      if (artifact.kind === "note") {
+        return yield* new ArtifactTypeMismatch({
+          artifactId: artifact.id,
+          expected: attempt.artifactKind,
+          actual: artifact.kind
+        });
+      }
+      const graded = gradeInProgressAttempt(artifact, attempt);
       yield* writeAttemptFile(graded);
       return graded;
     });

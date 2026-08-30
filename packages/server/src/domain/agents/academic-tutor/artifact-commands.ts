@@ -12,6 +12,7 @@ import {
   CreateArtifactInput,
   QuestionNotFound,
   AnswerTypeMismatch,
+  TooManyQuestions,
   SubmitAttemptInput,
   type ArtifactListing,
   type ArtifactRepository,
@@ -131,7 +132,7 @@ export const renderArtifactListing = (listing: ArtifactListing): string => {
   return `${lines}${unreadable}`;
 };
 
-const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch | ArtifactRepositoryStorageError | ArtifactRepositorySerializationError | RateLimited) => {
+const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch | TooManyQuestions | ArtifactRepositoryStorageError | ArtifactRepositorySerializationError | RateLimited) => {
   switch (error._tag) {
     case "ArtifactNotFound":
       return `Artifact not found: ${error.artifactId}`;
@@ -139,6 +140,8 @@ const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | Artifac
       return `Attempt not found: ${error.attemptId}`;
     case "ArtifactTypeMismatch":
       return `Artifact ${error.artifactId} has kind ${error.actual}; expected ${error.expected}`;
+    case "TooManyQuestions":
+      return `Artifact ${error.artifactId} has ${error.received} questions; the ceiling is ${error.ceiling}`;
     case "QuestionNotFound":
       return `Question not found: ${error.questionId}`;
     case "AnswerTypeMismatch":

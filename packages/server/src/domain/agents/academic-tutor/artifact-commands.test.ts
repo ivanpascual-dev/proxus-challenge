@@ -16,7 +16,11 @@ const quiz: Artifact = {
   kind: "quiz",
   id: "quiz-1",
   title: "Repaso",
-  questions: []
+  questions: [],
+  scope: { materialId: "mat-42", topicId: "t1", topicLabel: "Tema 1" },
+  origin: "material",
+  createdAt: "2026-08-30T00:00:00.000Z",
+  examTimeLimitSeconds: 300
 };
 
 test("renderArtifactListing: la línea del apunte lleva su materialId; el quiz no", () => {

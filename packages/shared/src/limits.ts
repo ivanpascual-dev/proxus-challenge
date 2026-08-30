@@ -20,6 +20,33 @@ export const LIMITS = {
   artifactsPerDay: { limit: 40, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
 
+  // Pruebas (fase 3)
+  // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.
+  questionsPerQuiz: { min: 4, max: 8, default: 6 },
+  questionsPerTest: { min: 10, max: 30, default: 20 },
+
+  // Cuántas pruebas y cuántos intentos.
+  maxQuizzesPerTopic: 2, // por tema, no por material: el techo va donde va el alcance del Control
+  maxTestsPerMaterial: 4,
+  maxPracticeAttemptsPerAssessment: 3,
+  maxExamAttemptsPerAssessment: 3,
+
+  // Generación: se completa hasta el número pedido o se falla (decisión 21).
+  maxGenerationRetriesPerTopic: 2,
+
+  maxHintCharacters: 300,
+  maxOpenAnswerCharacters: 1_500,
+  maxRubricCriteria: 5,
+  maxJudgeCallsPerAttempt: 8, // el reparto acota el Examen más grande a 6; esto es el fusible
+  examSecondsPerQuestion: {
+    "multiple-choice": 60,
+    "multiple-response": 90,
+    "true-false": 30,
+    "short-answer": 120
+  },
+  examReviewSeconds: 300,
+  examHeartbeatIntervalMs: 15_000, // mide el tiempo conectado; no cancela nada (decisión 19c)
+
   // Tamaño de salida
   maxQuestionsPerArtifact: 50,
   maxBlocksPerNote: 200,

@@ -388,3 +388,28 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   `window.DOMParser` y una vista de ProseMirror montada). MIT, solo test, fuera del runtime. De paso,
   el subrayado sale del esquema (`underline: false`): solo se representa con `<u>` y `tiptap-markdown`
   lo perdía en silencio al guardar.
+
+## 2026-08-30 · Fase 3 · tramo 3A · contratos y cimiento
+
+- **Desviación (frontera 3A/3B renegociada con Iván):** el plan §8 mete en 3A "endpoints del §5.6
+  declarados" (paso 6) y `question-parse` (parte del 9). Se quedan para 3B. En 3A entran solo: los
+  esquemas §5.1‑5.5 y su mirror, `limits.ts` §5.7, las clases de error nuevas
+  (`assessment-errors.ts`, **sin rutas todavía**), y los módulos puros `grading.ts` y
+  `exam-scoring.ts` con sus tests. Motivo: el cambio del ciclo de vida del intento (§5.5) rompe a la
+  vez repositorio, comando del tutor, eval y web; se cierra con shims mínimos y se dejan los endpoints
+  para cuando exista la generación de verdad, así cada commit deja el repo compilando.
+- **Desviación (la extracción de `grading.ts` no se pudo aislar en su propio commit):** el reparto
+  pedía "contrato" y "extracción" separados. La corrección vieja vivía en `artifact.ts` referida a
+  los esquemas de intento que el §5.5 elimina, así que reescribir el esquema obliga a reescribir la
+  corrección en el mismo commit. El bug del `maxScore` (recorría `attempt.answers`, así que 2 de 10
+  respondidas daban 2/2; ahora recorre `artifact.questions` y las no respondidas son `blank`) viaja
+  con esa reescritura.
+- **Deuda (shims que sustituyen 3B y 3D):**
+  - `makeArtifact` rellena `scope`/`origin`/`examTimeLimitSeconds` con marcadores. Lo desbloquea la
+    retirada de `artifacts create` (paso 27, tramo 3D).
+  - `makeInProgressAttempt` sintetiza un intento de práctica en el camino de `artifacts submit`. Lo
+    desbloquea el endpoint de crear intento (paso 14, tramo 3B).
+  - `ArtifactWorkspace.tsx` sigue con el solucionador viejo (respuesta múltiple como lista separada
+    por comas, sin pistas, sin modos). Lo sustituye `AssessmentSolver` (paso 15, tramo 3B).
+  - `artifact-authoring.eval.ts` con shim para pasar el typecheck; se reescribe entera (paso 27,
+    tramo 3D).

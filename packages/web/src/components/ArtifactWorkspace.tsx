@@ -15,7 +15,8 @@ import { artifactQuery, submitArtifactAttemptAction } from "../domain/artifacts/
 type Answers = Record<string, string>;
 
 const questionTypeLabels = {
-  "multiple-choice": "opción múltiple",
+  "multiple-choice": "respuesta única",
+  "multiple-response": "respuesta múltiple",
   "true-false": "verdadero/falso",
   "short-answer": "respuesta corta"
 } as const;
@@ -288,7 +289,7 @@ function TrueFalseInput({
 function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt, { readonly status: "graded" }> }) {
   return (
     <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
-      <p className="font-bold text-success-ink text-xl">Puntuación: {attempt.score} / {attempt.maxScore}</p>
+      <p className="font-bold text-success-ink text-xl">Puntuación: {attempt.rawScore} / {attempt.maxScore}</p>
       <p className="mt-1 text-success-ink">{attempt.summary}</p>
     </section>
   );
@@ -296,7 +297,15 @@ function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt
 
 function CorrectionBadge({ correction }: { readonly correction: QuestionCorrection }) {
   if (correction.questionType === "short-answer") {
+    return <span className="rounded-full bg-brand px-3 py-1 font-semibold text-on-brand text-sm">{correction.score === null ? "sin evaluar" : `${correction.score}/${correction.maxScore}`}</span>;
+  }
+
+  if (correction.questionType === "multiple-response") {
     return <span className="rounded-full bg-brand px-3 py-1 font-semibold text-on-brand text-sm">{correction.score}/{correction.maxScore}</span>;
+  }
+
+  if (correction.questionType === "blank") {
+    return <span className="rounded-full bg-border px-3 py-1 font-semibold text-muted text-sm">Sin responder</span>;
   }
 
   return correction.correct
@@ -335,31 +344,33 @@ function CorrectionDetails({
 const optionText = (question: MultipleChoiceQuestion, optionId: string) =>
   question.options.find((option) => option.id === optionId)?.text ?? optionId;
 
+type BuiltAnswer =
+  | { readonly questionType: "multiple-choice"; readonly questionId: string; readonly selectedOptionId: string }
+  | { readonly questionType: "multiple-response"; readonly questionId: string; readonly selectedOptionIds: readonly string[] }
+  | { readonly questionType: "true-false"; readonly questionId: string; readonly answer: boolean }
+  | { readonly questionType: "short-answer"; readonly questionId: string; readonly answer: string };
+
 function buildSubmitInput(
   artifact: Extract<Artifact, { readonly kind: "quiz" | "test" }>,
   answers: Answers
 ): SubmitAttemptInput {
-  const builtAnswers = artifact.questions.map((question) => {
+  const builtAnswers: BuiltAnswer[] = artifact.questions.map((question): BuiltAnswer => {
     const value = answers[question.id] ?? "";
     switch (question.type) {
       case "multiple-choice":
+        return { questionType: "multiple-choice", questionId: question.id, selectedOptionId: value };
+      case "multiple-response":
+        // La respuesta múltiple llega en 3B con su propia entrada; mientras tanto el valor es una
+        // lista separada por comas para que el contrato cuadre.
         return {
-          questionType: "multiple-choice" as const,
+          questionType: "multiple-response",
           questionId: question.id,
-          selectedOptionId: value
+          selectedOptionIds: value.length > 0 ? value.split(",") : []
         };
       case "true-false":
-        return {
-          questionType: "true-false" as const,
-          questionId: question.id,
-          answer: value === "true"
-        };
+        return { questionType: "true-false", questionId: question.id, answer: value === "true" };
       case "short-answer":
-        return {
-          questionType: "short-answer" as const,
-          questionId: question.id,
-          answer: value
-        };
+        return { questionType: "short-answer", questionId: question.id, answer: value };
     }
   });
 
@@ -367,7 +378,10 @@ function buildSubmitInput(
     return {
       artifactKind: "quiz",
       artifactId: artifact.id,
-      answers: builtAnswers.filter((answer) => answer.questionType !== "short-answer")
+      answers: builtAnswers.filter(
+        (answer): answer is Exclude<BuiltAnswer, { readonly questionType: "multiple-response" }> =>
+          answer.questionType !== "multiple-response"
+      )
     };
   }
 

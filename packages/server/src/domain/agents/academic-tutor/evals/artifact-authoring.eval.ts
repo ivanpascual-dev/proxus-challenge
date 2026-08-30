@@ -15,9 +15,10 @@ import {
   type CreateArtifactInput,
   type ListArtifactsInput,
   type SubmitAttemptInput,
-  gradeAttempt,
-  makeArtifact
+  makeArtifact,
+  makeInProgressAttempt
 } from "../../../artifacts/artifact.ts";
+import { gradeInProgressAttempt } from "../../../artifacts/grading.ts";
 import {
   MaterialIndexingFailed,
   MaterialNotFound,
@@ -196,11 +197,10 @@ const InMemoryArtifactRepository = Layer.effect(
           }
 
           return Ref.modify(ref, (state) => {
-            const attempt = {
-              ...input,
-              id: `attempt-${state.nextAttemptId}`,
-              status: "ungraded" as const
-            } as ArtifactAttempt;
+            const attempt: ArtifactAttempt = {
+              ...makeInProgressAttempt(input),
+              id: `attempt-${state.nextAttemptId}`
+            };
 
             return [
               attempt,
@@ -240,10 +240,17 @@ const InMemoryArtifactRepository = Layer.effect(
 
     const gradeSavedAttempt = (attemptId: string): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
       getAttempt(attemptId).pipe(
-        Effect.andThen((attempt) => getArtifact(attempt.artifactId).pipe(
-          Effect.andThen((artifact) => gradeAttempt(artifact, attempt)),
-          Effect.andThen((gradedAttempt) => saveAttempt(gradedAttempt).pipe(Effect.as(gradedAttempt)))
-        ))
+        Effect.andThen((attempt) => {
+          if (attempt.status !== "in-progress") {
+            return Effect.succeed(attempt);
+          }
+          return getArtifact(attempt.artifactId).pipe(
+            Effect.andThen((artifact) => artifact.kind === "note"
+              ? Effect.fail(new ArtifactTypeMismatch({ artifactId: artifact.id, expected: attempt.artifactKind, actual: artifact.kind }))
+              : Effect.succeed(gradeInProgressAttempt(artifact, attempt))),
+            Effect.andThen((gradedAttempt) => saveAttempt(gradedAttempt).pipe(Effect.as(gradedAttempt)))
+          );
+        })
       );
 
     return ArtifactRepository.of({
