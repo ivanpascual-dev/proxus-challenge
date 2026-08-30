@@ -242,7 +242,182 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 
 ### Fase 3 · El test que enseña
 
-_Pendiente._
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/fase3-el-test-que-ensena.md`](../notes/plans/fase3-el-test-que-ensena.md). Las cifras en
+mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domicilio. En la interfaz un
+`quiz` se llama **Control** y un `test` se llama **Examen**; el contrato sigue usando `quiz` y `test`.
+
+#### Anclaje de la pregunta
+
+- **F3-01.** EL sistema DEBERÁ guardar en cada pregunta su material, sus páginas y el tema del índice del
+  que salió, y esa cita la DEBERÁ copiar del índice, NO DEBERÁ aceptar páginas propuestas por el modelo.
+- **F3-02.** SI la cita de una pregunta no se puede comprobar contra el índice, ENTONCES EL sistema
+  DEBERÁ guardarla con el motivo concreto y la interfaz DEBERÁ mostrarlo, y NO DEBERÁ descartar la
+  pregunta ni presentarla como anclada.
+- **F3-03.** CUANDO alguna de las páginas citadas por una pregunta tenga procedencia `transcribed`, EL
+  sistema DEBERÁ marcarla como transcripción del modelo y la interfaz DEBERÁ señalarlo.
+
+#### Forma de la prueba
+
+- **F3-04.** EL alcance de un Control DEBERÁ ser un tema del índice, y el de un Examen el material
+  entero; ambos DEBERÁN guardar el nombre del tema en el momento de generarse.
+- **F3-05.** EL número de preguntas y su reparto por tipo los DEBERÁ decidir el código a partir del
+  alcance, dentro de `maxQuestionsPerAssessment` y sin superar nunca `maxQuestionsPerArtifact`.
+- **F3-06.** CUANDO se pida dos veces una prueba del mismo alcance con el mismo origen y el mismo perfil,
+  EL sistema DEBERÁ producir el mismo reparto de temas y tipos, aunque los enunciados difieran.
+- **F3-07.** CUANDO el material tenga apunte, EL sistema DEBERÁ usar el texto de los bloques de los temas
+  del alcance además del texto indexado, y los bloques marcados como importantes DEBERÁN recibir más
+  preguntas que los no marcados.
+
+#### La generación falla en voz alta
+
+- **F3-08.** SI una pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema DEBERÁ
+  descartarla nombrando el motivo en el resultado de la generación, y NO DEBERÁ completarla adivinando
+  ningún campo.
+- **F3-09.** CUANDO termine de generarse una prueba, EL sistema DEBERÁ informar de cuántas preguntas se
+  pidieron, cuántas se guardaron y por qué se cayeron las demás.
+- **F3-10.** SI no sobrevive ninguna pregunta, ENTONCES EL sistema DEBERÁ fallar la generación con su
+  motivo, y NO DEBERÁ guardar una prueba sin preguntas.
+
+#### Modo práctica
+
+- **F3-11.** CUANDO el alumno responda una pregunta en modo práctica, EL sistema DEBERÁ corregirla en el
+  momento, mostrar refuerzo si es correcta y la corrección con su explicación si no lo es, sin esperar a
+  que entregue la prueba.
+- **F3-12.** MIENTRAS una prueba se está resolviendo, la representación que reciba el navegador NO DEBERÁ
+  contener la opción correcta, la respuesta esperada, la rúbrica ni la explicación de ninguna pregunta.
+- **F3-13.** EN modo práctica EL sistema NO DEBERÁ aplicar ninguna penalización: la nota mostrada DEBERÁ
+  ser la puntuación bruta escalada.
+
+#### Pistas
+
+- **F3-14.** CUANDO el alumno abra la pista de una pregunta, EL sistema DEBERÁ registrarlo en el intento
+  antes de mostrarla, y SI el registro falla NO DEBERÁ mostrarla.
+- **F3-15.** EN modo examen EL sistema NO DEBERÁ servir ni mostrar ninguna pista, y DEBERÁ rechazar con
+  409 toda petición de revelar una.
+- **F3-16.** EL número de pistas abiertas DEBERÁ ser una señal propia del perfil, y NO DEBERÁ sumarse a
+  la dificultad observada ni convertir una respuesta correcta en incorrecta.
+- **F3-17.** EL texto de una pista NO DEBERÁ superar `maxHintCharacters` caracteres, y una pregunta sin
+  pista DEBERÁ decirlo en vez de mostrar un desplegable vacío.
+
+#### Modo examen
+
+- **F3-18.** CUANDO el alumno empiece un intento, EL sistema DEBERÁ crearlo en el servidor con su modo y
+  su hora de inicio, y EL tiempo límite de un examen lo DEBERÁ derivar del reparto de preguntas mediante
+  `examSecondsPerQuestion` y `examReviewSeconds`.
+- **F3-19.** MIENTRAS un intento en modo examen esté sin entregar, EL sistema NO DEBERÁ mostrar ninguna
+  corrección ni la puntuación de ninguna pregunta.
+- **F3-20.** CUANDO se entregue un intento en modo examen, EL sistema DEBERÁ restar por cada fallo de
+  pregunta de opciones o de verdadero/falso el valor de un acierto dividido entre el número de opciones
+  menos uno, NO DEBERÁ restar nada por una pregunta en blanco, y DEBERÁ escalar la nota a 10 con suelo
+  en 0.
+- **F3-21.** SI se entrega un intento en modo examen después de su tiempo límite, ENTONCES EL sistema
+  DEBERÁ rechazarlo con 409 nombrando el tiempo transcurrido y el límite.
+- **F3-22.** LA penalización del modo examen DEBERÁ cambiar únicamente la nota mostrada: el mismo juego
+  de respuestas DEBERÁ mover el perfil igual en modo práctica que en modo examen.
+
+#### El juez de las respuestas abiertas
+
+- **F3-23.** CUANDO se corrija una respuesta de desarrollo corto, EL modelo DEBERÁ devolver, criterio a
+  criterio de la rúbrica, si la respuesta lo cumple, y EL sistema DEBERÁ calcular la puntuación a partir
+  de esos criterios, NO DEBERÁ aceptar una puntuación propuesta por el modelo.
+- **F3-24.** SI el juez no puede corregir una respuesta, o su veredicto no se puede decodificar, o no
+  devuelve exactamente los criterios de la rúbrica, ENTONCES EL sistema DEBERÁ marcar la corrección como
+  sin evaluar con su motivo, y NO DEBERÁ asignarle ninguna puntuación.
+- **F3-25.** UNA corrección sin evaluar DEBERÁ verse como tal en la interfaz, NO DEBERÁ contar como
+  fallo, y NO DEBERÁ restar de la nota mostrada.
+- **F3-26.** SI un intento tiene más preguntas abiertas que `maxJudgeCallsPerAttempt`, ENTONCES EL
+  sistema DEBERÁ corregir hasta el techo y dejar el resto sin evaluar nombrando el techo alcanzado.
+
+#### Puntuación
+
+- **F3-27.** LA puntuación de un intento DEBERÁ calcularse sobre todas las preguntas de la prueba, y una
+  pregunta sin responder DEBERÁ contar en la puntuación máxima sin sumar puntos ni penalizar.
+- **F3-28.** UNA pregunta de varias respuestas correctas DEBERÁ puntuarse con crédito parcial y suelo en
+  cero en la nota mostrada, y DEBERÁ contar como acertada en el perfil solo si el conjunto marcado
+  coincide exactamente con el correcto.
+
+#### El perfil de estudio
+
+- **F3-29.** CUANDO se corrija un intento, EL sistema DEBERÁ actualizar el perfil de estudio de forma
+  determinista, guardando por material y tema la dificultad observada, las pistas abiertas y el énfasis
+  como tres señales separadas, y NO DEBERÁ guardar ningún valor que sea suma de dos de ellas.
+- **F3-30.** CUANDO se aplique al perfil un intento ya aplicado, EL sistema NO DEBERÁ moverlo.
+- **F3-31.** EL tutor DEBERÁ poder leer el perfil y NO DEBERÁ existir ninguna ruta ni comando por el que
+  pueda escribirlo, ni directamente ni creando o corrigiendo intentos.
+
+#### Repaso
+
+- **F3-32.** CUANDO se genere una prueba de repaso, EL sistema DEBERÁ concentrar las preguntas en los
+  temas con fallos, pistas abiertas o marca de énfasis, y cada pregunta DEBERÁ decir cuál de las tres
+  señales la trajo.
+- **F3-33.** SI no hay ninguna señal que repasar, ENTONCES EL sistema DEBERÁ decirlo y NO DEBERÁ generar
+  una prueba de repaso.
+
+#### El tutor
+
+- **F3-34.** EL tutor NO DEBERÁ crear, responder ni corregir Controles ni Exámenes, y CUANDO se le pida
+  uno DEBERÁ remitir a la pestaña "Pruebas" del material.
+
+#### El examen a puerta cerrada
+
+- **F3-35.** MIENTRAS un intento en modo examen esté sin terminar, EL sistema DEBERÁ rechazar con 409
+  toda petición al chat del tutor, a las páginas o al índice de un material, al listado y a la lectura de
+  artefactos, y a la generación de apuntes o de pruebas, nombrando el intento en curso y cómo salir de
+  él; y la interfaz NO DEBERÁ ofrecer ninguna de esas acciones.
+- **F3-36.** MIENTRAS un intento en modo examen esté sin terminar, EL sistema DEBERÁ seguir sirviendo la
+  prueba que se está resolviendo, ese intento, y su entrega y su cancelación.
+- **F3-37.** CUANDO el alumno cancele un intento, o CUANDO se consulte un intento en modo examen cuyo
+  tiempo límite ya venció, EL sistema DEBERÁ cerrarlo como abandonado con su motivo y su hora, DEBERÁ
+  volver a servir todo lo cerrado por F3-35, y NO DEBERÁ mover el perfil.
+- **F3-38.** CUANDO la interfaz arranque habiendo un intento en modo examen sin terminar, DEBERÁ llevar
+  al alumno a ese examen con el tiempo que le queda, y NO DEBERÁ dejarle en una pantalla cuyas peticiones
+  fallan sin explicación.
+- **F3-39.** SI se pierde la conexión, se cierra la pestaña o se cae el navegador durante un intento en
+  modo examen, ENTONCES EL sistema NO DEBERÁ cancelarlo: DEBERÁ conservarlo y DEBERÁ permitir retomarlo
+  más tarde, sin límite de cuándo.
+- **F3-39b.** EL tiempo límite de un intento en modo examen DEBERÁ medirse sobre el tiempo que el alumno
+  ha estado conectado a él, NO sobre el tiempo transcurrido, y EL sistema DEBERÁ registrar cada
+  interrupción con su duración y mostrarlas en el historial de ese intento.
+- **F3-39c.** CUANDO la interfaz arranque habiendo un intento en modo examen sin terminar, DEBERÁ
+  ofrecer volver a él o cancelarlo antes que ninguna otra cosa, y esas dos opciones DEBERÁN levantar el
+  bloqueo de F3-35; y CUANDO el alumno recargue, cierre o abandone la página con un examen abierto, EL
+  sistema DEBERÁ pedirle confirmación.
+- **F3-39d.** ANTES de empezar un intento en modo examen, EL sistema DEBERÁ advertir de que el examen se
+  puede retomar, de que el reloj solo corre mientras esté dentro, y de que las interrupciones quedan
+  registradas.
+
+#### Tamaño de la prueba y techos de acumulación
+
+- **F3-40.** CUANDO el alumno genere una prueba, EL sistema DEBERÁ dejarle elegir cuántas preguntas
+  dentro del rango de su tipo (`questionsPerQuiz`, `questionsPerTest`), y SI el número queda fuera del
+  rango DEBERÁ rechazarlo nombrando el rango y el valor recibido.
+- **F3-41.** EL reparto por tipo de pregunta DEBERÁ mantener sus porcentajes sea cual sea el total
+  pedido, y con el mínimo del rango DEBERÁ producir al menos una pregunta de cada tipo del reparto.
+- **F3-42.** SI un material alcanza `maxQuizzesPerMaterial` o `maxTestsPerMaterial`, o una prueba alcanza
+  `maxPracticeAttemptsPerAssessment` o `maxExamAttemptsPerAssessment`, ENTONCES EL sistema DEBERÁ
+  rechazar la siguiente con 400 nombrando el techo, cuántos hay y cómo bajar de él.
+
+#### Discrepar de la corrección
+
+- **F3-43.** CUANDO el alumno discrepe de un criterio de la rúbrica con el que se corrigió su respuesta,
+  EL sistema DEBERÁ marcar esa pregunta como sin evaluar con motivo de discrepancia, DEBERÁ retirar su
+  aportación al perfil, y NO DEBERÁ contarla como acertada ni cambiar la nota mostrada del intento.
+
+#### La prueba sale completa o no sale
+
+- **F3-44.** CUANDO el alumno pida una prueba de N preguntas, EL sistema DEBERÁ entregarla con
+  exactamente N preguntas, o DEBERÁ fallar la generación con su motivo sin guardar nada; NO DEBERÁ
+  entregar nunca una prueba con menos preguntas de las pedidas.
+- **F3-45.** SI alguna pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema
+  DEBERÁ volver a pedir solo las que faltan hasta `maxGenerationRetriesPerTopic` veces antes de fallar,
+  y NO DEBERÁ completar ninguna adivinando ningún campo.
+- **F3-46.** SI el modelo responde que el material no da para las preguntas pedidas, ENTONCES EL sistema
+  DEBERÁ fallar nombrando cuántas sí daba el tema, NO DEBERÁ reintentar, y NO DEBERÁ generar preguntas
+  que el material no sostenga.
+- **F3-47.** TODA pregunta de opción única y de varias respuestas correctas DEBERÁ tener exactamente
+  cuatro opciones, y sus identificadores los DEBERÁ asignar el código por posición: EL sistema NO DEBERÁ
+  aceptar del modelo ningún identificador de opción, de criterio ni de pregunta.
 
 ### Fase 4 · El agente
 
