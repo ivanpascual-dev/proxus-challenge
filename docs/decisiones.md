@@ -786,9 +786,12 @@ valore si compensan tocar el contrato del bloque y el render.
 
 - Lo que se guarda sigue siendo markdown; la reescritura de un bloque, la comparación de propuestas
   (ADR-014) y el render no cambian.
-- Round-trip comprobado montando y volviendo a serializar los 28 bloques reales del corpus: 0
-  pérdidas de contenido. El `onUpdate` del editor ignora el update cuyo markdown coincide con el de
-  carga, para que la re-serialización del montaje no cuente como edición.
+- Round-trip fijado con un test: `packages/web/src/components/note/noteBlockSchema.test.ts` monta un
+  editor con las mismas extensiones que `BlockEditor` (extraídas a `noteBlockSchema.ts` para que no
+  puedan divergir) y comprueba, formato a formato, que serializar es idempotente y que no se cuela
+  HTML. El subrayado quedó fuera del esquema (`StarterKit`, `underline: false`): solo se representa
+  con `<u>` y se perdería en silencio. El `onUpdate` del editor ignora el update cuyo markdown
+  coincide con el de carga, para que la re-serialización del montaje no cuente como edición.
 - La tabla solo se edita dentro de los límites GFM: quitar fila o columna va siempre por el extremo,
   para no borrar la fila de cabecera ni la primera columna (una tabla sin cabecera se serializaría
   como HTML). El menú «/» está deshabilitado dentro de una tabla.

@@ -1,12 +1,10 @@
-import { TableKit } from "@tiptap/extension-table";
 import { removeColumn, removeRow, selectedRect } from "@tiptap/pm/tables";
 import { Placeholder } from "@tiptap/extensions/placeholder";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import StarterKit from "@tiptap/starter-kit";
-import { Markdown } from "tiptap-markdown";
 import { useEffect, useRef } from "react";
 import { BLOCK_FORMATS } from "./blockFormats.ts";
+import { noteBlockSchemaExtensions } from "./noteBlockSchema.ts";
 import { SlashCommand } from "./SlashCommand.ts";
 
 interface BlockEditorProps {
@@ -31,14 +29,7 @@ export function BlockEditor({ markdown, onChange, placeholder }: BlockEditorProp
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        link: { openOnClick: false, autolink: true },
-        // Sin regla horizontal: markdown la serializa como "---" y choca con los separadores YAML.
-        horizontalRule: false
-      }),
-      // Tabla GFM: fila de cabecera, sin redimensionar columnas (una función menos que explicar) y
-      // envuelta en `.tableWrapper` para poder hacer scroll horizontal si es ancha.
-      TableKit.configure({ table: { resizable: false, renderWrapper: true } }),
+      ...noteBlockSchemaExtensions(),
       Placeholder.configure({
         // La pista de "/" va en cada párrafo vacío que tiene el foco, menos dentro de una celda de
         // tabla: ahí "/" no abre nada (no es principio de bloque) y el texto sólo estorbaría.
@@ -53,9 +44,6 @@ export function BlockEditor({ markdown, onChange, placeholder }: BlockEditorProp
           return placeholder ?? "Escribe «/» para ver las opciones de formato…";
         }
       }),
-      // `breaks: true` mantiene los saltos de línea sueltos del markdown ya guardado (un "**Título**"
-      // en su línea seguido de texto) como saltos, en vez de pegar las palabras.
-      Markdown.configure({ html: false, transformPastedText: true, breaks: true }),
       SlashCommand
     ],
     content: markdown,
