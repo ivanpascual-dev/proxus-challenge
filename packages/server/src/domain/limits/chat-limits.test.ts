@@ -18,6 +18,18 @@ test("checkChatRequestLimits rejects maxSteps above the ceiling", () => {
   assert.equal(Option.getOrThrow(result).limit, "maxAgentSteps");
 });
 
+test("checkChatRequestLimits rejects a non-integer maxSteps below the ceiling", () => {
+  const result = checkChatRequestLimits({ input: "hola", messages: [], maxSteps: LIMITS.maxAgentSteps - 0.1 });
+  assert.equal(Option.isSome(result), true);
+  assert.equal(Option.getOrThrow(result).limit, "maxAgentSteps");
+});
+
+test("checkChatRequestLimits rejects maxSteps below 1", () => {
+  const result = checkChatRequestLimits({ input: "hola", messages: [], maxSteps: 0 });
+  assert.equal(Option.isSome(result), true);
+  assert.equal(Option.getOrThrow(result).limit, "maxAgentSteps");
+});
+
 test("checkChatRequestLimits accepts a message exactly at the character ceiling", () => {
   const input = "a".repeat(LIMITS.maxMessageCharacters);
   const result = checkChatRequestLimits({ input, messages: [] });

@@ -8,13 +8,21 @@ export interface ChatRequestLimitsInput {
 }
 
 export const checkChatRequestLimits = (request: ChatRequestLimitsInput): Option.Option<LimitExceeded> => {
-  if (request.maxSteps !== undefined && request.maxSteps > LIMITS.maxAgentSteps) {
-    return Option.some(new LimitExceeded({
-      limit: "maxAgentSteps",
-      ceiling: LIMITS.maxAgentSteps,
-      received: request.maxSteps,
-      message: `El máximo de pasos por turno es ${LIMITS.maxAgentSteps}, se pidieron ${request.maxSteps}.`
-    }));
+  if (request.maxSteps !== undefined) {
+    // El techo es un número, pero también hay que exigir que sea un entero >= 1: `maxSteps: 12.9`
+    // pasaría el `> 12` y el bucle de pasos (`session.ts`) correría 13 iteraciones, una llamada al
+    // modelo por encima del techo. Un valor no entero o < 1 se rechaza en voz alta (invariante 11).
+    const valid = Number.isInteger(request.maxSteps)
+      && request.maxSteps >= 1
+      && request.maxSteps <= LIMITS.maxAgentSteps;
+    if (!valid) {
+      return Option.some(new LimitExceeded({
+        limit: "maxAgentSteps",
+        ceiling: LIMITS.maxAgentSteps,
+        received: request.maxSteps,
+        message: `Los pasos por turno deben ser un número entero entre 1 y ${LIMITS.maxAgentSteps}, se pidieron ${request.maxSteps}.`
+      }));
+    }
   }
 
   if (request.input.length > LIMITS.maxMessageCharacters) {
