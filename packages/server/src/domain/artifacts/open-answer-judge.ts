@@ -119,7 +119,9 @@ export const interpretJudgeResponse = (
   };
 };
 
-const userMessage = (question: JudgeQuestion) => [
+// El mensaje de usuario que ve el juez. Exportado como `interpretJudgeResponse`: los dos son lo que
+// mide la eval de §6.7.2 (`open-answer-judge.eval.ts`).
+export const judgeUserMessage = (question: JudgeQuestion) => [
   `Enunciado: ${question.prompt}`,
   "",
   `Criterios (devuelve exactamente estos ids):`,
@@ -155,7 +157,7 @@ export const make = (): OpenAnswerJudge => ({
       const response = yield* LanguageModel.generateText({
         prompt: [
           { role: "system", content: OPEN_ANSWER_JUDGE_PROMPT },
-          { role: "user", content: userMessage(question) }
+          { role: "user", content: judgeUserMessage(question) }
         ]
       }).pipe(
         Effect.map((result) => interpretJudgeResponse(result.text, question)),

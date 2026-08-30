@@ -497,3 +497,39 @@ Iván probó el tramo y pidió tres arreglos. Lo que no se ve en el diff:
   y si la huella del conjunto (enunciados normalizados, sin orden) coincide con la de una prueba
   existente del mismo alcance, la generación falla sin guardar nada. `priorAssessments` es tolerante:
   si el listado falla, se genera sin comprobar. El repaso (3D) no pasará por esta salvaguarda.
+
+### Paso 16 · la eval del juez y la medición del riesgo 2
+
+`open-answer-judge.eval.ts` + `open-answer-judge.fixture.json`: 3 preguntas de desarrollo corto
+(estadística, psicología social, lógica), cada una con su fragmento de material embebido para que la
+eval sea autónoma, y los 6 casos de §6.7.2. Corre con llamadas reales al modelo, con la capa JSON
+(`GeminiJsonLanguageModelLive`, `responseMimeType`) y sin ella (`GeminiLanguageModelLive`, temp 0.2).
+Script `eval:judge`. `judgeUserMessage` se exporta de `open-answer-judge.ts` junto a
+`interpretJudgeResponse`: son las dos piezas que la eval mide.
+
+**Riesgo 2 · tasa de caídas al parsear la respuesta del juez (18 respuestas por capa):**
+
+| | Caídas al parsear | Criterios que no casan |
+| --- | --- | --- |
+| Con capa JSON | **0 % (0/18)** | 0 % (0/18) |
+| Sin capa JSON (temp 0.2) | **0 % (0/18)** | 0 % (0/18) |
+
+El parser defensivo (`parseModelJson`: quita vallas de markdown, recorta al primer y último `{}`) ya
+absorbe lo que el modo JSON evitaría. En este fixture forzar `responseMimeType` **no reduce** las
+caídas porque no hay ninguna. **No se añade `responseSchema`** (§6.7.1 lo condicionaba a que la tasa
+siguiera siendo mala; es 0).
+
+Donde sí se nota la capa JSON es en la **consistencia del veredicto**, no en el parseo: con capa JSON
+(temp 0) el juez acertó 17-18/18 entre dos ejecuciones; sin ella (temp 0.2), 15-17/18, con los fallos
+saltando de una respuesta a otra entre ejecuciones. La capa JSON no hace al juez más listo, lo hace
+reproducible (§6.7 defensa 4). Los fallos sin capa JSON eran todos de criterio en el filo (dar por
+cumplido "las dos miden dispersión" cuando la respuesta solo lo dice explícito de una), nunca
+paráfrasis buenas marcadas como fallo.
+
+**Riesgo 1 · el caso central (paráfrasis válida):** 3/3 correctas con y sin capa JSON, en las dos
+ejecuciones. "Correcta al revés" (orden invertido), también 3/3. El único desajuste recurrente entre
+fixture y juez fue un "sobre otra cosa" demasiado cercano al tema (una respuesta sobre refuerzo
+positivo frente a una pregunta de disonancia cognitiva): el juez lo daba por `gradable` con criterios
+sin cumplir en vez de `gradable: false`. Es defendible (misma disciplina); se cambió el caso del
+fixture por uno inequívocamente ajeno (tectónica de placas) y pasó. La cifra y la redacción del
+riesgo 1 van a `NOTES.md` en el cierre de fase.

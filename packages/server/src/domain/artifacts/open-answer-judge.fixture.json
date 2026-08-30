@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "note": "Fixture versionado del juez de desarrollo corto (§6.7.2). Cada pregunta trae su fragmento de material embebido para que la eval sea autónoma (no depende de ningún PDF de .data). Seis casos por pregunta; la paráfrasis es el caso central.",
+  "questions": [
+    {
+      "id": "estadistica-varianza",
+      "prompt": "Explica la relación entre la varianza y la desviación típica de un conjunto de datos.",
+      "expectedAnswer": "Ambas miden la dispersión de los datos respecto a la media. La desviación típica es la raíz cuadrada de la varianza, de modo que recupera las unidades originales de los datos.",
+      "materialExcerpt": "La varianza mide la dispersión de los datos respecto a su media: es el promedio de los cuadrados de las desviaciones de cada valor respecto a la media. Como se calcula elevando al cuadrado, sus unidades son las de la variable al cuadrado, lo que dificulta su interpretación directa. La desviación típica es la raíz cuadrada positiva de la varianza; al deshacer el cuadrado, vuelve a las unidades originales de la variable y por eso se usa para describir la dispersión en términos comparables con la media.",
+      "rubric": [
+        { "id": "c1", "text": "Identifica que las dos medidas cuantifican la dispersión de los datos respecto a la media" },
+        { "id": "c2", "text": "Establece que la desviación típica es la raíz cuadrada de la varianza (o la varianza el cuadrado de la desviación típica)" }
+      ],
+      "cases": [
+        {
+          "id": "material-words",
+          "answer": "La varianza es el promedio de los cuadrados de las desviaciones respecto a la media. La desviación típica es la raíz cuadrada positiva de la varianza y devuelve las unidades originales de la variable.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "paraphrased",
+          "answer": "Las dos cosas cuantifican cuánto se alejan los valores del promedio. Si le haces la raíz cuadrada a la varianza te sale la desviación típica.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "inverted",
+          "answer": "La varianza no es más que la desviación típica elevada al cuadrado, y ambas describen lo repartidos que están los datos alrededor de la media.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "half",
+          "answer": "La varianza y la desviación típica sirven las dos para ver la dispersión de los datos respecto a la media.",
+          "expect": { "gradable": true, "met": ["c1"] }
+        },
+        {
+          "id": "incorrect-on-topic",
+          "answer": "La varianza y la desviación típica son lo mismo: las dos se calculan sumando todos los datos y dividiendo entre cuántos son.",
+          "expect": { "gradable": true, "met": [] }
+        },
+        {
+          "id": "offtopic",
+          "answer": "La fotosíntesis es el proceso por el que las plantas transforman la luz solar en energía química almacenada en glucosa.",
+          "expect": { "gradable": false }
+        }
+      ]
+    },
+    {
+      "id": "psicologia-disonancia",
+      "prompt": "¿Qué es la disonancia cognitiva y de qué manera las personas tienden a reducirla?",
+      "expectedAnswer": "Es la tensión que se siente al sostener dos cogniciones incompatibles. Se reduce cambiando una de ellas, añadiendo ideas que las reconcilien o quitándoles importancia.",
+      "materialExcerpt": "Festinger definió la disonancia cognitiva como el estado de tensión psicológica que aparece cuando una persona mantiene a la vez dos cogniciones (ideas, creencias, actitudes o percepciones de la propia conducta) que resultan incompatibles entre sí. Esa tensión resulta desagradable y motiva a reducirla. Las vías principales son tres: cambiar una de las cogniciones (por ejemplo, modificar la actitud para que encaje con la conducta ya realizada), añadir nuevas cogniciones consonantes que justifiquen la contradicción, o restar importancia a las cogniciones en conflicto.",
+      "rubric": [
+        { "id": "c1", "text": "Define la disonancia como una tensión o malestar por sostener a la vez dos cogniciones incompatibles" },
+        { "id": "c2", "text": "Menciona al menos una vía de reducción: cambiar una cognición, añadir cogniciones consonantes o restar importancia al conflicto" }
+      ],
+      "cases": [
+        {
+          "id": "material-words",
+          "answer": "Es el estado de tensión que surge cuando alguien mantiene a la vez dos cogniciones incompatibles. Se reduce cambiando una de las cogniciones, añadiendo cogniciones consonantes o restándole importancia al conflicto.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "paraphrased",
+          "answer": "Es ese malestar que notas cuando lo que piensas y lo que haces no cuadran. Para quitártelo sueles acabar convenciéndote de que tu conducta estaba bien, o sea, ajustas la actitud.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "inverted",
+          "answer": "La persona rebaja la incomodidad quitándole peso a una de las dos ideas o buscando razones nuevas que las hagan compatibles. Esa incomodidad, la que aparece cuando dos creencias chocan, es la disonancia cognitiva.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "half",
+          "answer": "La disonancia cognitiva es la incomodidad de mantener dos ideas contradictorias a la vez.",
+          "expect": { "gradable": true, "met": ["c1"] }
+        },
+        {
+          "id": "incorrect-on-topic",
+          "answer": "La disonancia cognitiva es la tendencia a recordar mejor la información que confirma lo que ya creemos y a pasar por alto la que la contradice.",
+          "expect": { "gradable": true, "met": [] }
+        },
+        {
+          "id": "offtopic",
+          "answer": "La tectónica de placas explica que la corteza terrestre está dividida en fragmentos rígidos que se desplazan lentamente sobre el manto.",
+          "expect": { "gradable": false }
+        }
+      ]
+    },
+    {
+      "id": "logica-validez-verdad",
+      "prompt": "Distingue entre la validez de un argumento deductivo y la verdad de sus enunciados.",
+      "expectedAnswer": "La validez depende de la forma: si las premisas fueran verdaderas, la conclusión no podría ser falsa. La verdad es una propiedad de los enunciados. Son independientes: un argumento válido puede partir de premisas falsas, y uno inválido puede tener premisas y conclusión verdaderas.",
+      "materialExcerpt": "En lógica deductiva, la validez es una propiedad de la forma del argumento: un argumento es válido cuando es imposible que sus premisas sean verdaderas y su conclusión falsa. La verdad, en cambio, es una propiedad de los enunciados concretos (premisas y conclusión), no del argumento. Ambas cosas son independientes: existen argumentos válidos con premisas falsas y conclusión falsa, y argumentos inválidos cuyas premisas y conclusión son todas verdaderas. Solo cuando un argumento es a la vez válido y tiene todas sus premisas verdaderas se garantiza que la conclusión es verdadera; a ese caso se le llama argumento sólido.",
+      "rubric": [
+        { "id": "c1", "text": "Explica que la validez es una propiedad de la forma: si las premisas son verdaderas, la conclusión no puede ser falsa" },
+        { "id": "c2", "text": "Señala que validez y verdad son independientes: un argumento válido puede partir de premisas falsas, o uno inválido tener premisas y conclusión verdaderas" }
+      ],
+      "cases": [
+        {
+          "id": "material-words",
+          "answer": "La validez es una propiedad de la forma del argumento: es válido cuando es imposible que las premisas sean verdaderas y la conclusión falsa. La verdad es de los enunciados. Son independientes: hay argumentos válidos con premisas falsas y argumentos inválidos con premisas y conclusión verdaderas.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "paraphrased",
+          "answer": "Que un argumento sea válido quiere decir que la conclusión se sigue sí o sí de las premisas: si estas fueran ciertas, la conclusión también. Otra cosa es que las premisas sean de hecho ciertas: puedes razonar de forma impecable partiendo de premisas falsas, y también soltar un razonamiento tramposo en el que todo lo que se dice resulta ser cierto.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "inverted",
+          "answer": "Lo que hace válido a un argumento es solo su estructura, que no deja pasar de premisas verdaderas a conclusión falsa; los enunciados en sí pueden ser falsos y el argumento seguir siendo válido. Verdad y validez no van de la mano.",
+          "expect": { "gradable": true, "met": ["c1", "c2"] }
+        },
+        {
+          "id": "half",
+          "answer": "Un argumento es válido cuando, si sus premisas son verdaderas, la conclusión tiene que serlo también.",
+          "expect": { "gradable": true, "met": ["c1"] }
+        },
+        {
+          "id": "incorrect-on-topic",
+          "answer": "Un argumento es válido cuando todas sus premisas y su conclusión son verdaderas; si algo de lo que afirma es falso, entonces el argumento es inválido.",
+          "expect": { "gradable": true, "met": [] }
+        },
+        {
+          "id": "offtopic",
+          "answer": "El sujeto de una oración es quien realiza la acción del verbo, mientras que el predicado expresa aquello que se dice del sujeto.",
+          "expect": { "gradable": false }
+        }
+      ]
+    }
+  ]
+}
