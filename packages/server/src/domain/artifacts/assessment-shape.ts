@@ -117,7 +117,7 @@ const ensureEveryType = (counts: number[], total: number): number[] => {
 
 // Expande el reparto por tipo a una lista plana de longitud `questionCount`, en el orden de
 // declaración de `TYPE_MIX` (todas las de un tipo seguidas). Es el orden más fácil de comprobar por
-// inspección.
+// inspección. La prueba final NO se presenta así: se baraja al montarla (`question-order.ts`).
 const expandTypes = (kind: "quiz" | "test", questionCount: number): AssessableQuestionType[] => {
   const mix = TYPE_MIX[kind];
   const raw = largestRemainder(questionCount, mix.map(([, weight]) => weight));

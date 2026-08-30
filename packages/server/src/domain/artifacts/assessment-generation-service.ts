@@ -27,6 +27,7 @@ import {
   type QuestionHole
 } from "./assessment-shape.ts";
 import { acceptsQuestionType, parseGeneratedQuestions, type ParsedQuestion } from "./question-parse.ts";
+import { shuffleBySeed } from "./question-order.ts";
 import { timeLimitSeconds } from "./exam-scoring.ts";
 import {
   QUESTION_GENERATION_PROMPT,
@@ -367,7 +368,8 @@ export const make = (
       }
       const topicsWithHoles = scopeTopics.filter((topic) => (holesByTopic.get(topic.id)?.length ?? 0) > 0);
 
-      const questions: (QuizQuestion | TestQuestion)[] = [];
+      const assessmentId = crypto.randomUUID();
+      const pending: { readonly parsed: ParsedQuestion; readonly source: QuestionSource }[] = [];
       let totalRetries = 0;
       for (const [position, topic] of topicsWithHoles.entries()) {
         yield* emit({
@@ -400,9 +402,16 @@ export const make = (
           unanchoredReason: excerpt.unanchoredReason
         };
         for (const parsedQuestion of outcome.questions) {
-          questions.push(attachMetadata(parsedQuestion, `q${questions.length + 1}`, source));
+          pending.push({ parsed: parsedQuestion, source });
         }
       }
+
+      // El reparto agrupa las preguntas por tema y por tipo. Se barajan con una permutación sembrada
+      // por el id de la prueba (question-order.ts) para que la posición no delate el tipo. Los ids
+      // `q1`, `q2`, … se ponen ya sobre el orden final.
+      const questions: (QuizQuestion | TestQuestion)[] = shuffleBySeed(pending, assessmentId).map(
+        (item, slot) => attachMetadata(item.parsed, `q${slot + 1}`, item.source)
+      );
 
       yield* emit({ topic: null, topicCount: topicsWithHoles.length, message: "guardando la prueba" });
 
@@ -417,7 +426,7 @@ export const make = (
       const artifact: QuizArtifact | TestArtifact = input.kind === "quiz"
         ? {
             kind: "quiz",
-            id: crypto.randomUUID(),
+            id: assessmentId,
             title: `Control de ${scope.topicLabel}`,
             questions: questions as readonly QuizQuestion[],
             scope,
@@ -427,7 +436,7 @@ export const make = (
           }
         : {
             kind: "test",
-            id: crypto.randomUUID(),
+            id: assessmentId,
             title: `Examen de ${material.title}`,
             questions: questions as readonly TestQuestion[],
             scope,

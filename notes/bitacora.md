@@ -483,3 +483,9 @@ Iván probó el tramo y pidió tres arreglos. Lo que no se ve en el diff:
   F3-11 en el paso 15 (la práctica corrige al entregar), "hay intento" dejó de significar "ya
   corregido", así que al empezar la práctica todos los inputs nacían deshabilitados y no se podía
   marcar ninguna respuesta, de ningún tipo. Pasa a `graded !== null`.
+- **Decisión sobre la marcha (contexto para la futura ADR-018):** el determinismo que defiende ADR-018
+  (plan §9) es el del REPARTO por tipo, no el de la secuencia. Las preguntas montadas salían agrupadas
+  por tipo porque el bucle las pide tipo por tipo. Ahora se barajan con una permutación de
+  Fisher-Yates sembrada por el id de la prueba (`question-order.ts`); es reproducible sin
+  `Math.random()` porque el id vive en el JSON guardado. F3-06c nuevo. No se crea ADR: el plan reserva
+  ADR-018..021 para el paso 30, esto es contexto para cuando se escriba ADR-018.

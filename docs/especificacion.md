@@ -265,6 +265,10 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   alcance, dentro de `maxQuestionsPerAssessment` y sin superar nunca `maxQuestionsPerArtifact`.
 - **F3-06.** CUANDO se pida dos veces una prueba del mismo alcance con el mismo origen y el mismo perfil,
   EL sistema DEBERÁ producir el mismo reparto de temas y tipos, aunque los enunciados difieran.
+- **F3-06c.** EL orden en que una prueba presenta sus preguntas NO DEBERÁ agruparlas por tipo ni por tema;
+  DEBERÁ quedar fijado al generarse (sembrado por el identificador de la prueba), de modo que las
+  sucesivas lecturas de esa misma prueba lo respeten. DOS pruebas distintas, con identificadores
+  distintos, DEBERÁN presentar sus preguntas en órdenes independientes.
 - **F3-07.** CUANDO el material tenga apunte, EL sistema DEBERÁ usar el texto de los bloques de los temas
   del alcance además del texto indexado, y los bloques marcados como importantes DEBERÁN recibir más
   preguntas que los no marcados.
