@@ -10,14 +10,14 @@ test("invalidationsForToolCall: 'artifacts note propose' invalida artifacts", ()
   assert.deepEqual(invalidationsForToolCall(toolCall("artifacts note propose id1 '{}'")), ["artifacts"]);
 });
 
-test("invalidationsForToolCall: create, submit y grade invalidan artifacts", () => {
-  for (const cmd of ["artifacts create '{}'", "artifacts submit '{}'", "artifacts grade a1"]) {
-    assert.deepEqual(invalidationsForToolCall(toolCall(cmd)), ["artifacts"]);
-  }
-});
-
-test("invalidationsForToolCall: leer no invalida nada", () => {
-  for (const cmd of ["artifacts list note", "artifacts show id1", "materials read m1 1-2"]) {
+test("invalidationsForToolCall: leer no invalida nada (el tutor ya no crea, entrega ni corrige)", () => {
+  for (const cmd of [
+    "artifacts list note",
+    "artifacts show id1",
+    "artifacts attempts id1",
+    "profile show m1",
+    "materials read m1 1-2"
+  ]) {
     assert.deepEqual(invalidationsForToolCall(toolCall(cmd)), []);
   }
 });

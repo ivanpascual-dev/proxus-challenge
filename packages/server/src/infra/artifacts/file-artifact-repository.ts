@@ -7,20 +7,14 @@ import {
   ArtifactRepository,
   ArtifactRepositorySerializationError,
   ArtifactRepositoryStorageError,
-  ArtifactTypeMismatch,
   AttemptNotFound,
-  CreateArtifactInput,
   ListArtifactsInput,
-  SubmitAttemptInput,
   TooManyQuestions,
-  makeArtifact,
-  makeInProgressAttempt,
   type Artifact as ArtifactType,
   type ArtifactAttempt as ArtifactAttemptType,
   type ArtifactRepository as ArtifactRepositoryType,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
-import { gradeInProgressAttempt } from "../../domain/artifacts/grading.ts";
 
 const ArtifactFromJson = Schema.fromJsonString(Artifact);
 const ArtifactAttemptFromJson = Schema.fromJsonString(ArtifactAttempt);
@@ -147,14 +141,6 @@ export const FileArtifactRepository = {
       };
     });
 
-    // `createArtifact` ya no crea apuntes (fase 2, decisión 25): solo quiz y test. El apunte lo genera
-    // `NoteGenerationService`, que comprueba el "un apunte por material" (decisión 19) antes de guardar.
-    const createArtifact = (input: CreateArtifactInput) => Effect.gen(function* () {
-      const artifact = makeArtifact(input);
-      yield* writeArtifactFile(artifact);
-      return artifact;
-    });
-
     const deleteArtifact = (id: string): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
       const filePath = artifactPath(id);
       const exists = yield* fs.exists(filePath).pipe(Effect.mapError(mapStorageError));
@@ -162,21 +148,6 @@ export const FileArtifactRepository = {
         return yield* new ArtifactNotFound({ artifactId: id });
       }
       yield* fs.remove(filePath).pipe(Effect.mapError(mapStorageError));
-    });
-
-    const submitAttempt = (input: SubmitAttemptInput) => Effect.gen(function* () {
-      const artifact = yield* readArtifactFile(input.artifactId);
-      if (artifact.kind !== input.artifactKind) {
-        return yield* new ArtifactTypeMismatch({
-          artifactId: input.artifactId,
-          expected: input.artifactKind,
-          actual: artifact.kind
-        });
-      }
-
-      const attempt = makeInProgressAttempt(input);
-      yield* writeAttemptFile(attempt);
-      return attempt;
     });
 
     // Igual que `listArtifacts`: un fichero de intento ilegible (por ejemplo de una versión anterior
@@ -196,36 +167,14 @@ export const FileArtifactRepository = {
       return attempts.filter((attempt) => artifactId === undefined || attempt.artifactId === artifactId);
     });
 
-    const gradeAttemptById = (attemptId: string) => Effect.gen(function* () {
-      const attempt = yield* readAttemptFile(attemptId);
-      if (attempt.status !== "in-progress") {
-        // Ya cerrado (entregado o abandonado): se devuelve tal cual, no se vuelve a corregir.
-        return attempt;
-      }
-      const artifact = yield* readArtifactFile(attempt.artifactId);
-      if (artifact.kind === "note") {
-        return yield* new ArtifactTypeMismatch({
-          artifactId: artifact.id,
-          expected: attempt.artifactKind,
-          actual: artifact.kind
-        });
-      }
-      const graded = gradeInProgressAttempt(artifact, attempt);
-      yield* writeAttemptFile(graded);
-      return graded;
-    });
-
     return {
-      createArtifact,
       deleteArtifact,
       saveArtifact: writeArtifactFile,
       getArtifact: readArtifactFile,
       listArtifacts,
-      submitAttempt,
       saveAttempt: writeAttemptFile,
       getAttempt: readAttemptFile,
-      listAttempts,
-      gradeAttempt: gradeAttemptById
+      listAttempts
     };
   }),
   layer: (directory: string) => Layer.effect(ArtifactRepository)(FileArtifactRepository.make(directory))

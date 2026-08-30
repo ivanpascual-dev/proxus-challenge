@@ -26,11 +26,11 @@ test("tokenize: las comillas dobles sí desescapan", () => {
   assert.deepEqual(tokens, ["say", 'hola "mundo"']);
 });
 
-test("tokenize: JSON limpio entre comillas simples (artifacts create) no se toca", () => {
-  const json = '{"kind":"quiz","title":"Basics","questions":[]}';
-  const tokens = run(`artifacts create '${json}'`);
-  assert.equal(tokens[2], json);
-  assert.deepEqual(JSON.parse(tokens[2] as string).questions, []);
+test("tokenize: JSON limpio entre comillas simples (artifacts note propose) no se toca", () => {
+  const json = '{"rationale":"Falta un caso","operation":{"type":"remove","blockId":"b1"}}';
+  const tokens = run(`artifacts note propose id1 '${json}'`);
+  assert.equal(tokens[4], json);
+  assert.deepEqual(JSON.parse(tokens[4] as string).operation.type, "remove");
 });
 
 test("tokenize: tokens sueltos y espacios", () => {

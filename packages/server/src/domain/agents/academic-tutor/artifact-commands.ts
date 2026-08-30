@@ -2,28 +2,24 @@ import { Effect, Schema } from "effect";
 import { RateLimited } from "@proxus/shared";
 import * as AgentCli from "../harness/index.ts";
 import {
-  Artifact,
-  ArtifactAttempt,
-  ArtifactNotFound,
-  ArtifactRepositoryStorageError,
   ArtifactRepositorySerializationError,
-  ArtifactTypeMismatch,
-  AttemptNotFound,
-  CreateArtifactInput,
-  QuestionNotFound,
-  AnswerTypeMismatch,
-  TooManyQuestions,
-  SubmitAttemptInput,
+  type Artifact,
+  type ArtifactAttempt,
   type ArtifactListing,
   type ArtifactRepository,
+  type ArtifactRepositoryError,
   type NoteArtifact,
   type NoteBlock
 } from "../../artifacts/artifact.ts";
 import type { RateLimiter } from "../../limits/rate-limiter.ts";
 import { ProposeNoteChangeInput, type NoteService } from "../../artifacts/note-service.ts";
 
-const UnknownFromJson = Schema.fromJsonString(Schema.Unknown);
-const SubmitAttemptInputFromJson = Schema.fromJsonString(SubmitAttemptInput);
+// Fase 3, decisión 4 y 7: el tutor NO crea Controles ni Exámenes, ni entrega, ni corrige intentos.
+// Esos comandos (`artifacts create`, `artifacts submit`, `artifacts grade`) se retiran: solo el
+// alumno, desde la interfaz, genera intentos que muevan el perfil (§1.3, invariante 4 impuesta en el
+// código). Aquí quedan la lectura (`list`, `show`, `block`, `attempts`) y la propuesta de cambios en
+// un apunte, que el alumno acepta o descarta (ADR-014).
+
 const ProposeNoteChangeInputFromJson = Schema.fromJsonString(ProposeNoteChangeInput);
 
 // El `excerpt` de la fuente de un bloque es texto del material cacheado para la interfaz (invariante
@@ -107,10 +103,39 @@ export const renderNoteBlocks = (note: NoteArtifact, blockIds: readonly string[]
   ].filter((part) => part !== undefined).join("\n\n") || `Note ${note.id} has no blocks.`;
 };
 
+// Un quiz o un test se enseñan como JSON entero (el tutor los lee para hablar de ellos, no para
+// crearlos); un apunte, como su índice de bloques.
 const renderArtifact = (artifact: Artifact) =>
   artifact.kind === "note" ? renderNoteOutline(artifact) : JSON.stringify(artifact, null, 2);
 
-const renderAttempt = (attempt: ArtifactAttempt) => JSON.stringify(attempt, null, 2);
+const attemptScoreLabel = (attempt: ArtifactAttempt): string => {
+  switch (attempt.status) {
+    case "graded":
+      return `score ${attempt.displayedScore}/10`;
+    case "abandoned":
+      return attempt.reason === "cancelled" ? "cancelled" : "expired";
+    case "in-progress":
+      return "in progress";
+  }
+};
+
+const attemptInstant = (attempt: ArtifactAttempt): string =>
+  attempt.status === "graded" ? attempt.submittedAt
+    : attempt.status === "abandoned" ? attempt.abandonedAt
+    : attempt.startedAt;
+
+// El listado de intentos que ve el tutor: fecha, modo y nota, de solo lectura (decisión 7, §6.10). El
+// tutor los cita al hablar de cómo lleva el alumno una prueba; no puede entregar ni corregir.
+const renderAttempts = (attempts: readonly ArtifactAttempt[]): string => {
+  if (attempts.length === 0) {
+    return "No attempts found.";
+  }
+  return [...attempts]
+    .sort((a, b) => attemptInstant(b).localeCompare(attemptInstant(a)))
+    .map((attempt) =>
+      `- ${attempt.id}  ${attempt.artifactKind} ${attempt.artifactId}  ${attempt.mode}  ${attemptInstant(attempt)}  ${attemptScoreLabel(attempt)}`)
+    .join("\n");
+};
 
 // El listado que ve el tutor. La línea de un apunte lleva su `materialId`: así el tutor empareja
 // "los apuntes de este material" con su id sin adivinar por el título, y de ahí los lee con
@@ -132,7 +157,7 @@ export const renderArtifactListing = (listing: ArtifactListing): string => {
   return `${lines}${unreadable}`;
 };
 
-const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch | TooManyQuestions | ArtifactRepositoryStorageError | ArtifactRepositorySerializationError | RateLimited) => {
+const renderArtifactError = (error: ArtifactRepositoryError | RateLimited): string => {
   switch (error._tag) {
     case "ArtifactNotFound":
       return `Artifact not found: ${error.artifactId}`;
@@ -140,100 +165,32 @@ const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | Artifac
       return `Attempt not found: ${error.attemptId}`;
     case "ArtifactTypeMismatch":
       return `Artifact ${error.artifactId} has kind ${error.actual}; expected ${error.expected}`;
-    case "TooManyQuestions":
-      return `Artifact ${error.artifactId} has ${error.received} questions; the ceiling is ${error.ceiling}`;
     case "QuestionNotFound":
       return `Question not found: ${error.questionId}`;
     case "AnswerTypeMismatch":
       return `Answer type mismatch for question ${error.questionId}: expected ${error.expected}, got ${error.actual}`;
+    case "TooManyQuestions":
+      return `Artifact ${error.artifactId} has ${error.received} questions; the ceiling is ${error.ceiling}`;
     case "ArtifactRepositoryStorageError":
       return `Artifact repository storage error: ${String(error.reason)}`;
     case "ArtifactRepositorySerializationError":
-      return renderSerializationError(error.reason);
+      return `Invalid artifact JSON: ${String(error.reason)}`;
     case "RateLimited":
       return error.message;
   }
 };
 
-const renderSerializationError = (reason: unknown) => {
-  const message = String(reason);
-  const multipleChoiceHint = message.includes("options")
-    ? "\n\nFor multiple-choice questions, options must be objects, not strings: [{\"id\":\"a\",\"text\":\"Option A\"}]. The correctOptionId must match one option id."
-    : "";
-
-  return `Invalid artifact/attempt JSON: ${message}${multipleChoiceHint}\n\nUse artifacts create --help or artifacts submit --help for examples.`;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const optionId = (text: string) => text
-  .trim()
-  .toLocaleLowerCase()
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, "-")
-  .replace(/^-|-$/g, "") || "option";
-
-const normalizeMultipleChoiceQuestion = (question: Record<string, unknown>) => {
-  const options = Array.isArray(question.options)
-    ? question.options.map((option) => typeof option === "string"
-        ? { id: optionId(option), text: option }
-        : option)
-    : question.options;
-
-  const correctOptionId = typeof question.correctOptionId === "string" && Array.isArray(options)
-    ? options.find((option) => isRecord(option) && option.text === question.correctOptionId) !== undefined
-      ? optionId(question.correctOptionId)
-      : question.correctOptionId
-    : question.correctOptionId;
-
-  return {
-    ...question,
-    options,
-    correctOptionId
-  };
-};
-
-const normalizeQuestion = (question: unknown) =>
-  isRecord(question) && question.type === "multiple-choice"
-    ? normalizeMultipleChoiceQuestion(question)
-    : question;
-
-const normalizeCreateArtifactInput = (input: unknown) => {
-  if (!isRecord(input) || !Array.isArray(input.questions)) {
-    return input;
-  }
-
-  return {
-    ...input,
-    questions: input.questions.map(normalizeQuestion)
-  };
-};
-
-const decodeCreateArtifactInput = (json: string) =>
-  Schema.decodeUnknownEffect(UnknownFromJson)(json).pipe(
-    Effect.map(normalizeCreateArtifactInput),
-    Effect.flatMap(Schema.decodeUnknownEffect(CreateArtifactInput)),
-    Effect.mapError((reason) => new ArtifactRepositorySerializationError({ reason }))
-  );
-
-const decodeSubmitAttemptInput = (json: string) =>
-  Schema.decodeUnknownEffect(SubmitAttemptInputFromJson)(json).pipe(
-    Effect.mapError((reason) => new ArtifactRepositorySerializationError({ reason }))
-  );
+// Los errores de `proposeChange` vienen del contrato (`@proxus/shared`) y ya traen `message` en
+// español; el de decodificación es del dominio. Todos se enseñan al agente como texto.
+const renderProposeError = (error: { readonly _tag: string; readonly message?: string; readonly reason?: unknown }) =>
+  error._tag === "ArtifactRepositorySerializationError"
+    ? `Invalid proposal JSON: ${String(error.reason)}\n\nUse artifacts note propose --help for an example.`
+    : error.message ?? error._tag;
 
 const decodeProposeNoteChangeInput = (json: string) =>
   Schema.decodeUnknownEffect(ProposeNoteChangeInputFromJson)(json).pipe(
     Effect.mapError((reason) => new ArtifactRepositorySerializationError({ reason }))
   );
-
-// Los errores de `proposeChange` vienen del contrato (`@proxus/shared`) y ya traen `message` en
-// español; el de decodificación es del dominio. Todos se enseñan al agente como texto.
-const renderProposeError = (error: { readonly _tag: string; readonly message?: string; readonly reason?: unknown }) =>
-  error._tag === "ArtifactRepositorySerializationError"
-    ? renderSerializationError(error.reason)
-    : error.message ?? error._tag;
 
 export const makeArtifactCommands = (
   repository: ArtifactRepository,
@@ -295,81 +252,18 @@ export const makeArtifactCommands = (
     )
   );
 
-  // Fase 2, decisión 25: `artifacts create` solo hace quiz y test. Los apuntes los genera
-  // `NoteGenerationService` desde la pestaña Apuntes del material, no el tutor.
-  const create = AgentCli.Command.withExamples([
-    {
-      command: `artifacts create '{"kind":"quiz","title":"Basics quiz","questions":[{"type":"true-false","id":"q1","prompt":"2+2=4","correctAnswer":true,"explanation":"Basic arithmetic."}]}'`,
-      description: "Create a quiz artifact"
-    }
-  ])(
-    AgentCli.Command.withDescription("Create a quiz or test artifact from JSON")(
-      AgentCli.Command.exec("create", {
-        json: AgentCli.Argument.string("json").pipe(
-          AgentCli.Argument.withDescription("CreateArtifactInput JSON (quiz or test)")
-        )
-      }, ({ json }) =>
-        rateLimiter.check(clientKey, "artifacts").pipe(
-          Effect.andThen(() => decodeCreateArtifactInput(json)),
-          Effect.andThen((input) => repository.createArtifact(input)),
-          Effect.map(renderArtifact),
-          Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
-        )
-      )
-    )
-  );
-
-  const submit = AgentCli.Command.withExamples([
-    {
-      command: `artifacts submit '{"artifactKind":"quiz","artifactId":"abc123","answers":[{"questionType":"true-false","questionId":"q1","answer":true}]}'`,
-      description: "Submit answers for a quiz or test"
-    }
-  ])(
-    AgentCli.Command.withDescription("Submit an ungraded attempt for a quiz or test")(
-      AgentCli.Command.exec("submit", {
-        json: AgentCli.Argument.string("json").pipe(
-          AgentCli.Argument.withDescription("SubmitAttemptInput JSON")
-        )
-      }, ({ json }) =>
-        decodeSubmitAttemptInput(json).pipe(
-          Effect.andThen((input) => repository.submitAttempt(input)),
-          Effect.map(renderAttempt),
-          Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
-        )
-      )
-    )
-  );
-
   const attempts = AgentCli.Command.withExamples([
-    { command: "artifacts attempts", description: "List all attempts" },
-    { command: "artifacts attempts abc123", description: "List attempts for one artifact" }
+    { command: "artifacts attempts", description: "List all attempts, newest first" },
+    { command: "artifacts attempts abc123", description: "List attempts for one quiz or test" }
   ])(
-    AgentCli.Command.withDescription("List artifact attempts")(
+    AgentCli.Command.withDescription("List quiz and test attempts, read-only: date, mode and score. You cannot submit or grade attempts; the student does that from the interface.")(
       AgentCli.Command.exec("attempts", {
         artifactId: AgentCli.Argument.optionalString("artifactId").pipe(
           AgentCli.Argument.withDescription("Optional artifact id filter")
         )
       }, ({ artifactId }) =>
         repository.listAttempts(artifactId).pipe(
-          Effect.map((attempts) => attempts.length === 0
-            ? "No attempts found."
-            : attempts.map((attempt) => `- ${attempt.id}: ${attempt.artifactKind} ${attempt.status} for ${attempt.artifactId}`).join("\n")
-          ),
-          Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
-        )
-      )
-    )
-  );
-
-  const grade = AgentCli.Command.withExamples([
-    { command: "artifacts grade attempt123", description: "Grade a quiz/test attempt and persist the graded attempt" }
-  ])(
-    AgentCli.Command.withDescription("Grade an ungraded quiz/test attempt")(
-      AgentCli.Command.exec("grade", {
-        attemptId: AgentCli.Argument.string("attemptId")
-      }, ({ attemptId }) =>
-        repository.gradeAttempt(attemptId).pipe(
-          Effect.map(renderAttempt),
+          Effect.map(renderAttempts),
           Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
         )
       )
@@ -411,7 +305,7 @@ export const makeArtifactCommands = (
     AgentCli.Command.withDescription("Propose changes to a study note")
   );
 
-  return AgentCli.Command.group("artifacts", [list, show, block, create, submit, attempts, grade, note] as const).pipe(
-    AgentCli.Command.withDescription("Study artifacts: notes, quizzes, tests, and attempts")
+  return AgentCli.Command.group("artifacts", [list, show, block, attempts, note] as const).pipe(
+    AgentCli.Command.withDescription("Study artifacts: read notes, quizzes and tests, and list attempts")
   );
 };

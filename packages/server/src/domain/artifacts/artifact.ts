@@ -249,29 +249,10 @@ export const Artifact = Schema.Union([
 export type Artifact = typeof Artifact.Type;
 export type ArtifactKind = Artifact["kind"];
 
-// Fase 2, decisión 25: el agente ya no crea apuntes. Fase 3, decisión 4: el agente tampoco crea
-// Controles ni Exámenes en esta fase (vuelven en la fase 4, anclados). `CreateArtifactInput` sigue
-// aquí solo para el comando `artifacts create`, que se retira en el tramo 3D; `makeArtifact` rellena
-// los campos de alcance con marcadores hasta entonces.
-export const CreateQuizArtifactInput = Schema.Struct({
-  kind: Schema.Literal("quiz"),
-  title: Schema.String,
-  questions: Schema.Array(QuizQuestion)
-});
-export type CreateQuizArtifactInput = typeof CreateQuizArtifactInput.Type;
-
-export const CreateTestArtifactInput = Schema.Struct({
-  kind: Schema.Literal("test"),
-  title: Schema.String,
-  questions: Schema.Array(TestQuestion)
-});
-export type CreateTestArtifactInput = typeof CreateTestArtifactInput.Type;
-
-export const CreateArtifactInput = Schema.Union([
-  CreateQuizArtifactInput,
-  CreateTestArtifactInput
-]);
-export type CreateArtifactInput = typeof CreateArtifactInput.Type;
+// Fase 2, decisión 25: el agente ya no crea apuntes. Fase 3, decisiones 4 y 7: el agente tampoco crea
+// Controles ni Exámenes, ni entrega, ni corrige intentos. Solo el alumno, desde la interfaz, genera
+// intentos que muevan el perfil (§1.3). Los Controles y Exámenes se generan con
+// `AssessmentGenerationService` y su ruta; los intentos, con `AttemptService`.
 
 export const MultipleChoiceAnswer = Schema.Struct({
   questionType: Schema.Literal("multiple-choice"),
@@ -471,26 +452,6 @@ export const ArtifactAttempt = Schema.Union([
 ]);
 export type ArtifactAttempt = typeof ArtifactAttempt.Type;
 
-export const SubmitQuizAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("quiz"),
-  artifactId: Schema.String,
-  answers: Schema.Array(QuizAnswer)
-});
-export type SubmitQuizAttemptInput = typeof SubmitQuizAttemptInput.Type;
-
-export const SubmitTestAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("test"),
-  artifactId: Schema.String,
-  answers: Schema.Array(TestAnswer)
-});
-export type SubmitTestAttemptInput = typeof SubmitTestAttemptInput.Type;
-
-export const SubmitAttemptInput = Schema.Union([
-  SubmitQuizAttemptInput,
-  SubmitTestAttemptInput
-]);
-export type SubmitAttemptInput = typeof SubmitAttemptInput.Type;
-
 export const ListArtifactsInput = Schema.Struct({
   kind: Schema.optional(Schema.Union([
     Schema.Literal("note"),
@@ -571,58 +532,18 @@ export type ArtifactRepositoryError =
   | ArtifactRepositorySerializationError;
 
 export interface ArtifactRepository {
-  readonly createArtifact: (input: CreateArtifactInput) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly saveArtifact: (artifact: Artifact) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getArtifact: (id: string) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly deleteArtifact: (id: string) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly listArtifacts: (input?: ListArtifactsInput) => Effect.Effect<ArtifactListing, ArtifactRepositoryError>;
-  readonly submitAttempt: (input: SubmitAttemptInput) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly saveAttempt: (attempt: ArtifactAttempt) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getAttempt: (id: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly listAttempts: (artifactId?: string) => Effect.Effect<readonly ArtifactAttempt[], ArtifactRepositoryError>;
-  readonly gradeAttempt: (attemptId: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
 }
 
 export const ArtifactRepository = Context.Service<ArtifactRepository>(
   "@proxus/server/artifacts/ArtifactRepository"
 );
 
-// `artifacts create` se retira en el tramo 3D (decisión 4). Hasta entonces sigue creando quiz y test,
-// pero el alcance, el origen y el tiempo de examen los pone luego la generación de verdad
-// (`AssessmentGenerationService`, tramo 3B): aquí van marcadores.
-const placeholderScope = (): AssessmentScope => ({ materialId: "", topicId: null, topicLabel: "" });
-
-export const makeArtifact = (input: CreateArtifactInput): Artifact => {
-  const id = crypto.randomUUID();
-  const shared = {
-    id,
-    scope: placeholderScope(),
-    origin: "material" as const,
-    createdAt: new Date().toISOString(),
-    examTimeLimitSeconds: 0
-  };
-  switch (input.kind) {
-    case "quiz":
-      return { ...input, ...shared };
-    case "test":
-      return { ...input, ...shared, mode: "practice" };
-  }
-};
-
-// El intento se crea al empezarlo (decisión 8). En el camino de `artifacts submit` / `POST
-// /artifacts/:id/submit` (que se rehace en el tramo 3B) se sintetiza un intento de práctica: sin
-// reloj, sin pistas, con las respuestas ya dentro.
-export const makeInProgressAttempt = (input: SubmitAttemptInput): InProgressAttempt => ({
-  id: crypto.randomUUID(),
-  artifactId: input.artifactId,
-  artifactKind: input.artifactKind,
-  mode: "practice",
-  startedAt: new Date().toISOString(),
-  timeLimitSeconds: null,
-  hintsRevealed: [],
-  answers: input.answers,
-  connectedSeconds: 0,
-  lastHeartbeatAt: null,
-  interruptions: [],
-  status: "in-progress"
-});
+// El intento se crea en el servidor al empezarlo (decisión 8), con `AttemptService.start`. No hay
+// ningún camino por el que el tutor sintetice un intento (decisión 7).

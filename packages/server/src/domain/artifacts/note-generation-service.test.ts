@@ -55,7 +55,6 @@ const fakeMaterials = (overrides?: Partial<MaterialRepository>) => Layer.succeed
 const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
   ArtifactRepository,
   ArtifactRepository.of({
-    createArtifact: () => Effect.die("not used"),
     saveArtifact: (artifact) => Effect.sync(() => {
       const at = store.findIndex((candidate) => candidate.id === artifact.id);
       if (at === -1) { store.push(artifact); } else { store[at] = artifact; }
@@ -69,11 +68,9 @@ const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
       artifacts: input?.kind === undefined ? store : store.filter((candidate) => candidate.kind === input.kind),
       unreadable: []
     }),
-    submitAttempt: () => Effect.die("not used"),
     saveAttempt: () => Effect.void,
     getAttempt: () => Effect.die("not used"),
-    listAttempts: () => Effect.succeed([]),
-    gradeAttempt: () => Effect.die("not used")
+    listAttempts: () => Effect.succeed([])
   })
 );
 

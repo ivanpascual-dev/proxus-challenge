@@ -628,3 +628,17 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   porque sin perfil no hay nada con qué concentrar las preguntas. Distinto del fail-open del guard del
   examen y del recálculo del perfil (paso 25): allí la alternativa era encerrar o descorregir; aquí es
   generar un repaso sin foco, que es un repaso inventado (invariante 3).
+
+### Paso 27 · el tutor deja de autorar pruebas
+
+- **Desviación (se retiró más de lo que decía el plan):** el plan hablaba de "retirada de los comandos
+  `create`/`submit`/`grade`". Además de los comandos, se retiró el código muerto que solo ellos
+  usaban: los métodos `createArtifact`/`submitAttempt`/`gradeAttempt` del puerto `ArtifactRepository`,
+  los esquemas `Create*Input`/`Submit*Input` (en el mirror del servidor y en `@proxus/shared`), y
+  `makeArtifact`/`makeInProgressAttempt`/`placeholderScope`. Quedaron sin referencias al irse los
+  comandos; el comentario del mirror ya anticipaba la retirada ("que se retira en el tramo 3D").
+- **Decisión sobre la marcha (`profile show`, el eval y la retirada viajan en un commit):** el eval
+  `artifact-authoring` se reescribe entero (comprueba lo contrario que antes) y no compila hasta que
+  aterrizan las dos mitades del cambio, porque el `tsconfig` de `@proxus/server` incluye los
+  `.eval.ts` y la firma de `makeAcademicTutorHarness` la tocan las dos. La skill sí va en un commit
+  aparte (es texto, no ata el typecheck).

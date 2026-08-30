@@ -108,8 +108,13 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   barra lateral y las pruebas (enunciados, tipos de pregunta, correcciones, botones) pasan de inglés a
   español, además de la zona de apuntes que ya lo estaba.
 - **El tutor ya no crea apuntes.** Los apuntes se generan desde la pestaña "Apuntes" de cada material,
-  no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña. El tutor sigue creando
-  quizzes y tests.
+  no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña.
+- **El tutor ya no crea, entrega ni corrige pruebas por el chat.** Pedirle "hazme un test" o
+  "corrígeme esto" lleva a la pestaña "Pruebas" del material: solo el alumno, desde ahí, genera
+  pruebas y hace intentos que muevan su perfil. El tutor sí las lee para hablar de ellas, y ahora
+  también lee el perfil de estudio del material: al recomendar qué repasar nombra la señal concreta
+  que trae cada tema ("fallaste este tema", "abriste una pista aquí", "lo marcaste como importante")
+  en vez de una nota resumen.
 - **El aviso de fichero de artefacto ilegible da un motivo en lenguaje humano** ("no tiene el formato
   de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
   detalle técnico va al log del servidor.

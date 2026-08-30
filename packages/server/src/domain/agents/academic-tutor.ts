@@ -14,7 +14,14 @@ import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts"
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
 import { makeArtifactCommands } from "./academic-tutor/artifact-commands.ts";
+import { makeProfileCommands } from "./academic-tutor/profile-commands.ts";
 import { make as makeNoteService } from "../artifacts/note-service.ts";
+import {
+  make as makeStudyProfileService,
+  StudyProfileRepository,
+  type StudyProfileService
+} from "../profile/study-profile.ts";
+import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills/index.ts";
 import { initialTurnBudgetState, type TurnBudgetState } from "../limits/turn-budget.ts";
 import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limiter.ts";
@@ -22,6 +29,7 @@ import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limite
 export const makeAcademicTutorHarness = (
   materialRepository: MaterialRepository,
   artifactRepository: ArtifactRepository,
+  studyProfileService: StudyProfileService,
   budgetRef: Ref.Ref<TurnBudgetState>,
   rateLimiter: RateLimiter,
   clientKey: string
@@ -38,7 +46,8 @@ Be precise, pedagogical, and honest about what you can infer from the available 
       makeNoteService(artifactRepository, materialRepository),
       rateLimiter,
       clientKey
-    )
+    ),
+    makeProfileCommands(studyProfileService)
   ]
 });
 
@@ -48,6 +57,8 @@ export const academicTutorAgent = Effect.gen(function* () {
   const sessionRepository = yield* SessionRepository;
   const materialRepository = yield* MaterialRepository;
   const artifactRepository = yield* ArtifactRepository;
+  const studyProfileRepository = yield* StudyProfileRepository;
+  const studyProfileService = makeStudyProfileService(studyProfileRepository, artifactRepository, materialRepository);
   const task = process.argv.slice(2).join(" ").trim() || "List my uploaded materials.";
   const sessionId = process.env.AGENT_SESSION_ID ?? "academic-tutor-demo";
   const storedSession = yield* sessionRepository.getSession(sessionId).pipe(
@@ -56,7 +67,7 @@ export const academicTutorAgent = Effect.gen(function* () {
 
   const budgetRef = yield* Ref.make(initialTurnBudgetState);
   const rateLimiter = yield* makeRateLimiter();
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, budgetRef, rateLimiter, sessionId);
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, sessionId);
   const session = AgentSession.make(harness);
 
   console.log(`Provider: ${provider}`);
@@ -105,6 +116,9 @@ export const academicTutorAgent = Effect.gen(function* () {
       Layer.provide(NodeServices.layer)
     ),
     FileArtifactRepository.layer(".data/artifacts").pipe(
+      Layer.provide(NodeServices.layer)
+    ),
+    FileStudyProfileRepository.layer(".data/profile").pipe(
       Layer.provide(NodeServices.layer)
     )
   ))

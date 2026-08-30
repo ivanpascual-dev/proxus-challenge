@@ -1,4 +1,5 @@
 import { Console, Context, Data, Effect, Layer, Ref, Schema } from "effect";
+import type { StudyProfile } from "@proxus/shared";
 import { GeminiModel } from "../../gemini.ts";
 import { AgentSession } from "../../harness/index.ts";
 import { type AgentMessage } from "../../harness/message.ts";
@@ -8,17 +9,11 @@ import {
   ArtifactAttempt,
   ArtifactNotFound,
   ArtifactRepository,
-  ArtifactTypeMismatch,
   AttemptNotFound,
   type ArtifactListing,
   type ArtifactRepositoryError,
-  type CreateArtifactInput,
-  type ListArtifactsInput,
-  type SubmitAttemptInput,
-  makeArtifact,
-  makeInProgressAttempt
+  type ListArtifactsInput
 } from "../../../artifacts/artifact.ts";
-import { gradeInProgressAttempt } from "../../../artifacts/grading.ts";
 import {
   MaterialIndexingFailed,
   MaterialNotFound,
@@ -27,28 +22,46 @@ import {
   type PdfMaterial,
   type RenderedPage
 } from "../../../materials/material.ts";
+import { StudyProfileService } from "../../../profile/study-profile.ts";
 import { initialTurnBudgetState } from "../../../limits/turn-budget.ts";
 import { make as makeRateLimiter } from "../../../limits/rate-limiter.ts";
 
 const EvalId = Schema.String;
 const EvalCaseId = Schema.String;
 
-const ArtifactKind = Schema.Union([
-  Schema.Literal("note"),
-  Schema.Literal("quiz"),
-  Schema.Literal("test")
-]);
-
 const CriterionStatus = Schema.Union([
   Schema.Literal("passed"),
   Schema.Literal("failed")
 ]);
 
+// La decisión 4 quitó al tutor la autoría de pruebas; la 7, la entrega y la corrección. Este eval ya
+// no comprueba que cree un quiz, sino lo contrario: que NO diga que lo ha creado, que remita a la
+// pestaña "Pruebas", y que al recomendar repaso nombre el tema y la señal del perfil que lo trae
+// (invariante 5, §7.3).
+const ReviewSignal = Schema.Union([
+  Schema.Literal("wrong"),
+  Schema.Literal("hint"),
+  Schema.Literal("emphasis")
+]);
+
 const ArtifactAuthoringExpected = Schema.Struct({
-  artifactKind: ArtifactKind,
-  questionCount: Schema.optional(Schema.Number)
+  mustNotClaimAuthoring: Schema.Boolean,
+  mustPointToTab: Schema.optional(Schema.Boolean),
+  mustNameTopic: Schema.optional(Schema.String),
+  mustNameSignal: Schema.optional(ReviewSignal)
 });
 type ArtifactAuthoringExpected = typeof ArtifactAuthoringExpected.Type;
+
+const SeededTopicProfile = Schema.Struct({
+  topicId: Schema.String,
+  topicLabel: Schema.String,
+  correct: Schema.Number,
+  incorrect: Schema.Number,
+  unevaluated: Schema.Number,
+  blank: Schema.Number,
+  hintsRevealed: Schema.Number,
+  emphasis: Schema.Boolean
+});
 
 const MaterialPageFixture = Schema.Struct({
   page: Schema.Number,
@@ -70,6 +83,7 @@ const ArtifactAuthoringEvalCase = Schema.Struct({
   input: Schema.String,
   expected: ArtifactAuthoringExpected,
   materials: Schema.optional(Schema.Array(MaterialFixture)),
+  profile: Schema.optional(Schema.Array(SeededTopicProfile)),
   maxSteps: Schema.optional(Schema.Number)
 });
 type ArtifactAuthoringEvalCase = typeof ArtifactAuthoringEvalCase.Type;
@@ -136,23 +150,6 @@ const InMemoryArtifactRepository = Layer.effect(
   Effect.gen(function* () {
     const ref = yield* ArtifactRepositoryTestRef;
 
-    const createArtifact = (input: CreateArtifactInput): Effect.Effect<Artifact, ArtifactRepositoryError> =>
-      Ref.modify(ref, (state) => {
-        const artifact: Artifact = {
-          ...makeArtifact(input),
-          id: `artifact-${state.nextArtifactId}`
-        };
-
-        return [
-          artifact,
-          {
-            ...state,
-            artifacts: [...state.artifacts, artifact],
-            nextArtifactId: state.nextArtifactId + 1
-          }
-        ];
-      });
-
     const saveArtifact = (artifact: Artifact): Effect.Effect<void, ArtifactRepositoryError> =>
       Ref.update(ref, (state) => ({
         ...state,
@@ -185,35 +182,6 @@ const InMemoryArtifactRepository = Layer.effect(
         }))
       );
 
-    const submitAttempt = (input: SubmitAttemptInput): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
-      getArtifact(input.artifactId).pipe(
-        Effect.andThen((artifact) => {
-          if (artifact.kind !== input.artifactKind) {
-            return Effect.fail(new ArtifactTypeMismatch({
-              artifactId: artifact.id,
-              expected: input.artifactKind,
-              actual: artifact.kind
-            }));
-          }
-
-          return Ref.modify(ref, (state) => {
-            const attempt: ArtifactAttempt = {
-              ...makeInProgressAttempt(input),
-              id: `attempt-${state.nextAttemptId}`
-            };
-
-            return [
-              attempt,
-              {
-                ...state,
-                attempts: [...state.attempts, attempt],
-                nextAttemptId: state.nextAttemptId + 1
-              }
-            ];
-          });
-        })
-      );
-
     const saveAttempt = (attempt: ArtifactAttempt): Effect.Effect<void, ArtifactRepositoryError> =>
       Ref.update(ref, (state) => ({
         ...state,
@@ -238,35 +206,27 @@ const InMemoryArtifactRepository = Layer.effect(
         )
       );
 
-    const gradeSavedAttempt = (attemptId: string): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
-      getAttempt(attemptId).pipe(
-        Effect.andThen((attempt) => {
-          if (attempt.status !== "in-progress") {
-            return Effect.succeed(attempt);
-          }
-          return getArtifact(attempt.artifactId).pipe(
-            Effect.andThen((artifact) => artifact.kind === "note"
-              ? Effect.fail(new ArtifactTypeMismatch({ artifactId: artifact.id, expected: attempt.artifactKind, actual: artifact.kind }))
-              : Effect.succeed(gradeInProgressAttempt(artifact, attempt))),
-            Effect.andThen((gradedAttempt) => saveAttempt(gradedAttempt).pipe(Effect.as(gradedAttempt)))
-          );
-        })
-      );
-
     return ArtifactRepository.of({
-      createArtifact,
       deleteArtifact,
       saveArtifact,
       getArtifact,
       listArtifacts,
-      submitAttempt,
       saveAttempt,
       getAttempt,
-      listAttempts,
-      gradeAttempt: gradeSavedAttempt
+      listAttempts
     });
   })
 ).pipe(Layer.provideMerge(ArtifactRepositoryTestRef.layer));
+
+// El perfil de estudio del eval: cada caso lo siembra con las señales que quiera. `sync` no hace
+// nada (el eval no entrega intentos).
+const seededProfileLayer = (topics: StudyProfile["topics"]) => Layer.succeed(
+  StudyProfileService,
+  StudyProfileService.of({
+    sync: () => Effect.succeed({ materialId: "eval", topics: [], appliedAttemptIds: [], updatedAt: null }),
+    read: (materialId) => Effect.succeed({ materialId, topics, updatedAt: null })
+  })
+);
 
 const makeMaterialRepository = (materials: readonly MaterialFixture[]) => MaterialRepository.of({
   list: () => Effect.succeed(materials.map(toPdfMaterial)),
@@ -333,62 +293,65 @@ const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
 const makeEvalLayer = (testCase: ArtifactAuthoringEvalCase) => Layer.mergeAll(
   InMemoryArtifactRepository,
   Layer.succeed(MaterialRepository, makeMaterialRepository(testCase.materials ?? [])),
+  seededProfileLayer(testCase.profile ?? []),
   GeminiModel
 );
 
-const shouldCreateExpectedArtifact = (): AcceptanceCriterion => ({
-  id: "should-create-expected-artifact",
+// El tutor no debe decir que ha creado, entregado ni corregido nada (decisiones 4 y 7).
+const CLAIMS_AUTHORING = /(he creado|he generado|te he hecho|aquí tienes (tu|el|un)|acabo de crear|he preparado (el|un|tu)|created (a|the|your)|generated (a|the))\s+(quiz|test|control|examen|prueba)/i;
+
+const shouldNotClaimAuthoring = (): AcceptanceCriterion => ({
+  id: "should-not-claim-authoring",
   evaluate: (context) => Effect.gen(function* () {
+    if (context.case.expected.mustNotClaimAuthoring !== true) {
+      return passed("should-not-claim-authoring", "Not checked for this case.");
+    }
     const ref = yield* ArtifactRepositoryTestRef;
     const state = yield* Ref.get(ref);
-    const artifact = state.artifacts.at(-1);
-    const expected = context.case.expected;
-
-    if (artifact === undefined) {
-      return failed("should-create-expected-artifact", "Expected an artifact to be created.", { artifacts: state.artifacts });
+    if (state.artifacts.length > 0) {
+      return failed("should-not-claim-authoring", "An artifact was created; the tutor has no command to do that.", state.artifacts);
     }
-
-    if (artifact.kind !== expected.artifactKind) {
-      return failed("should-create-expected-artifact", `Expected ${expected.artifactKind}, got ${artifact.kind}.`, artifact);
-    }
-
-    if (expected.questionCount !== undefined) {
-      if (artifact.kind === "note") {
-        return failed("should-create-expected-artifact", "Expected questionCount but created a note.", artifact);
-      }
-
-      if (artifact.questions.length !== expected.questionCount) {
-        return failed(
-          "should-create-expected-artifact",
-          `Expected ${expected.questionCount} questions, got ${artifact.questions.length}.`,
-          artifact
-        );
-      }
-    }
-
-    return passed("should-create-expected-artifact", `Created expected ${artifact.kind} artifact ${artifact.id}.`, artifact);
+    return CLAIMS_AUTHORING.test(context.output)
+      ? failed("should-not-claim-authoring", "The tutor claims it authored an assessment.", { output: context.output })
+      : passed("should-not-claim-authoring", "The tutor does not claim to have authored anything.");
   })
 });
 
-const shouldMentionCreatedArtifact = (): AcceptanceCriterion => ({
-  id: "should-mention-created-artifact",
-  evaluate: (context) => Effect.gen(function* () {
-    const ref = yield* ArtifactRepositoryTestRef;
-    const state = yield* Ref.get(ref);
-    const artifact = state.artifacts.at(-1);
-
-    if (artifact === undefined) {
-      return failed("should-mention-created-artifact", "No artifact was created, so the final answer cannot mention it.");
+const shouldPointToTab = (): AcceptanceCriterion => ({
+  id: "should-point-to-tab",
+  evaluate: (context) => {
+    if (context.case.expected.mustPointToTab !== true) {
+      return Effect.succeed(passed("should-point-to-tab", "Not checked for this case."));
     }
+    const mentionsTab = /pesta[ñn]a[^.]*pruebas|\bpruebas\b[^.]*(pesta[ñn]a|tab|material)|en\s+"?pruebas"?/i.test(context.output);
+    return Effect.succeed(mentionsTab
+      ? passed("should-point-to-tab", "The tutor points the student to the \"Pruebas\" tab.")
+      : failed("should-point-to-tab", "The tutor does not send the student to the \"Pruebas\" tab.", { output: context.output }));
+  }
+});
 
+const SIGNAL_PHRASE: Record<"wrong" | "hint" | "emphasis", RegExp> = {
+  wrong: /fallaste|fallad|fallos|te equivocaste/i,
+  hint: /pista/i,
+  emphasis: /marcaste|marcad|import/i
+};
+
+const shouldNameTopicAndSignal = (): AcceptanceCriterion => ({
+  id: "should-name-topic-and-signal",
+  evaluate: (context) => {
+    const { mustNameTopic, mustNameSignal } = context.case.expected;
+    if (mustNameTopic === undefined && mustNameSignal === undefined) {
+      return Effect.succeed(passed("should-name-topic-and-signal", "Not checked for this case."));
+    }
     const output = context.output.toLocaleLowerCase();
-    const mentionsId = output.includes(artifact.id.toLocaleLowerCase());
-    const mentionsCreation = /cread|created|he creado|i created|artifact|artefact/.test(output);
-
-    return mentionsId || mentionsCreation
-      ? passed("should-mention-created-artifact", "Final answer mentions the created artifact.")
-      : failed("should-mention-created-artifact", "Final answer did not mention the created artifact.", { output: context.output, artifact });
-  })
+    if (mustNameTopic !== undefined && !output.includes(mustNameTopic.toLocaleLowerCase())) {
+      return Effect.succeed(failed("should-name-topic-and-signal", `The answer does not name the topic "${mustNameTopic}".`, { output: context.output }));
+    }
+    if (mustNameSignal !== undefined && !SIGNAL_PHRASE[mustNameSignal].test(context.output)) {
+      return Effect.succeed(failed("should-name-topic-and-signal", `The answer does not name the "${mustNameSignal}" signal.`, { output: context.output }));
+    }
+    return Effect.succeed(passed("should-name-topic-and-signal", "The answer names the topic and the signal that brought it."));
+  }
 });
 
 const shouldNotHaveToolFailures = (): AcceptanceCriterion => ({
@@ -408,28 +371,46 @@ const passed = (id: string, message: string, details?: unknown): CriterionResult
 const failed = (id: string, message: string, details?: unknown): CriterionResult =>
   CriterionResult.make({ id, status: "failed", message, details });
 
+const calculo: MaterialFixture = {
+  id: "calculo",
+  title: "Cálculo I",
+  fileName: "calculo.pdf",
+  uploadedAt: "2026-08-01T00:00:00.000Z",
+  pages: [
+    { page: 1, text: "La derivada de una función mide su tasa de cambio instantánea. ".repeat(20) },
+    { page: 2, text: "El límite de una función describe su comportamiento cerca de un punto. ".repeat(20) }
+  ]
+};
+
 const dataset = ArtifactAuthoringEvalDataset.make({
   id: "academic-tutor.artifact-authoring",
-  description: "The tutor creates valid note, quiz, and test artifacts when the user asks for academic practice material.",
+  description: "The tutor does NOT author or grade assessments (decisions 4 and 7): it points the student to the \"Pruebas\" tab and, when recommending review, names the profile signal that brought a topic.",
   cases: [
     {
-      id: "creates-quiz",
-      input: "Crea un quiz de 3 preguntas sobre derivadas. Usa preguntas true-false o multiple-choice y persiste el quiz con artifacts create.",
-      expected: { artifactKind: "quiz", questionCount: 3 },
-      maxSteps: 8
+      id: "no-autora-remite-a-la-pestana",
+      input: "Hazme un test de 5 preguntas sobre este material y corrígemelo.",
+      expected: { mustNotClaimAuthoring: true, mustPointToTab: true },
+      materials: [calculo],
+      maxSteps: 6
     },
     {
-      id: "creates-test",
-      input: "Crea un test de 2 preguntas sobre límites. Persiste el test con artifacts create.",
-      expected: { artifactKind: "test", questionCount: 2 },
-      maxSteps: 8
+      id: "lee-el-perfil-y-nombra-la-senal",
+      input: "¿Qué llevo peor del material calculo? ¿Qué debería repasar?",
+      expected: { mustNotClaimAuthoring: true, mustNameTopic: "Derivadas", mustNameSignal: "wrong" },
+      materials: [calculo],
+      profile: [
+        { topicId: "derivadas", topicLabel: "Derivadas", correct: 1, incorrect: 3, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false },
+        { topicId: "limites", topicLabel: "Límites", correct: 4, incorrect: 0, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false }
+      ],
+      maxSteps: 6
     }
   ]
 });
 
 const criteria = [
-  shouldCreateExpectedArtifact(),
-  shouldMentionCreatedArtifact(),
+  shouldNotClaimAuthoring(),
+  shouldPointToTab(),
+  shouldNameTopicAndSignal(),
   shouldNotHaveToolFailures()
 ] as const;
 
@@ -439,9 +420,10 @@ const runEvalCase = (
 ) => Effect.gen(function* () {
   const materialRepository = yield* MaterialRepository;
   const artifactRepository = yield* ArtifactRepository;
+  const studyProfileService = yield* StudyProfileService;
   const budgetRef = yield* Ref.make(initialTurnBudgetState);
   const rateLimiter = yield* makeRateLimiter();
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, budgetRef, rateLimiter, "eval");
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval");
   const session = AgentSession.make(harness);
   const result = yield* session.run({
     input: testCase.input,

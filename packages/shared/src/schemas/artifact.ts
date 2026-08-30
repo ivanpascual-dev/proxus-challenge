@@ -430,24 +430,7 @@ export const ArtifactAttempt = Schema.Union([
 ]);
 export type ArtifactAttempt = typeof ArtifactAttempt.Type;
 
-// El contrato de entrega. Lleva el `artifactId` dentro porque el CLI del agente no tiene URL
-// (packages/shared/CLAUDE.md). El modo y el resto del ciclo de vida los pone el servidor.
-export const SubmitQuizAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("quiz"),
-  artifactId: Schema.String,
-  answers: Schema.Array(QuizAnswer)
-});
-export type SubmitQuizAttemptInput = typeof SubmitQuizAttemptInput.Type;
-
-export const SubmitTestAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("test"),
-  artifactId: Schema.String,
-  answers: Schema.Array(TestAnswer)
-});
-export type SubmitTestAttemptInput = typeof SubmitTestAttemptInput.Type;
-
-export const SubmitAttemptInput = Schema.Union([
-  SubmitQuizAttemptInput,
-  SubmitTestAttemptInput
-]);
-export type SubmitAttemptInput = typeof SubmitAttemptInput.Type;
+// La entrega de un intento va por `POST /artifacts/:id/attempts/:attemptId/submit` con
+// `SubmitAttemptAnswersInput` (schemas/attempt-api.ts): el `attemptId` viaja en la ruta y el modo lo
+// pone el servidor. El contrato viejo con `artifactKind`/`artifactId` dentro se retiró con el comando
+// `artifacts submit` del tutor (fase 3, decisión 7).

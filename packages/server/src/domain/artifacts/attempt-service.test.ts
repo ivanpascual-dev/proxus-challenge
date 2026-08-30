@@ -80,7 +80,6 @@ const fakeMaterials = Layer.succeed(MaterialRepository, MaterialRepository.of({
 }));
 
 const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => Layer.succeed(ArtifactRepository, ArtifactRepository.of({
-  createArtifact: () => Effect.die("not used"),
   saveArtifact: () => Effect.void,
   getArtifact: (id) => {
     const found = artifacts.find((a) => a.id === id);
@@ -88,7 +87,6 @@ const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => La
   },
   deleteArtifact: () => Effect.void,
   listArtifacts: () => Effect.succeed({ artifacts, unreadable: [] }),
-  submitAttempt: () => Effect.die("not used"),
   saveAttempt: (attempt) => Effect.sync(() => {
     const at = attempts.findIndex((a) => a.id === attempt.id);
     if (at === -1) { attempts.push(attempt); } else { attempts[at] = attempt; }
@@ -97,8 +95,7 @@ const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => La
     const found = attempts.find((a) => a.id === id);
     return found === undefined ? Effect.fail(new AttemptNotFound({ attemptId: id })) : Effect.succeed(found);
   },
-  listAttempts: (artifactId) => Effect.succeed(artifactId === undefined ? attempts : attempts.filter((a) => a.artifactId === artifactId)),
-  gradeAttempt: () => Effect.die("not used")
+  listAttempts: (artifactId) => Effect.succeed(artifactId === undefined ? attempts : attempts.filter((a) => a.artifactId === artifactId))
 }));
 
 // El juez falso: cumple todos los criterios.
