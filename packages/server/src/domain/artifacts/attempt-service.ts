@@ -5,6 +5,7 @@ import {
   ArtifactStorageError as ApiArtifactStorageError,
   ArtifactTypeMismatch as ApiArtifactTypeMismatch,
   AttemptAlreadyClosed,
+  AttemptInProgress,
   AttemptLimitExceeded,
   AttemptNotFound,
   AttemptNotGraded,
@@ -51,7 +52,7 @@ export interface AttemptService {
   >;
   readonly start: (artifactId: string, mode: AttemptMode) => Effect.Effect<
     InProgressAttempt,
-    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptLimitExceeded | ApiArtifactStorageError
+    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptLimitExceeded | AttemptInProgress | ApiArtifactStorageError
   >;
   readonly revealHint: (artifactId: string, attemptId: string, questionId: string) => Effect.Effect<
     { readonly questionId: string; readonly hint: string },
@@ -207,9 +208,35 @@ export const make = (
 
   const start = (artifactId: string, mode: AttemptMode) => Effect.gen(function* () {
     const artifact = yield* getAssessment(artifactId);
-    const attempts = yield* repository.listAttempts(artifactId).pipe(
+    const allAttempts = yield* repository.listAttempts().pipe(
       Effect.mapError(storageError(`No se pudo leer los intentos de ${artifactId}`))
     );
+
+    // Solo se puede tener un intento abierto a la vez, sea de práctica o de examen y sea de la prueba
+    // que sea. Empezar de nuevo LA MISMA prueba en EL MISMO modo retoma el intento a medias (el
+    // intento se guarda aunque lo dejes a medias); cualquier otro intento abierto se rechaza nombrando
+    // cuál es, para que la interfaz ofrezca retomarlo o cancelarlo.
+    const openHere = allAttempts.find(
+      (attempt): attempt is InProgressAttempt =>
+        attempt.status === "in-progress" && attempt.artifactId === artifactId && attempt.mode === mode
+    );
+    if (openHere !== undefined) {
+      return openHere;
+    }
+    const openElsewhere = allAttempts.find(
+      (attempt): attempt is InProgressAttempt => attempt.status === "in-progress"
+    );
+    if (openElsewhere !== undefined) {
+      return yield* new AttemptInProgress({
+        attemptId: openElsewhere.id,
+        artifactId: openElsewhere.artifactId,
+        artifactKind: openElsewhere.artifactKind,
+        mode: openElsewhere.mode,
+        message: `Ya tienes un intento a medias en modo ${openElsewhere.mode === "exam" ? "examen" : "práctica"}. Entrégalo o cancélalo antes de empezar otro.`
+      });
+    }
+
+    const attempts = allAttempts.filter((attempt) => attempt.artifactId === artifactId);
     // Un intento cancelado o caducado también cuenta contra el techo (decisión 22): abandonar tiene
     // el mismo precio que intentar.
     const sameMode = attempts.filter((attempt) => attempt.mode === mode).length;

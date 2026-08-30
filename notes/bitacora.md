@@ -565,3 +565,9 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   la que el ahorro justifica a esta escala (ficheros de intento acotados por los techos de §5.7). Si
   el listado falla, la puerta se **abre** (fail-open) y el motivo va al log: encerrar al alumno por un
   fallo de disco es peor que dejar pasar una petición. Contexto para ADR-018 (paso 30).
+- **Regla nueva pedida a mitad (un solo intento a medias a la vez):** Iván la pidió durante la sesión,
+  no estaba en el plan. `start()` ya no solo mira el techo: si hay otro intento `in-progress` (de otra
+  prueba o de otro modo) lo rechaza con `AttemptInProgress` 409 nombrando cuál; si el que hay abierto
+  es de la misma prueba y el mismo modo, lo retoma en vez de crear otro. El techo de intentos por modo
+  se mantiene y ahora se cuenta sobre todos los intentos del artefacto (`listAttempts()` sin filtro,
+  luego `filter`), no sobre `listAttempts(artifactId)`. Contexto para un ADR nuevo (paso 30).

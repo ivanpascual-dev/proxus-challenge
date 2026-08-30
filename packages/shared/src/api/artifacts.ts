@@ -30,6 +30,7 @@ import {
 } from "../errors/artifact-errors.ts";
 import {
   AttemptAlreadyClosed,
+  AttemptInProgress,
   AttemptLimitExceeded,
   AttemptNotFound,
   HintNotAvailable,
@@ -83,6 +84,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactNotFound.pipe(HttpApiSchema.status(404)),
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
         AttemptLimitExceeded.pipe(HttpApiSchema.status(400)),
+        AttemptInProgress.pipe(HttpApiSchema.status(409)),
         RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]

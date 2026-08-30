@@ -21,6 +21,19 @@ export class AttemptLimitExceeded extends Schema.ErrorClass<AttemptLimitExceeded
   message: Schema.String
 }) {}
 
+// Se intentó empezar una prueba (Control o Examen, práctica o examen) teniendo otra a medias. Solo se
+// puede tener un intento abierto a la vez. El cuerpo dice cuál está abierto para que la interfaz
+// ofrezca retomarlo o cancelarlo. Empezar de nuevo la MISMA prueba en el MISMO modo no da este error:
+// se retoma el intento a medias.
+export class AttemptInProgress extends Schema.ErrorClass<AttemptInProgress>("AttemptInProgress")({
+  _tag: Schema.tag("AttemptInProgress"),
+  attemptId: Schema.String,
+  artifactId: Schema.String,
+  artifactKind: Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")]),
+  mode: Schema.Union([Schema.Literal("practice"), Schema.Literal("exam")]),
+  message: Schema.String
+}) {}
+
 // Se intentó entregar, abandonar o discrepar de un intento que ya no está `in-progress`.
 export class AttemptAlreadyClosed extends Schema.ErrorClass<AttemptAlreadyClosed>("AttemptAlreadyClosed")({
   _tag: Schema.tag("AttemptAlreadyClosed"),

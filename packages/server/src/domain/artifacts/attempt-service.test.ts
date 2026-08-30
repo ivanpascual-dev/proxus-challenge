@@ -126,12 +126,31 @@ test("la proyección resoluble no lleva clave de respuesta ni pista ni explicaci
 
 test("empezar cuenta contra el techo de intentos del modo, incluidos los abandonados", async () => {
   const attempts: ArtifactAttempt[] = [];
-  await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
-  await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
-  await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  // Solo se puede tener uno abierto a la vez: se abandona cada uno antes de empezar el siguiente.
+  for (let i = 0; i < 3; i += 1) {
+    const started = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+    await run((s) => s.abandon(started.id, "cancelled"), [quiz], attempts);
+  }
   await assert.rejects(
     run((s) => s.start("quiz-1", "practice"), [quiz], attempts),
     (e: unknown) => (e as { _tag?: string })._tag === "AttemptLimitExceeded"
+  );
+});
+
+test("empezar la misma prueba en el mismo modo retoma el intento a medias, no crea otro", async () => {
+  const attempts: ArtifactAttempt[] = [];
+  const first = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  const again = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  assert.equal(again.id, first.id);
+  assert.equal(attempts.filter((a) => a.status === "in-progress").length, 1);
+});
+
+test("no se puede empezar un intento con otro a medias (otra prueba o otro modo)", async () => {
+  const attempts: ArtifactAttempt[] = [];
+  await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  await assert.rejects(
+    run((s) => s.start("quiz-1", "exam"), [quiz], attempts),
+    (e: unknown) => (e as { _tag?: string })._tag === "AttemptInProgress"
   );
 });
 
