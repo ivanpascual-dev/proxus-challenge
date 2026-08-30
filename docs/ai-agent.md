@@ -2,15 +2,21 @@
 
 ## Objetivo
 
-El tutor ayuda a estudiar usando materiales locales y creando artefactos de aprendizaje:
+El tutor ayuda a estudiar usando los materiales locales, sus apuntes, sus pruebas y el perfil de
+estudio del alumno. **Lee y explica; no autora nada.**
 
-- `quiz`: ejercicio corto, cerrado y autocorregible.
-- `test`: evaluación más completa; puede incluir respuesta corta.
-
-Los apuntes (`note`) **no** los crea el tutor: se generan desde la pestaña "Apuntes" de cada material
-(`POST /api/materials/:id/notes`, un servicio del dominio como la indexación). El tutor, si se lo
-piden, remite a esa pestaña. El porqué del límite está en el ADR-016: el tutor autora lo abierto
-(quiz, test); transformar un material en un activo estructurado es un servicio con ruta.
+- Los **apuntes** (`note`) los genera la pestaña "Apuntes" de cada material
+  (`POST /api/materials/:id/notes`), no el tutor (ADR-016). El tutor puede **proponer** cambios en un
+  apunte (`artifacts note propose`), que el alumno acepta o descarta; nunca los aplica (ADR-014).
+- Los **Controles y Exámenes** (`quiz`, `test`) los genera la pestaña "Pruebas"
+  (`POST /api/materials/:id/assessments`), no el tutor. En la fase 3 el tutor **pierde** `artifacts
+  create`, `submit` y `grade`: si pudiera crear o corregir intentos, movería el perfil de estudio
+  fabricando datos, y la invariante 4 (el perfil lo escribe el código, nunca el modelo) se rompería
+  de forma indirecta (ADR-022). Si se lo piden, remite a la pestaña. `artifacts create` anclado
+  vuelve en la fase 4.
+- El tutor **lee** las pruebas, los intentos y el perfil (`artifacts list` / `show` / `attempts`,
+  `profile show`), y al recomendar qué repasar nombra el tema y **cuál de las tres señales** lo trajo
+  (fallo, pista o énfasis), sin fundirlas en un número (invariante 5).
 
 Editar un apunte tampoco pasa por el tutor. Reescribir un bloque
 (`POST /api/artifacts/:id/blocks/:blockId/rewrite`) es un botón de la interfaz que llama al modelo con
@@ -26,13 +32,14 @@ solo ese bloque y su fragmento; no hay comando del agente para ello.
 Skills:
 
 - `packages/server/src/domain/agents/academic-tutor/skills/use-uploaded-materials.ts`
-- `packages/server/src/domain/agents/academic-tutor/skills/create-study-artifacts.ts`
+- `packages/server/src/domain/agents/academic-tutor/skills/use-study-assessments.ts`
 - `packages/server/src/domain/agents/academic-tutor/skills/propose-note-changes.ts`
 
 Commands:
 
 - `packages/server/src/domain/agents/academic-tutor/material-commands.ts`
 - `packages/server/src/domain/agents/academic-tutor/artifact-commands.ts`
+- `packages/server/src/domain/agents/academic-tutor/profile-commands.ts`
 
 ## Modelo mental
 
@@ -53,29 +60,37 @@ materials read <materialId> <pages>
 materials view <materialId> <pages>
 ```
 
-Artifacts:
+Artifacts (todo lectura salvo `note propose`):
 
 ```txt
-artifacts list
+artifacts list [note|quiz|test]
 artifacts show <artifactId>
 artifacts block <artifactId> <blockIds>
-artifacts create '<json>'
-artifacts submit '<json>'
-artifacts attempts [artifactId]
-artifacts grade <attemptId>
+artifacts attempts <artifactId>
 artifacts note propose <artifactId> '<json>'
 ```
 
-`artifacts create` solo acepta `quiz` y `test`. Los apuntes se generan fuera del tutor (ver arriba).
+Perfil de estudio (solo lectura):
+
+```txt
+profile show <materialId>
+```
 
 `artifacts show` de un apunte devuelve un índice de bloques (id, encabezado, autor, énfasis, fuente,
-tamaño), no el texto; quiz y test se siguen mostrando como JSON. `artifacts block` da el markdown
-completo de los bloques pedidos (ids separados por coma), sin el fragmento cacheado. Es a `artifacts
-show` lo que `materials view` a `materials read`.
+tamaño), no el texto; quiz y test se muestran como JSON sin la clave de respuesta. `artifacts block` da
+el markdown completo de los bloques pedidos (ids separados por coma), sin el fragmento cacheado. Es a
+`artifacts show` lo que `materials view` a `materials read`.
+
+`artifacts attempts <artifactId>` lista los intentos de una prueba (fecha, modo, nota), para que el
+tutor pueda hablar de cómo le está yendo al alumno sin poder tocar nada.
+
+`profile show <materialId>` devuelve el perfil de estudio tema a tema, con las tres señales por
+separado. No dispara el recálculo del perfil: solo lo mueve el código al corregir un intento del
+alumno (ADR-022). Ver la skill `use-study-assessments`.
 
 `artifacts note propose` deja una propuesta pendiente (añadir, reescribir o borrar un bloque) que el
-alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Ver la skill
-`propose-note-changes`.
+alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Es su **única**
+mutación. Ver la skill `propose-note-changes`.
 
 `materials read` devuelve el texto ya indexado, agrupado por tema y con su procedencia, sin gastar
 presupuesto de imágenes: es la primera opción para leer un material. Tiene su propio techo de
@@ -112,8 +127,10 @@ GEMINI_MODEL=gemini-3.1-flash-lite
 ## Smoke test manual
 
 ```bash
-pnpm --filter @proxus/server run agent:tutor "list my uploaded materials"
-pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta sobre variables cualitativas"
+pnpm --filter @proxus/server run agent:tutor "lista mis materiales"
+pnpm --filter @proxus/server run agent:tutor "¿qué llevo peor de este material?"
 ```
 
-Después, abre la web y comprueba que el artifact aparece en la sidebar y puede resolverse.
+Lo segundo tiene que acabar en `profile show` (o `artifacts attempts`) y nombrar el tema y la señal
+(fallo, pista o énfasis), no ofrecer crear una prueba. Si se le pide crear o corregir una prueba, debe
+remitir a la pestaña "Pruebas".

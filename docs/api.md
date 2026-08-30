@@ -28,10 +28,15 @@ La ruta streaming está implementada manualmente para soportar eventos increment
 ### Materials
 
 ```http
-GET /api/materials/
-GET /api/materials/:id
+GET  /api/materials/
+GET  /api/materials/:id
+GET  /api/materials/:id/index
+GET  /api/materials/:id/assessments
+GET  /api/materials/:id/profile
+GET  /api/materials/:id/pages/:page
 POST /api/materials/:id/index
 POST /api/materials/:id/notes
+POST /api/materials/:id/assessments
 ```
 
 Los materiales representan PDFs disponibles para el tutor. El server puede renderizar páginas vía Poppler para que Gemini las procese como imágenes.
@@ -43,22 +48,67 @@ termina con `done` (el resumen del apunte) o `failed` (el motivo). Si el materia
 responde **409 `NoteAlreadyExists`** (con `noteId`) antes de abrir el stream: es un conflicto, no un
 fallo de generación. También responde `429` si se supera la frecuencia.
 
+`POST /:id/assessments` (`GenerateAssessmentInput` → NDJSON) genera un Control o un Examen como un
+servicio del dominio con ruta, igual que la indexación y los apuntes (ADR-016, ADR-019). El cuerpo
+lleva `kind` (`quiz` \| `test`), `topicId` (el tema del Control, `null` para un Examen), `origin`
+(`material` \| `review`), `questionCount` (dentro del rango que fija `LIMITS`) y, para el Examen,
+`mode` (`practice` \| `exam`). Las precondiciones (material inexistente, sin indexar, techo de pruebas
+alcanzado, repaso sin nada que repasar) salen como **JSON con `message` y su estado** (404, 409) antes
+de abrir el stream; una vez abierto, emite el progreso tema a tema y termina con `done` (id de la
+prueba, número de preguntas, reintentos) o `failed` (el motivo). O la prueba sale con las
+`questionCount` pedidas o no sale (F3-44). `429` si se supera la frecuencia del cubo `artifacts`.
+
+`GET /:id/assessments` (`MaterialAssessmentsResponse`) lista los Controles y Exámenes del material con
+su último intento, para pintar la pestaña Pruebas sin descargar cada prueba entera. `GET /:id/profile`
+(`StudyProfile`) devuelve el perfil de estudio tema a tema, con las tres señales **por separado**
+(invariante 5, ADR-022): solo lectura, ni el modelo ni esta ruta lo escriben.
+
 ### Artifacts
 
 ```http
-GET /api/artifacts/
-GET /api/artifacts/:id
-PUT /api/artifacts/:id/note
-POST /api/artifacts/:id/blocks/:blockId/rewrite
-POST /api/artifacts/url-source
-POST /api/artifacts/:id/proposals/:proposalId/accept
-POST /api/artifacts/:id/proposals/:proposalId/reject
+GET    /api/artifacts/
+GET    /api/artifacts/:id
+GET    /api/artifacts/:id/solvable
+GET    /api/artifacts/:id/attempts
+POST   /api/artifacts/:id/attempts
+POST   /api/artifacts/:id/attempts/:attemptId/hint
+POST   /api/artifacts/:id/attempts/:attemptId/submit
+POST   /api/artifacts/:id/attempts/:attemptId/abandon
+PUT    /api/artifacts/:id/note
+POST   /api/artifacts/:id/blocks/:blockId/rewrite
+POST   /api/artifacts/url-source
+POST   /api/artifacts/:id/proposals/:proposalId/accept
+POST   /api/artifacts/:id/proposals/:proposalId/reject
 DELETE /api/artifacts/:id
 ```
 
-Resolver una prueba (Control o Examen) va por el ciclo de vida del intento: `GET /:id/solvable` sirve
-las preguntas sin clave de respuesta y los endpoints bajo `/:id/attempts` crean, corrigen y cierran el
-intento. Se documentan enteros al cerrar la fase 3.
+### Resolver una prueba: el ciclo de vida del intento
+
+Resolver un Control o un Examen no toca el artefacto: crea un **intento** y lo lleva de `in-progress` a
+`graded` o `abandoned` (ADR-021).
+
+- `GET /:id/solvable` (`SolvableAssessment`) sirve la prueba **sin la clave de respuesta**: ni
+  `correctOptionId`, ni `correctAnswer`, ni `expectedAnswer`, ni rúbrica, ni explicación, ni el texto
+  de la pista (decisión 9, F3-12). `ArtifactTypeMismatch` 409 si el id no es una prueba.
+- `POST /:id/attempts` (sin cuerpo → `ArtifactAttempt`) crea el intento en el servidor, con
+  `startedAt` con autoridad (decisión 8). El modo lo hereda del artefacto, no lo elige quien empieza
+  (ADR-018). `AttemptLimitExceeded` 400 (techo de intentos), `AttemptInProgress` 409 (ya hay uno
+  abierto de esa prueba), `429`.
+- `POST /:id/attempts/:attemptId/hint` (`RevealHintInput` → `RevealHintResult`) registra que se abrió
+  una pista y devuelve su texto. Solo en modo práctica: en examen `HintNotAvailable` 409 (decisión
+  10). Si no se pudo registrar, no se sirve.
+- `POST /:id/attempts/:attemptId/submit` (`SubmitAttemptAnswersInput` → `ArtifactAttempt` ya `graded`)
+  entrega y corrige: el juez corrige el desarrollo corto y la aritmética la hace el código (ADR-020).
+  `TimeLimitExceeded` 409 si se entrega pasado el tiempo límite más `examSubmitGraceSeconds`
+  (decisión 9, F3-21). `429`.
+- `POST /:id/attempts/:attemptId/abandon` (sin cuerpo → `ArtifactAttempt` ya `abandoned`) cancela el
+  intento y abre la puerta cerrada (decisión 19). Se guarda con su motivo, se ve en el historial y
+  **no mueve el perfil** (ADR-022, F3-37).
+- `GET /:id/attempts` (`ArtifactAttempt[]`) es el historial de la prueba: todos sus intentos, los
+  abandonados incluidos con su motivo y sus interrupciones (F3-39e).
+
+Ninguno de estos handlers usa `Effect.orDie`: cada error va declarado en
+`packages/shared/src/errors/assessment-errors.ts` y mapeado a su estado.
 
 `POST /:id/blocks/:blockId/rewrite` (`{mode: "clearer" | "deeper"}` → `{markdown, usedSource}`)
 reescribe un bloque con una llamada al modelo: solo el texto del bloque y su fragmento cacheado, sin
@@ -99,34 +149,67 @@ Ningún handler del grupo `artifacts` usa `Effect.orDie`: cada error va declarad
 cuerpo y motivo). `GET /` devuelve también `unreadable`, la lista de ficheros de artefacto que no se
 pudieron decodificar, cada uno con su motivo, en vez de fallar entero.
 
+### Attempts
+
+Endpoints de intento que no cuelgan de una prueba concreta.
+
+```http
+GET  /api/attempts/active
+GET  /api/attempts/:attemptId
+POST /api/attempts/:attemptId/heartbeat
+POST /api/attempts/:attemptId/dispute
+```
+
+- `GET /active` (`ActiveAttemptResponse`) es lo que la interfaz pregunta al arrancar: si hay un examen
+  en modo examen sin terminar, devuelve el intento y el tiempo que queda. Es la llave de la puerta
+  cerrada (decisión 19d).
+- `GET /:attemptId` (`ArtifactAttempt`) lee un intento suelto.
+- `POST /:attemptId/heartbeat` (`HeartbeatResponse`) es el latido del examen: acumula el tiempo
+  **conectado** en el servidor, cierra el hueco de interrupción si venía de uno, y devuelve el tiempo
+  restante. No cancela nada; si el tiempo conectado se agotó, el intento ya está `abandoned` cuando el
+  latido lo mira (decisión 19c).
+- `POST /:attemptId/dispute` (`DisputeQuestionInput` → `ArtifactAttempt`) es "esto sí lo dije": marca
+  una pregunta abierta como `disputed`, **retira su corrección del perfil** en cualquier dirección, y
+  **no cambia la nota mostrada** (F3-43, ADR-020). `AttemptNotGraded` 409 si el intento aún no se ha
+  corregido.
+
+Todo el grupo pasa por `ExamLockdownGuard`: `dispute` está cerrado mientras dura un examen, `active`,
+`get` y `heartbeat` siguen abiertos (son lo que permite volver al examen y entregarlo).
+
+### La puerta cerrada
+
+Los grupos `materials`, `artifacts` y `attempts`, más las rutas NDJSON sueltas, pasan por
+`ExamLockdownGuard`. Mientras un intento en modo examen siga `in-progress`, las rutas del material,
+los apuntes, otras pruebas y el chat del tutor responden **409 `ExamInProgress`**, nombrando el
+intento y cómo salir (ADR-021, F3-35). Siguen abiertas: la lista de materiales, la prueba sin clave
+que se está resolviendo, leer un intento, y entregar / cancelar / latir del intento activo. La
+clasificación vive en una sola lista (`domain/artifacts/exam-lockdown.ts`) con un test de cobertura
+que falla si una ruta no está en la lista cerrada ni en la abierta.
+
 ## Tipos de artifact
 
 - `note`: atado a un material (`materialId`), uno por material. Lista ordenada de bloques, cada uno con
   autoría (`tutor` o `student`), marca de énfasis y fuente opcional (un material con sus páginas o una
   URL). Lleva además las propuestas del tutor pendientes de que el alumno las acepte o descarte. Lo
-  genera `POST /api/materials/:id/notes`, no `artifacts create` (el tutor solo crea quiz y test).
-- `quiz`: preguntas cerradas.
-- `test`: preguntas cerradas o `short-answer`.
+  genera `POST /api/materials/:id/notes` (ADR-016).
+- `quiz` (Control): preguntas cerradas, un tema del índice, siempre en modo práctica.
+- `test` (Examen): preguntas cerradas o de desarrollo corto, el material entero, con `mode`
+  (`practice` \| `exam`).
+
+Los tres los produce un servicio del dominio con su ruta, no el tutor: los apuntes por
+`POST /materials/:id/notes`, las pruebas por `POST /materials/:id/assessments` (ADR-016, ADR-019). El
+tutor los lee, nunca los crea (ADR-022).
 
 Tipos de pregunta:
 
-- `multiple-choice`
-- `true-false`
-- `short-answer` solo para tests.
+- `multiple-choice`: cuatro opciones, una correcta.
+- `multiple-response`: cuatro opciones, dos o tres correctas.
+- `true-false`.
+- `short-answer`: solo en `test`, corregida por el juez con rúbrica (ADR-020).
 
-Formato correcto para multiple choice:
-
-```json
-{
-  "type": "multiple-choice",
-  "options": [
-    { "id": "a", "text": "Respuesta A" },
-    { "id": "b", "text": "Respuesta B" }
-  ]
-}
-```
-
-El CLI tolera options como strings y las normaliza, pero el contrato estable usa `{ id, text }`.
+Las opciones se guardan como `{ id, text }`, pero el modelo nunca propone el `id`: devuelve las
+opciones como lista de textos y la correcta como su posición, y el código asigna `a`..`d` por orden
+(decisión 20b, F3-47). Lo mismo con los identificadores de criterio de rúbrica y de pregunta.
 
 ## Cliente web
 
