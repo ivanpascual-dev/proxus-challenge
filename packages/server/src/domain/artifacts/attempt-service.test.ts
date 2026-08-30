@@ -16,6 +16,7 @@ import {
 } from "./artifact.ts";
 import { AttemptService, AttemptServiceLive, toSolvable } from "./attempt-service.ts";
 import { OpenAnswerJudge } from "./open-answer-judge.ts";
+import { StudyProfileService } from "../profile/study-profile.ts";
 
 const source: QuestionSource = { materialId: "m1", topicId: "t1", pages: [1], transcribed: false, unanchoredReason: null };
 
@@ -116,6 +117,13 @@ const fakeJudge = Layer.succeed(OpenAnswerJudge, OpenAnswerJudge.of({
 
 const noModel = Layer.succeed(LanguageModel.LanguageModel, LanguageModel.LanguageModel.of({} as never));
 
+// El perfil se recalcula al entregar y al discrepar; aquí no se comprueba (tiene su propio test), así
+// que el doble es inofensivo.
+const fakeProfile = Layer.succeed(StudyProfileService, StudyProfileService.of({
+  sync: () => Effect.succeed({ materialId: "m", topics: [], appliedAttemptIds: [], updatedAt: null }),
+  read: () => Effect.succeed({ materialId: "m", topics: [], updatedAt: null })
+}));
+
 const run = <A, E>(
   effect: (service: AttemptService) => Effect.Effect<A, E, LanguageModel.LanguageModel>,
   artifacts: Artifact[],
@@ -129,7 +137,8 @@ const run = <A, E>(
       AttemptServiceLive.pipe(
         Layer.provide(fakeArtifacts(artifacts, attempts)),
         Layer.provide(fakeMaterials),
-        Layer.provide(fakeJudge)
+        Layer.provide(fakeJudge),
+        Layer.provide(fakeProfile)
       ),
       noModel
     ))

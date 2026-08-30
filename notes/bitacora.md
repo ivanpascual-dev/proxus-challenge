@@ -591,3 +591,22 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   y Control no cambian) y `ExamRun` lo pasa a `false`, también sobre el intento ya entregado. El dato
   sigue en la pregunta (F3-01 intacto); criterio nuevo F3-19b. No mueve ningún registro de decisiones:
   es presentación, no contrato.
+
+## 2026-08-30 · Fase 3 · tramo 3D · el bucle
+
+### Paso 25 · el perfil de estudio
+
+- **Desviación (el perfil se recalcula entero, no se aplica incremental):** el plan §6.5 describe
+  `applyAttempt(profile, artifact, gradedAttempt)` como la operación central. La implementación la
+  deja como función pura pero la envuelve en `StudyProfileService.sync`, que **reconstruye el perfil
+  desde cero** (`rebuildProfile`) a partir de todos los intentos `graded` del material en cada
+  escritura. Motivo: "esto sí lo dije" (§6.7 defensa 1) reescribe un intento ya aplicado, y un rebuild
+  desde cero lo refleja sin un camino de reversión aparte, manteniendo el determinismo y la
+  idempotencia que pide §6.5/ADR-002. `appliedAttemptIds` se guarda igual: hace idempotente el propio
+  rebuild y deja traza de qué intentos entraron.
+- **Decisión sobre la marcha (un fallo al recalcular el perfil no tumba la entrega):** `submit` y
+  `dispute` guardan el intento y **luego** llaman a `sync`; si `sync` falla se registra con
+  `logWarning` y la operación devuelve bien. El perfil es una proyección y se rehace desde cero en el
+  siguiente `sync` o `read`; dejar sin corregir un intento ya corregido por un fallo de disco del
+  perfil sería peor. Mismo criterio fail-open que el guard del examen (tramo 3C). Contexto para
+  ADR-022 (paso 30).

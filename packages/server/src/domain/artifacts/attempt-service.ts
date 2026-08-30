@@ -37,6 +37,7 @@ import { findActiveExam } from "./exam-lockdown.ts";
 import { gradeInProgressAttempt } from "./grading.ts";
 import { buildMaterialExcerpt } from "./note-source.ts";
 import { OpenAnswerJudge, type JudgeQuestion } from "./open-answer-judge.ts";
+import { StudyProfileService } from "../profile/study-profile.ts";
 
 // El ciclo de vida del intento, orquestado (§5.5, §6.1, §6.7). El intento nace `in-progress` en el
 // servidor al empezarlo (decisión 8) y cierra a `graded` (entrega) o `abandoned` (cancelado o
@@ -166,8 +167,20 @@ export const buildAssessmentListEntry = (
 export const make = (
   repository: ArtifactRepository,
   materials: MaterialRepository,
-  judge: OpenAnswerJudge
+  judge: OpenAnswerJudge,
+  profile: StudyProfileService
 ): AttemptService => {
+  // El único estado que mueve el perfil es `graded` (§5.5). El perfil es una proyección de los
+  // intentos corregidos: se recalcula al entregar y al discrepar. Un fallo al recalcularlo NO tumba
+  // la entrega (el intento ya está corregido y guardado); se registra y el siguiente `sync` o `read`
+  // lo rehará, porque parte de cero.
+  const syncProfile = (materialId: string) =>
+    profile.sync(materialId).pipe(
+      Effect.catchTag("StudyProfileError", (error) =>
+        Effect.logWarning(`no se pudo recalcular el perfil de ${materialId}: ${error.reason}`)),
+      Effect.asVoid
+    );
+
   const getAssessment = (artifactId: string) =>
     repository.getArtifact(artifactId).pipe(
       Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError =>
@@ -362,6 +375,7 @@ export const make = (
 
     const graded = gradeInProgressAttempt(artifact, { ...attempt, answers }, openCorrections);
     yield* save(graded, `No se pudo guardar el intento entregado ${attemptId}`);
+    yield* syncProfile(artifact.scope.materialId);
     return graded;
   });
 
@@ -487,6 +501,13 @@ export const make = (
           : candidate)
     };
     yield* save(disputed, `No se pudo registrar la discrepancia del intento ${attemptId}`);
+    // La pregunta discrepada deja de mover el perfil: se recalcula desde los intentos ya corregidos.
+    const assessment = yield* getAssessment(attempt.artifactId).pipe(
+      Effect.catch(() => Effect.succeed(null))
+    );
+    if (assessment !== null) {
+      yield* syncProfile(assessment.scope.materialId);
+    }
     return disputed;
   });
 
@@ -498,6 +519,7 @@ export const AttemptServiceLive = Layer.effect(AttemptService)(
     const repository = yield* ArtifactRepository;
     const materials = yield* MaterialRepository;
     const judge = yield* OpenAnswerJudge;
-    return make(repository, materials, judge);
+    const profile = yield* StudyProfileService;
+    return make(repository, materials, judge, profile);
   })
 );
