@@ -9,11 +9,16 @@ import type {
   TestQuestion
 } from "@proxus/shared";
 import { useMemo, useState } from "react";
-import { Streamdown } from "streamdown";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, submitArtifactAttemptAction } from "../domain/artifacts/atoms.ts";
 
 type Answers = Record<string, string>;
+
+const questionTypeLabels = {
+  "multiple-choice": "opción múltiple",
+  "true-false": "verdadero/falso",
+  "short-answer": "respuesta corta"
+} as const;
 
 interface ArtifactWorkspaceProps {
   readonly artifactId: string | null;
@@ -32,9 +37,9 @@ function EmptyWorkspace() {
     <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       <div className="grid h-full place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-8 text-center">
         <div>
-          <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Practice workspace</p>
-          <h2 className="text-balance font-bold text-3xl text-heading">Select a note, quiz, or test from the sidebar.</h2>
-          <p className="mt-3 max-w-xl text-muted">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
+          <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Espacio de trabajo</p>
+          <h2 className="text-balance font-bold text-3xl text-heading">Elige un quiz o un test en la barra lateral.</h2>
+          <p className="mt-3 max-w-xl text-muted">Los quizzes y los tests se resuelven aquí. Los apuntes viven en la pestaña "Apuntes" de cada material.</p>
         </div>
       </div>
     </main>
@@ -47,9 +52,9 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
   return (
     <main className="h-screen min-w-0 overflow-y-auto border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       {AsyncResult.matchWithError(artifact, {
-        onInitial: () => <p className="text-muted">Loading artifact…</p>,
-        onError: (error) => <p className="text-danger-ink">{String(error)}</p>,
-        onDefect: (defect) => <p className="text-danger-ink">{String(defect)}</p>,
+        onInitial: () => <p className="text-muted">Cargando el artefacto…</p>,
+        onError: (error) => <p className="text-danger-ink">No se pudo cargar el artefacto: {String(error)}</p>,
+        onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el artefacto: {String(defect)}</p>,
         onSuccess: ({ value }) => <ArtifactContent artifact={value} />
       })}
     </main>
@@ -59,23 +64,17 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
 function ArtifactContent({ artifact }: { readonly artifact: Artifact }) {
   switch (artifact.kind) {
     case "note":
-      return <NoteViewer artifact={artifact} />;
+      // Los apuntes se ven y se editan dentro de su material (fase 2, decisión 18); no se llega aquí
+      // por la barra lateral. Si se llega por un enlace viejo, se dice dónde están.
+      return (
+        <p className="text-muted">
+          Estos apuntes se ven desde la pestaña "Apuntes" de su material.
+        </p>
+      );
     case "quiz":
     case "test":
       return <ExerciseSolver artifact={artifact} />;
   }
-}
-
-function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "note" }> }) {
-  return (
-    <article className="mx-auto max-w-4xl rounded-3xl border border-border bg-surface p-6 shadow-2xl">
-      <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">Note</p>
-      <h2 className="mb-6 font-bold text-3xl text-heading">{artifact.title}</h2>
-      <div className="prose dark:prose-invert max-w-none">
-        <Streamdown>{artifact.markdown}</Streamdown>
-      </div>
-    </article>
-  );
 }
 
 function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "quiz" | "test" }> }) {
@@ -118,7 +117,7 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
       <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">{artifact.kind}</p>
         <h2 className="font-bold text-3xl text-heading">{artifact.title}</h2>
-        <p className="mt-2 text-muted">Answer every question, submit, and review your corrections.</p>
+        <p className="mt-2 text-muted">Responde cada pregunta, envía y revisa las correcciones.</p>
       </header>
 
       <div className="grid gap-4">
@@ -145,8 +144,8 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-muted text-sm">
                   {unansweredQuestions.length === 0
-                    ? "Ready to submit."
-                    : `${unansweredQuestions.length} question${unansweredQuestions.length === 1 ? "" : "s"} unanswered.`}
+                    ? "Listo para enviar."
+                    : `${unansweredQuestions.length} pregunta${unansweredQuestions.length === 1 ? "" : "s"} sin responder.`}
                 </p>
                 <button
                   className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -154,13 +153,13 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
                   disabled={unansweredQuestions.length > 0 || isSubmitting}
                   onClick={submit}
                 >
-                  {isSubmitting ? "Submitting…" : `Submit ${artifact.kind}`}
+                  {isSubmitting ? "Enviando…" : `Enviar ${artifact.kind}`}
                 </button>
               </div>
             )
           : (
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold text-success-ink">Attempt graded.</p>
+                <p className="font-semibold text-success-ink">Intento corregido.</p>
                 <button
                   className="rounded-full border border-border-strong px-5 py-2 text-body hover:border-brand"
                   type="button"
@@ -170,7 +169,7 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
                     setError(undefined);
                   }}
                 >
-                  Try again
+                  Volver a intentar
                 </button>
               </div>
             )}
@@ -198,7 +197,7 @@ function QuestionCard({
     <section className="rounded-3xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-2 text-muted text-sm">Question {index + 1} · {question.type}</p>
+          <p className="mb-2 text-muted text-sm">Pregunta {index + 1} · {questionTypeLabels[question.type]}</p>
           <h3 className="font-semibold text-lg text-heading">{question.prompt}</h3>
         </div>
         {correction !== undefined && <CorrectionBadge correction={correction} />}
@@ -216,7 +215,7 @@ function QuestionCard({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.currentTarget.value)}
-          placeholder="Write your answer…"
+          placeholder="Escribe tu respuesta…"
         />
       )}
 
@@ -267,8 +266,8 @@ function TrueFalseInput({
   return (
     <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
       {([
-        ["true", "True"],
-        ["false", "False"]
+        ["true", "Verdadero"],
+        ["false", "Falso"]
       ] as const).map(([nextValue, label]) => (
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand" key={nextValue}>
           <input
@@ -289,7 +288,7 @@ function TrueFalseInput({
 function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt, { readonly status: "graded" }> }) {
   return (
     <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
-      <p className="font-bold text-success-ink text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
+      <p className="font-bold text-success-ink text-xl">Puntuación: {attempt.score} / {attempt.maxScore}</p>
       <p className="mt-1 text-success-ink">{attempt.summary}</p>
     </section>
   );
@@ -301,8 +300,8 @@ function CorrectionBadge({ correction }: { readonly correction: QuestionCorrecti
   }
 
   return correction.correct
-    ? <span className="rounded-full bg-success/20 px-3 py-1 font-semibold text-success-ink text-sm">Correct</span>
-    : <span className="rounded-full bg-danger/20 px-3 py-1 font-semibold text-danger-ink text-sm">Review</span>;
+    ? <span className="rounded-full bg-success/20 px-3 py-1 font-semibold text-success-ink text-sm">Correcta</span>
+    : <span className="rounded-full bg-danger/20 px-3 py-1 font-semibold text-danger-ink text-sm">Revisar</span>;
 }
 
 function CorrectionDetails({
@@ -316,13 +315,13 @@ function CorrectionDetails({
     <div className="mt-4 rounded-2xl border border-border bg-canvas p-4 text-sm">
       {correction.questionType === "multiple-choice" && question.type === "multiple-choice" && (
         <>
-          <p className="text-body">Correct answer: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
+          <p className="text-body">Respuesta correcta: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
           <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "true-false" && (
         <>
-          <p className="text-body">Correct answer: <strong>{correction.correctAnswer ? "True" : "False"}</strong></p>
+          <p className="text-body">Respuesta correcta: <strong>{correction.correctAnswer ? "Verdadero" : "Falso"}</strong></p>
           <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}

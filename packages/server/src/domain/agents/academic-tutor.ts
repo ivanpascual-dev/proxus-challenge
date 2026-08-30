@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, Ref, Stream } from "effect";
 import { Model as AiModel } from "effect/unstable/ai";
+import { LIMITS } from "@proxus/shared";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { SessionRepository, AgentHarness, AgentSession } from "./harness/index.ts";
 import { GeminiModel } from "./gemini.ts";
@@ -13,6 +14,7 @@ import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts"
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
 import { makeArtifactCommands } from "./academic-tutor/artifact-commands.ts";
+import { make as makeNoteService } from "../artifacts/note-service.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills/index.ts";
 import { initialTurnBudgetState, type TurnBudgetState } from "../limits/turn-budget.ts";
 import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limiter.ts";
@@ -31,7 +33,12 @@ Be precise, pedagogical, and honest about what you can infer from the available 
   skills: AcademicTutorSkills,
   commands: [
     makeMaterialCommands(materialRepository, budgetRef),
-    makeArtifactCommands(artifactRepository, rateLimiter, clientKey)
+    makeArtifactCommands(
+      artifactRepository,
+      makeNoteService(artifactRepository, materialRepository),
+      rateLimiter,
+      clientKey
+    )
   ]
 });
 
@@ -60,7 +67,7 @@ export const academicTutorAgent = Effect.gen(function* () {
   const messages = yield* session.stream({
     input: task,
     messages: storedSession.messages,
-    maxSteps: 8
+    maxSteps: LIMITS.maxAgentSteps
   }).pipe(
     Stream.provide(harness.layer),
     Stream.tap((message) => Effect.gen(function* () {

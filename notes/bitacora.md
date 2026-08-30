@@ -191,3 +191,200 @@ volver a cumplir.
   que no fuera `"light"`/`"dark"` como "seguir al SO", así que no cambió.
 - **Nota para quien pruebe:** si ya se tocó el tema antes, `localStorage` tiene una elección explícita
   guardada; hay que elegir "Sistema" una vez para volver al comportamiento por defecto.
+
+## 2026-08-29 · Fase 2 · tramo 2A · hardening de los handlers de artefactos
+
+- **Decisión sobre la marcha (mapeo de `ArtifactRepositoryError` a HTTP):** al quitar los tres
+  `Effect.orDie` de `list`/`get`/`submit`, se fija el patrón para el grupo entero: `ArtifactNotFound`
+  a 404, `ArtifactTypeMismatch` a 409 y todo lo demás (fallo de disco, de serialización, de
+  calificación) a `ArtifactStorageError` 500 con cuerpo y motivo. Es el molde para `saveNote` y los
+  endpoints que vienen en 2B.
+
+## 2026-08-29 · Fase 2 · tramo 2A · el apunte por bloques
+
+El apunte pasa a ser una lista de bloques, pero el tramo se cerró más estrecho de lo que pinta el
+plan. Lo que la sesión siguiente (2B) no vería en el diff:
+
+- **Desviación (`CreateNoteArtifactInput` sigue con `markdown`):** crear un apunte lo arranca como un
+  único bloque del tutor (`makeArtifact`). La forma por bloques más la skill de generación es el paso
+  15 del plan (tramo 2B); en 2A no se tocó `artifacts create`.
+- **Desviación (`NoteService` reducido a `saveNote`):** el plan §4.5 lista cinco métodos. El resto
+  (reescritura, propuestas, resolución de fuentes) llega en 2B/2D. `NoteService` compone hoy solo
+  `ArtifactRepository`; le falta `MaterialRepository`, que entra cuando `resolveSources` deje de
+  devolver `excerpt: null`.
+- **Decisión sobre la marcha (errores de `shared` en las funciones puras):** `note-blocks.ts` usa
+  `NoteLimitExceeded` y `UnknownBlock` de `@proxus/shared` directamente, sin una capa de errores de
+  dominio aparte. Un error de contrato es aquí un error de dominio; duplicarlo no daba nada.
+- **Deuda (bloques con fuente de material se guardan con `excerpt: null`):** `resolveInputSource` deja
+  el fragmento cacheado sin rellenar; lo completará `resolveSources` en 2B leyendo el índice. Hasta
+  entonces F2-09 a F2-12 no se cumplen.
+- **Deuda (apuntes de `.data` en formato viejo):** los `.json` con `markdown` en vez de `blocks` ya no
+  decodifican. Los de prueba se borraron a mano (no los rastrea git). No hay migración: si aparece uno
+  viejo, el listado lo devuelve en `unreadable` con su motivo (F2-07), no lo convierte.
+- **Duda cerrada de refilón:** el esquema de artefactos sigue duplicado entre `shared` y
+  `server/domain` (deuda anterior, `architecture.md:288`). El mirror de los esquemas de note lo
+  hereda; lo tapa `note-schema.test.ts`, que decodifica un apunte con los dos esquemas y compara.
+
+## 2026-08-29 · Fase 2 · tramo 2B · la generación de apuntes sale del agente
+
+El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesión siguiente no vería en el diff:
+
+- **Desviación (enfoque de generación, 3 pasadas):** el plan original (§7 paso 17) generaba apuntes con
+  `artifacts create` autorado por el tutor. Iván lo rechazó dos veces: el agente colapsaba todos los
+  temas en un bloque, y la interfaz daba por "creado" lo que el agente no llegaba a guardar (viola
+  invariante 3). Solución final: `NoteGenerationService` en el dominio con ruta
+  `POST /api/materials/:id/notes`, sin agente. La estructura (un bloque por tema hoja del índice, en
+  orden, cita copiada del índice) la pone el código; el modelo solo redacta la prosa de cada bloque.
+- **Causa raíz del "bloque único":** no era el código de creación (siempre manejó N bloques). Se
+  sumaban `maxAgentSteps: 8` (empujaba al modelo a cerrar de una tacada), un único ejemplo de un
+  bloque en la skill, y el JSON entero emitido de una vez. Subir a 12 y reescribir la skill no bastó;
+  por eso la estructura pasó a código.
+- **Decisión sobre la marcha (ADR-016):** el disparador es una ruta directa, no un comando del tutor.
+  Se trazó el arnés: los comandos del `cli` son `Effect<unknown, CliError>` sin canal de dependencias
+  (`harness/cli.ts:198`), así que pasar `LanguageModel` a un comando obliga a enhebrarlo a mano por
+  los tres constructores del arnés; y generar un apunte no tiene ninguna decisión para el modelo.
+  Contexto aquí, decisión en el ADR-016.
+- **Deuda (costura de dos caminos al modelo):** el servidor llama al modelo por el arnés del tutor y
+  por los servicios `IndexingService` / `NoteGenerationService`. Deliberado y explicado en el ADR-016;
+  no se unifica en esta fase.
+- **Deuda (apuntes pobres por índice pobre):** `NoteGenerationService` redacta desde
+  `index.pages[].text`; si la extracción falló (visto: páginas con 30-670 caracteres) el bloque sale
+  flojo. `draftBlock` marca el bloque cuando el texto del tema no llega a 60 caracteres, pero no
+  re-mira el PDF. Se desbloquea re-indexando el material.
+- **Limpieza:** se retiró el parámetro `noteService` que la segunda pasada había enhebrado hasta
+  `makeArtifactCommands` sin llegar a usarlo (era para `artifacts note propose`, tramo 2D). Cuando 2D
+  lo necesite, se vuelve a cablear.
+
+## 2026-08-29 · Fase 2 · tramo 2C · reescribir un bloque y traer una URL
+
+- **Desviación (la URL devuelve también un borrador):** el plan §4.7 decía que
+  `POST /artifacts/url-source` devolviera un `UrlBlockSource` pelado. Iván pidió sobre la marcha que el
+  servidor redacte además un borrador del cuerpo del bloque, así que devuelve
+  `UrlSourceResult = { source, draft }`. El `excerpt` de `source` es el fragmento crudo de la página y
+  **el modelo no lo toca**: es el recibo verificable (invariante 8), igual que en la generación de
+  apuntes (§13). El `draft` es una segunda llamada al modelo sobre ese fragmento; si falla o la página
+  trae poco texto, `draft: null` y el bloque nace vacío con `author: "student"` (invariante 3, no se
+  disfraza el fallo). Queda recogido en el plan §16.2 y en F2-25b.
+- **Desviación (500 en `rewrite` que el plan no listaba):** `rewriteBlock` lee el artefacto del disco,
+  así que declara `ArtifactStorageError` 500 como cualquier otro handler de lectura; `Effect.orDie`
+  está prohibido (invariante 6).
+- **Deuda (DNS rebinding, riesgo 2):** entre nuestra resolución con `dns.lookup` y la que hace `fetch`
+  por su cuenta hay una ventana. Sin cerrar; va a `NOTES.md`. Se desbloquea fijando la IP resuelta y
+  pasando la cabecera `Host` a mano.
+- **Deuda (`extractText` no es un parser de HTML, riesgo 3):** con markup roto puede colar texto que no
+  es contenido. El fragmento se enseña antes de aceptarlo, así que es visible. Sin cerrar; va a
+  `NOTES.md`.
+
+## 2026-08-29 · Fase 2 · tramo 2D · el tutor propone cambios en el apunte
+
+- **Causa raíz (`artifacts note propose` fallaba siempre desde el chat):** el síntoma era `JSON.parse`
+  reventando con `Expected ',' or '}' ... at position 36`, y parecía cosa del modelo escapando mal el
+  JSON. Era el tokenizador de `harness/cli.ts`: aplicaba el desescapado de comillas dobles también
+  dentro de comillas simples, así que el `\"` correcto del modelo se convertía en `"` y rompía el JSON
+  antes de `JSON.parse`. Ahora las comillas simples son literales (semántica POSIX); solo las dobles y
+  los tokens sueltos pasan por `unescapeToken`. Antes no había ningún test del tokenizador.
+- **Decisión sobre la marcha (enmienda a ADR-014, ya en `docs/decisiones.md` y `docs/especificacion.md`
+  F2-26):** el `baseMarkdown` de una propuesta de `replace` o `remove` lo rellena el servidor con el
+  texto actual del bloque, no lo aporta el tutor (el plan §4.9 lo pedía en el JSON). Nació del fallo
+  de arriba: obligar al modelo a reproducir un bloque de varios párrafos palabra por palabra dentro
+  de un argumento JSON de una línea rompía el JSON en la práctica, y una paráfrasis mínima hacía nacer
+  la propuesta ya caducada. El tutor manda solo `blockId` (y el texto nuevo si reescribe); un
+  `blockId` que no está en el apunte se rechaza con `BlockNotFound`.
+
+## 2026-08-29 · Fase 2 · tramo 2D · el tutor lee los bloques del apunte
+
+- **Desviación (añadido no planificado a 2D):** el tramo 2D del plan (§7, §13) solo preveía
+  `artifacts note propose`. Probar el tutor con una traza que pasó Iván destapó dos cosas que ningún
+  tramo cubría; se arreglaron dentro del commit de 2D (el código) y aquí (la skill, los tests, los
+  docs). Recogido en §17 del plan.
+- **Causa raíz (contaba secciones del PDF, no bloques del apunte):** al preguntarle "¿cuántos bloques
+  hay?" el tutor listaba los encabezados del PDF y solo cambiaba de idea al decir "mapa mental"
+  explícito. No era comprensión: ninguna skill ataba la palabra "bloque" al apunte. Arreglo: sección
+  nueva "The material's study note" en `use-uploaded-materials`, donde "block / the note / the mind
+  map" son el apunte y sus bloques, nunca las secciones del PDF.
+- **Decisión sobre la marcha (índice + `artifacts block`, no volcado):** `artifacts show` de un apunte
+  real son ~15k tokens (markdown entero de cada bloque + fragmento cacheado) y disparan el aviso de
+  `maxHistoryCharacters` en un turno. `artifacts show` de un apunte pasa a devolver un índice (una
+  línea por bloque: id, encabezado, autor, énfasis, fuente, tamaño) y el texto se pide bloque a bloque
+  con `artifacts block <id> <blockIds>`. Mismo reparto que `materials view` / `materials read`. Solo
+  cambia el CLI del tutor; `GET /artifacts/:id` sigue devolviendo el apunte entero para la web. No
+  llega a ADR: es coherente con ADR-016 (lo caro se lee a demanda) y no abre ninguna puerta nueva.
+
+## 2026-08-29 · Fase 2 · tramo 2E · el bloque se escribe con un editor enriquecido
+
+- **Desviación (paquetes de TipTap v2 → v3):** el plan §11.2 y el paso 26 listan
+  `@tiptap/extension-placeholder`, `@tiptap/extension-link` y `@tiptap/extension-bubble-menu`. En
+  TipTap v3 (3.30.5) eso cambió de sitio: `Placeholder` vive en `@tiptap/extensions/placeholder`,
+  `Link` ya viene en `@tiptap/starter-kit` (se configura ahí), `BubbleMenu` es un componente de
+  `@tiptap/react/menus`. Se añaden además `@tiptap/core`, `@tiptap/extension-table` (tablas GFM) y
+  `@tiptap/suggestion` (menú «/»). Plan amendado en el tramo 2E.
+- **Desviación (`breaks: true` en `Markdown.configure`):** sin ello, un salto de línea suelto del
+  markdown ya guardado (un `**Título**` en su línea seguido del texto) pegaba las palabras al
+  re-serializar. Con `breaks: true` el salto se mantiene.
+- **Desviación (`useEditorState` para la barra):** en v3 `shouldRerenderOnTransaction` es `false` por
+  defecto, así que el componente no se re-renderiza al mover la selección y los botones "activos" de
+  la barra se quedaban congelados. `useEditorState` con un `selector` sí reacciona.
+- **Decisión sobre la marcha (ADR-017):** el editor ofrece solo formatos que `tiptap-markdown`
+  serializa a markdown limpio (`html: false`). Resaltado de color, ecuaciones, desplegables y
+  menciones quedan fuera porque exigirían HTML en el texto guardado, que rompería la reescritura de
+  bloque y la comparación `baseMarkdown` de las propuestas (ADR-014). Contexto aquí, decisión en el
+  ADR-017.
+- **Comprobado (round-trip):** montar y volver a serializar los 28 bloques reales del corpus da 0
+  pérdidas de contenido. El `onUpdate` ignora el update cuyo markdown coincide con el de carga
+  (`canonical`), para que la re-serialización del montaje (o un re-montaje de StrictMode) no ensucie
+  el apunte.
+
+## 2026-08-29 · Fase 2 · tramo 2F · cierre
+
+- **Desviación (paso 29):** el plan pide separar "Apuntes, Quizzes y Tests" en la barra lateral con
+  `artifactsByKindQuery`. Los apuntes ya salieron de la barra lateral en §13.2 (viven en su material),
+  así que el paso queda en separar `quiz` y `test` en dos secciones. Se usa `artifactsByKindQuery`
+  como pedía el plan (hasta ahora sin usar por nadie, ver `packages/web/CLAUDE.md`).
+- **Decisión menor:** el aviso de ficheros de artefacto ilegibles se lee de `artifactsByKindQuery("quiz")`.
+  El servidor devuelve `unreadable` igual con cualquier `?kind=` (lista todos los ficheros, decodifica,
+  filtra por tipo: `file-artifact-repository.ts:132`), así que da igual de cuál de las dos secciones se
+  lea y no hace falta reintroducir la consulta completa.
+- **Español:** solo quedaban en inglés `Sidebar.tsx`, `Chat.tsx` y el solucionador de ejercicios de
+  `ArtifactWorkspace.tsx` (grep del resto de `packages/web/src`, todo lo demás ya estaba). Los valores
+  del contrato (`multiple-choice`, `true-false`, `short-answer`, `quiz`, `test`) no se traducen: se
+  mapean a etiquetas en español solo para mostrar.
+- **Guardarraíles del cierre (§18 del plan):** la auditoría estática encontró un bypass ALTO de la
+  guarda anti-SSRF. `isPrivateAddress` solo casaba `::ffff:` + IPv4 con puntos; la misma dirección en
+  hex (`::ffff:7f00:1` = 127.0.0.1), y las formas 6to4 y NAT64, pasaban como públicas. Lo no evidente:
+  `new URL("https://[::ffff:a9fe:a9fe]/")` **no** normaliza a la forma con puntos, `isIP` la da por
+  IPv6 válida y `resolveAddresses` la devuelve sin pasar por DNS. Arreglo: `parseIpv6` expande a 16
+  bytes, `isPrivateIpv6` clasifica por prefijo y decodifica la IPv4 embebida en cualquiera de las tres
+  formas. Además: `rewrite`/`url-source` toman permiso de concurrencia (les faltaba), y las escrituras
+  de artefacto (`saveNote`, `accept`/`reject`, `DELETE`) pasan a tener fusible de frecuencia.
+- **DNS rebinding, no arreglado a propósito:** el arreglo correcto (fijar la IP resuelta en la
+  conexión) necesita un dispatcher de undici (no es dependencia directa de `@proxus/server`, solo
+  transitiva vía `@effect/platform-node`) o un cliente HTTP nuevo. Sobre una beta y para un riesgo
+  autoinfligido sin autenticación, no compensa. A `NOTES.md`.
+
+## 2026-08-30 · Fase 2 · cierre: hallazgos de la pasada del verifier
+
+- **F2-34 pasa a 409 (antes era un evento `failed` del stream):** generar un segundo apunte sobre un
+  material que ya tiene uno se rechazaba con `{"type":"failed",…}` y HTTP 200, porque la comprobación
+  vivía dentro de `forMaterial`, ya con el stream abierto. Ahora la ruta consulta
+  `NoteGenerationService.existingNoteId` **antes** de abrir el stream y responde **409
+  `NoteAlreadyExists`** (nuevo error en `packages/shared`, con `noteId`). Es un conflicto, no un fallo
+  a mitad de generación, y el cliente puede distinguirlo por el código. El guardarraíl de carrera
+  dentro de `forMaterial` (segunda comprobación justo antes de guardar) se queda para la ventana
+  estrecha entre la comprobación previa y el guardado; ahí sigue emitiendo `failed`.
+- **Restricción "un apunte por material", posible sobre-diseño:** Iván anota que quizá el tope de uno
+  por material sea innecesario. No se toca en fase 2 (decisión 19); queda como posible revisión futura.
+- **La guía de `artifacts note propose` acabó en su propia skill (`propose-note-changes.ts`), no
+  plegada en `create-study-artifacts` como decía el plan §4.9/§6.2.** Es lo correcto: una skill por
+  capacidad, y proponer cambios a un apunte es una capacidad distinta de autorar un quiz. Se anota
+  aquí porque el plan no lo recogió como decisión.
+- **Checklist de invariantes de la skill `proxus-verifier` desactualizado:** listaba 10, `AGENTS.md`
+  tiene 11. Añadida la #11 ("Ningún límite implícito") al `SKILL.md`.
+- **F2-41 sin test automático (deuda saldada en esta sesión):** ver la entrada del tramo 2E; el
+  round-trip markdown→editor→markdown solo se había comprobado a mano contra el corpus. Se extraen
+  las extensiones del esquema del bloque de `BlockEditor.tsx` a `noteBlockSchema.ts` (para que el
+  editor real y el test partan de la misma configuración y no puedan divergir) y se añade
+  `packages/web/src/components/note/noteBlockSchema.test.ts` con `happy-dom` como devDependency
+  (única forma de instanciar un `Editor` de TipTap fuera del navegador: `tiptap-markdown` necesita
+  `window.DOMParser` y una vista de ProseMirror montada). MIT, solo test, fuera del runtime. De paso,
+  el subrayado sale del esquema (`underline: false`): solo se representa con `<u>` y `tiptap-markdown`
+  lo perdía en silencio al guardar.

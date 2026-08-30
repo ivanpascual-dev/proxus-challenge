@@ -4,9 +4,17 @@
 
 El tutor ayuda a estudiar usando materiales locales y creando artefactos de aprendizaje:
 
-- `note`: apunte/explicación.
 - `quiz`: ejercicio corto, cerrado y autocorregible.
 - `test`: evaluación más completa; puede incluir respuesta corta.
+
+Los apuntes (`note`) **no** los crea el tutor: se generan desde la pestaña "Apuntes" de cada material
+(`POST /api/materials/:id/notes`, un servicio del dominio como la indexación). El tutor, si se lo
+piden, remite a esa pestaña. El porqué del límite está en el ADR-016: el tutor autora lo abierto
+(quiz, test); transformar un material en un activo estructurado es un servicio con ruta.
+
+Editar un apunte tampoco pasa por el tutor. Reescribir un bloque
+(`POST /api/artifacts/:id/blocks/:blockId/rewrite`) es un botón de la interfaz que llama al modelo con
+solo ese bloque y su fragmento; no hay comando del agente para ello.
 
 ## Archivos principales
 
@@ -19,6 +27,7 @@ Skills:
 
 - `packages/server/src/domain/agents/academic-tutor/skills/use-uploaded-materials.ts`
 - `packages/server/src/domain/agents/academic-tutor/skills/create-study-artifacts.ts`
+- `packages/server/src/domain/agents/academic-tutor/skills/propose-note-changes.ts`
 
 Commands:
 
@@ -40,6 +49,7 @@ Materiales:
 
 ```txt
 materials list
+materials read <materialId> <pages>
 materials view <materialId> <pages>
 ```
 
@@ -48,13 +58,30 @@ Artifacts:
 ```txt
 artifacts list
 artifacts show <artifactId>
+artifacts block <artifactId> <blockIds>
 artifacts create '<json>'
 artifacts submit '<json>'
 artifacts attempts [artifactId]
 artifacts grade <attemptId>
+artifacts note propose <artifactId> '<json>'
 ```
 
-`materials view` puede devolver imágenes de páginas para llamadas multimodales a Gemini.
+`artifacts create` solo acepta `quiz` y `test`. Los apuntes se generan fuera del tutor (ver arriba).
+
+`artifacts show` de un apunte devuelve un índice de bloques (id, encabezado, autor, énfasis, fuente,
+tamaño), no el texto; quiz y test se siguen mostrando como JSON. `artifacts block` da el markdown
+completo de los bloques pedidos (ids separados por coma), sin el fragmento cacheado. Es a `artifacts
+show` lo que `materials view` a `materials read`.
+
+`artifacts note propose` deja una propuesta pendiente (añadir, reescribir o borrar un bloque) que el
+alumno acepta o descarta desde la pestaña "Apuntes"; el tutor no puede aplicarla. Ver la skill
+`propose-note-changes`.
+
+`materials read` devuelve el texto ya indexado, agrupado por tema y con su procedencia, sin gastar
+presupuesto de imágenes: es la primera opción para leer un material. Tiene su propio techo de
+caracteres por turno (`maxIndexTextCharactersPerTurn`) y, al alcanzarlo, para y nombra la última
+página servida frente al total pedido. `materials view` puede devolver imágenes de páginas para
+llamadas multimodales a Gemini, y se reserva para cuando el texto no basta (un diagrama, una fórmula).
 
 ## Flujo de chat
 

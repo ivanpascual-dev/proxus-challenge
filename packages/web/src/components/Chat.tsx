@@ -1,17 +1,17 @@
-import { useAtomRefresh } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet } from "@effect/atom-react";
 import { LIMITS, type AgentMessage } from "@proxus/shared";
 import { useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
-import { artifactsQuery } from "../domain/artifacts/atoms.ts";
+import { invalidateArtifactsAction } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
 
 const starterPrompts = [
-  "List my uploaded materials",
-  "Create a short quiz from my materials",
-  "Explain the hardest concept in my notes step by step"
+  "Lista mis materiales subidos",
+  "Crea un quiz corto a partir de mis materiales",
+  "Explícame paso a paso el concepto más difícil de mis apuntes"
 ] as const;
 
 export function Chat() {
@@ -19,7 +19,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const refreshArtifacts = useAtomRefresh(artifactsQuery);
+  const invalidateArtifacts = useAtomSet(invalidateArtifactsAction);
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
 
@@ -58,7 +58,7 @@ export function Chat() {
           const keys = pendingInvalidations.current.shift() ?? [];
           if (!message.isFailure) {
             applyInvalidations(keys, {
-              refreshArtifacts,
+              invalidateArtifacts: () => invalidateArtifacts(),
               refreshMaterials
             });
           }
@@ -77,8 +77,8 @@ export function Chat() {
     <main className="grid h-screen max-h-screen min-w-0 grid-rows-[auto_1fr_auto_auto] bg-canvas max-md:h-auto max-md:max-h-none">
       <header className="flex items-center justify-between gap-4 border-border border-b px-6 py-5">
         <div>
-          <p className="mb-1 font-bold text-brand text-xs uppercase tracking-widest">Ephemeral session</p>
-          <h1 className="m-0 font-bold text-3xl text-heading">Academic tutor</h1>
+          <p className="mb-1 font-bold text-brand text-xs uppercase tracking-widest">Sesión efímera</p>
+          <h1 className="m-0 font-bold text-3xl text-heading">Tutor académico</h1>
         </div>
         <button
           className="rounded-full border border-border-strong px-4 py-2 text-body hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
@@ -86,7 +86,7 @@ export function Chat() {
           onClick={() => setMessages([])}
           disabled={messages.length === 0}
         >
-          Clear chat
+          Vaciar el chat
         </button>
       </header>
 
@@ -95,9 +95,9 @@ export function Chat() {
           ? (
               <div className="m-auto w-full max-w-3xl text-center">
                 <h2 className="m-0 text-balance font-bold text-4xl text-heading leading-tight md:text-6xl">
-                  Ask about your materials, notes, quizzes, or tests.
+                  Pregunta por tus materiales, apuntes, quizzes o tests.
                 </h2>
-                <p className="mt-4 text-muted">The chat history lives only in browser memory. Refreshing starts over.</p>
+                <p className="mt-4 text-muted">El historial del chat vive solo en la memoria del navegador. Al recargar, empieza de cero.</p>
                 <div className="mt-6 grid grid-cols-3 gap-3 max-lg:grid-cols-1">
                   {starterPrompts.map((prompt) => (
                     <button
@@ -131,7 +131,7 @@ export function Chat() {
             }`}
             value={input}
             onChange={(event) => setInput(event.currentTarget.value)}
-            placeholder="Ask your tutor something…"
+            placeholder="Pregúntale algo a tu tutor…"
             rows={3}
             aria-invalid={overMessageLimit}
           />
@@ -149,7 +149,7 @@ export function Chat() {
           type="submit"
           disabled={isSending || input.trim().length === 0 || overMessageLimit}
         >
-          {isSending ? "Thinking…" : "Send"}
+          {isSending ? "Pensando…" : "Enviar"}
         </button>
       </form>
     </main>
@@ -161,7 +161,7 @@ function MessageBubble({ message }: { readonly message: AgentMessage }) {
     return (
       <details className="w-full rounded-2xl border border-border bg-canvas p-4 text-muted">
         <summary className="cursor-pointer">
-          {message.role === "tool-call" ? `Tool call: ${message.name}` : `Tool result: ${message.name}`}
+          {message.role === "tool-call" ? `Llamada a herramienta: ${message.name}` : `Resultado de herramienta: ${message.name}`}
         </summary>
         <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-sm">
           {JSON.stringify(message.role === "tool-call" ? message.input : message.result, null, 2)}
@@ -176,7 +176,7 @@ function MessageBubble({ message }: { readonly message: AgentMessage }) {
       : "max-w-3xl self-start rounded-2xl border border-border bg-surface p-4"}
     >
       <span className="mb-2 block font-bold text-brand text-xs uppercase tracking-wide">
-        {message.role === "user" ? "You" : "Tutor"}
+        {message.role === "user" ? "Tú" : "Tutor"}
       </span>
       <div className="text-heading leading-7">
         <Streamdown>{message.content}</Streamdown>

@@ -11,7 +11,7 @@ export const LIMITS = {
   // Coste por turno
   maxPagesPerTurn: 20,
   maxTurnImageBytes: 12 * 1024 * 1024, // base64, medido en la fase 1
-  maxAgentSteps: 8,
+  maxAgentSteps: 12, // holgura para el camino de generación de apuntes (fase 2, decisión 22); sigue lejos del riesgo de ADR-007
 
   // Frecuencia
   messagesPerWindow: { limit: 20, windowMs: 10 * 60 * 1000 },
@@ -23,6 +23,11 @@ export const LIMITS = {
   // Tamaño de salida
   maxQuestionsPerArtifact: 50,
   maxBlocksPerNote: 200,
+  maxNoteTitleCharacters: 200,
+  maxSourceExcerptCharacters: 4_000, // fragmento cacheado por bloque
+  maxPendingProposalsPerNote: 20,
+  maxIndexTextPagesPerRead: 20, // el mismo techo que las imágenes, por coherencia
+  maxIndexTextCharactersPerTurn: 60_000, // ~15.000 tokens; 20 páginas A4 indexadas son ~44.000 caracteres
   maxTopicsPerMaterial: 40,
   maxTopicsPerPage: 3,
   maxIndexedCharactersPerPage: 8_000,

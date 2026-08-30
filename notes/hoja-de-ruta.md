@@ -135,12 +135,24 @@ viene del cliente, que puede fabricar mensajes de `assistant` y resultados de he
 - **Sesión en el servidor.** El `SessionRepository` ya existe (`.data/agent-sessions`) y solo lo usa el
   camino del CLI. Pasarlo al camino HTTP cierra el agujero del historial fabricable **y es la
   funcionalidad de historial de conversaciones**: un cambio, dos cosas.
+- **Observabilidad de la conversación, no solo el texto.** Hoy `StoredAgentSession` guarda `id`,
+  `messages`, `createdAt` y `updatedAt` y nada más: ni tokens, ni número de llamadas a `cli`, ni los
+  fallos del modelo (que `session.ts` disfraza de mensaje de texto y pierde al recargar). Al pasar la
+  sesión al HTTP se amplía el modelo para registrar, por paso: el `usage` que devuelve
+  `LanguageModel.generateText`, las tool calls y sus resultados (ya se emiten como mensajes), y los
+  errores del turno tal cual, sin convertirlos en texto. Es la invariante 3 llevada al historial: un
+  fallo del agente se guarda y se ve, no se disuelve. El coste a la vista (chips) sale de aquí.
 - **System prompt canónico**: identidad y alcance, regla de datos reales con tabla de comandos,
   herramienta primero, anti-manipulación, no inventar citas.
 - **El material envuelto como datos**, con delimitador, declarado como material del alumno y nunca como
   orden.
 - **Subir ficheros**: PDF, `.md` y `.txt`, con techo de 25 MB y tipo comprobado por contenido, no por
   extensión.
+- **Al subir, indexar y generar apuntes solos** (idea de Iván, tras probar la fase 2). Subir un PDF
+  dispara el indexado, y al terminar dispara `NoteGenerationService.forMaterial` (fase 2, decisión
+  27): el alumno sube 5 archivos y se encuentra 5 mapas mentales con sus apuntes sin pulsar nada. El
+  servicio y su ruta (`POST /api/materials/:id/notes`) ya existen; aquí solo se encadenan al alta.
+  "Mapa mental automático" = "indexar automático": el mapa ya se deriva del índice.
 - **`scripts/test-guardarrailes.mjs`**, la batería completa (ADR-008).
 - Todo **sobre el comando `cli` que ya existe** (ADR-004): cero herramientas nuevas.
 

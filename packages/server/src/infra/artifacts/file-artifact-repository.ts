@@ -103,21 +103,52 @@ export const FileArtifactRepository = {
       return yield* fs.readDirectory(targetDirectory).pipe(Effect.mapError(mapStorageError));
     });
 
+    // Recolecta por fichero: un JSON ilegible se anota con su motivo y se sigue, en vez de tumbar el
+    // listado entero y dejar a la web sin barra lateral (F2-07, invariante 3).
+    // El motivo va a la interfaz: se nombra qué fichero falla (F2-07, invariante 3) pero sin volcar el
+    // `SchemaError` crudo, que es ruido para el usuario (fase 2, decisión 28). El detalle técnico, al
+    // log del servidor.
+    const describeReadError = (error: ArtifactRepositoryError): string => {
+      switch (error._tag) {
+        case "ArtifactNotFound":
+          return "el fichero desapareció durante el listado";
+        case "ArtifactRepositorySerializationError":
+          return "no tiene el formato de un artefacto válido (puede ser de una versión anterior); bórralo o vuelve a generarlo";
+        default:
+          return "no se pudo leer del almacenamiento";
+      }
+    };
+
+    const listArtifacts = (input: ListArtifactsInput = {}) => Effect.gen(function* () {
+      const files = (yield* listFiles(artifactsDirectory)).filter((file) => file.endsWith(".json"));
+      const [unreadable, artifacts] = yield* Effect.partition(files, (file) => {
+        const artifactId = decodeURIComponent(file.replace(/\.json$/, ""));
+        return readArtifactFile(artifactId).pipe(
+          Effect.tapError((error) => Effect.logWarning(`artefacto ilegible ${file}: ${String("reason" in error ? error.reason : error._tag)}`)),
+          Effect.mapError((error) => ({ fileName: file, reason: describeReadError(error) }))
+        );
+      });
+      return {
+        artifacts: artifacts.filter((artifact) => input.kind === undefined || artifact.kind === input.kind),
+        unreadable
+      };
+    });
+
+    // `createArtifact` ya no crea apuntes (fase 2, decisión 25): solo quiz y test. El apunte lo genera
+    // `NoteGenerationService`, que comprueba el "un apunte por material" (decisión 19) antes de guardar.
     const createArtifact = (input: CreateArtifactInput) => Effect.gen(function* () {
       const artifact = makeArtifact(input);
       yield* writeArtifactFile(artifact);
       return artifact;
     });
 
-    const listArtifacts = (input: ListArtifactsInput = {}) => Effect.gen(function* () {
-      const files = yield* listFiles(artifactsDirectory);
-      const artifacts = yield* Effect.all(
-        files.filter((file) => file.endsWith(".json")).map((file) => {
-          const artifactId = decodeURIComponent(file.replace(/\.json$/, ""));
-          return readArtifactFile(artifactId);
-        })
-      );
-      return artifacts.filter((artifact) => input.kind === undefined || artifact.kind === input.kind);
+    const deleteArtifact = (id: string): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
+      const filePath = artifactPath(id);
+      const exists = yield* fs.exists(filePath).pipe(Effect.mapError(mapStorageError));
+      if (!exists) {
+        return yield* new ArtifactNotFound({ artifactId: id });
+      }
+      yield* fs.remove(filePath).pipe(Effect.mapError(mapStorageError));
     });
 
     const submitAttempt = (input: SubmitAttemptInput) => Effect.gen(function* () {
@@ -156,6 +187,7 @@ export const FileArtifactRepository = {
 
     return {
       createArtifact,
+      deleteArtifact,
       saveArtifact: writeArtifactFile,
       getArtifact: readArtifactFile,
       listArtifacts,

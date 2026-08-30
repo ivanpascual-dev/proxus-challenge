@@ -2,6 +2,10 @@ import { Effect, Layer, Option } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { HttpServerRequest } from "effect/unstable/http";
 import {
+  ArtifactNotFound as ApiArtifactNotFound,
+  ArtifactStorageError as ApiArtifactStorageError,
+  ArtifactTypeMismatch as ApiArtifactTypeMismatch,
+  BlockNotFound as ApiBlockNotFound,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
   MaterialStorageError as ApiMaterialStorageError,
@@ -9,7 +13,14 @@ import {
   ProxusApi
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
-import { ArtifactRepository, type Artifact } from "../../domain/artifacts/artifact.ts";
+import {
+  ArtifactRepository,
+  type Artifact,
+  type ArtifactRepositoryError
+} from "../../domain/artifacts/artifact.ts";
+import { NoteService } from "../../domain/artifacts/note-service.ts";
+import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
+import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -104,28 +115,134 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
 const artifactSummary = (artifact: Artifact) => ({
   id: artifact.id,
   kind: artifact.kind,
-  title: artifact.title
+  title: artifact.title,
+  // Solo los apuntes lo llevan: la interfaz los coloca en su material (fase 2, decisiones 17 a 19).
+  ...(artifact.kind === "note" ? { materialId: artifact.materialId } : {})
 });
+
+// 500 con cuerpo y motivo, nunca un orDie mudo (invariante 6, F2-08).
+const artifactStorageError = (context: string) => (error: ArtifactRepositoryError) =>
+  new ApiArtifactStorageError({
+    message: `${context}: ${String("reason" in error ? error.reason : error._tag)}`
+  });
+
+const artifactNotFound = (id: string) =>
+  new ApiArtifactNotFound({ artifactId: id, message: `No hay ningún artefacto con id ${id}.` });
 
 export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
   "artifacts",
   Effect.fn(function* (handlers) {
     const artifacts = yield* ArtifactRepository;
+    const notes = yield* NoteService;
+    const rateLimiter = yield* RateLimiter;
 
     return handlers
       .handle("list", ({ query }) => artifacts.listArtifacts({ kind: query.kind }).pipe(
-        Effect.map((items) => ({ artifacts: items.map(artifactSummary) })),
-        Effect.orDie
+        Effect.map((listing) => ({
+          artifacts: listing.artifacts.map(artifactSummary),
+          unreadable: listing.unreadable.map((file) => ({ fileName: file.fileName, reason: file.reason }))
+        })),
+        Effect.mapError(artifactStorageError("No se pudo listar los artefactos"))
       ))
-      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(Effect.orDie))
+      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(
+        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+          ? artifactNotFound(params.id)
+          : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
+      ))
       .handle("submit", ({ params, payload }) => artifacts.submitAttempt({
         ...payload,
         artifactId: params.id
       }).pipe(
         Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
-        Effect.orDie
-      ));
+        Effect.mapError((error): ApiArtifactNotFound | ApiArtifactTypeMismatch | ApiArtifactStorageError => {
+          switch (error._tag) {
+            case "ArtifactNotFound":
+              return artifactNotFound(params.id);
+            case "ArtifactTypeMismatch":
+              return new ApiArtifactTypeMismatch({
+                artifactId: params.id,
+                expected: error.expected,
+                actual: error.actual,
+                message: `El artefacto ${params.id} es de tipo ${error.actual}; se esperaba ${error.expected}.`
+              });
+            default:
+              return artifactStorageError(`No se pudo calificar el intento de ${params.id}`)(error);
+          }
+        })
+      ))
+      // Escribe el apunte entero (hasta ~1 MB con los techos de bloque). No es una operación cara ni
+      // destructiva (el último que guarda manda, por diseño), pero pasa por el fusible de frecuencia
+      // para que no se pueda martillear: cubo de mensajes, holgado para una sesión de edición.
+      .handle("saveNote", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.saveNote(params.id, payload);
+      }))
+      // Reescribe un bloque con una llamada al modelo (decisión 7): solo el texto del bloque y su
+      // fragmento cacheado (F2-17). No guarda: devuelve la propuesta y el alumno decide.
+      .handle("rewriteBlock", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        // Gasta una llamada al modelo: cuenta contra el cubo de mensajes y toma un permiso de
+        // concurrencia, para que `maxConcurrentRequests` acote también estas puertas (igual que el
+        // chat y la generación de apuntes).
+        yield* rateLimiter.check(key, "messages");
+        yield* rateLimiter.acquire(key);
+
+        return yield* Effect.gen(function* () {
+          const artifact = yield* artifacts.getArtifact(params.id).pipe(
+            Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+              ? artifactNotFound(params.id)
+              : artifactStorageError(`No se pudo leer el artefacto ${params.id}`)(error))
+          );
+
+          const block = artifact.kind === "note"
+            ? artifact.blocks.find((candidate) => candidate.id === params.blockId)
+            : undefined;
+          if (block === undefined) {
+            return yield* new ApiBlockNotFound({
+              blockId: params.blockId,
+              message: `El apunte ${params.id} no tiene ningún bloque con id ${params.blockId}.`
+            });
+          }
+
+          const excerpt = block.source === null ? null : block.source.excerpt;
+          return yield* rewriteBlock({ markdown: block.markdown, excerpt }, payload.mode);
+        }).pipe(Effect.ensuring(rateLimiter.release(key)));
+      }))
+      // Trae una URL. Las siete guardas viven en el dominio (`url-source`); aquí el fusible: sale a la
+      // red y hace hasta dos llamadas al modelo, así que cuenta contra el cubo `artifacts` (más
+      // estricto) y toma un permiso de concurrencia, igual que la generación de apuntes.
+      .handle("fetchUrlSource", ({ payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        yield* rateLimiter.acquire(key);
+        return yield* fetchUrlSource(payload.url).pipe(Effect.ensuring(rateLimiter.release(key)));
+      }))
+      // El alumno acepta o descarta una propuesta del tutor (ADR-014). El servicio devuelve ya los
+      // errores del contrato (`ProposalStale` 409 con los dos textos, F2-29), así que el handler no
+      // mapea nada: no hay `orDie` que valga (invariante 6).
+      .handle("acceptProposal", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.acceptProposal(params.id, params.proposalId);
+      }))
+      .handle("rejectProposal", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "messages");
+        return yield* notes.rejectProposal(params.id, params.proposalId);
+      }))
+      // Borrado: la única operación destructiva por HTTP de la fase 2. Cubo `artifacts` (más
+      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte.
+      .handle("deleteArtifact", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        return yield* artifacts.deleteArtifact(params.id).pipe(
+          Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
+            ? artifactNotFound(params.id)
+            : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))
+        );
+      }));
   })
 );
 

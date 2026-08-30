@@ -201,9 +201,9 @@ página sea un entero positivo y que el rango no esté invertido, y nada más: n
 ahí que `materials view apuntes 1-1000` renderice mil páginas a 144 dpi, las convierta a base64 y las
 meta todas en una petición. Eso no es lento: es una factura y casi seguro un error de tamaño de la API.
 
-**Por qué el techo por llamada no sirve.** El agente tiene 8 pasos por turno y puede llamar a
-`materials view` en cada uno. Con un tope de 20 páginas por llamada, un solo mensaje del usuario puede
-leer 160 páginas cumpliendo el límite las ocho veces.
+**Por qué el techo por llamada no sirve.** El agente tiene 8 pasos por turno (12 desde la fase 2,
+decisión 22) y puede llamar a `materials view` en cada uno. Con un tope de 20 páginas por llamada, un
+solo mensaje del usuario puede leer 160 páginas cumpliendo el límite las ocho veces.
 
 **Opciones consideradas.**
 
@@ -236,7 +236,7 @@ Cuatro familias:
 | | Fichero subido (fase 4) | 25 MB |
 | Coste por turno | Páginas renderizadas | 20 |
 | | Bytes de imagen | 12 MB, contando la cadena base64 (medido en la fase 1) |
-| | Pasos del agente | 8, **acotado en el servidor** |
+| | Pasos del agente | 12, **acotado en el servidor** (subió de 8 en la fase 2, decisión 22 del plan: holgura para el camino de generación, no más seguridad) |
 | Frecuencia | Mensajes | 20 / 10 min · 200 / día |
 | | Artefactos generados | 5 / 10 min · 40 / día |
 | | Peticiones simultáneas por cliente | 3 |
@@ -555,3 +555,247 @@ aplana al ancestro raíz. Un `parentId` colgante nunca llega al índice.
   versión; hoy la invalidación es manual.)
 - La fase 3 se encuentra los temas ya jerarquizados y no tiene que volver a pasar el modelo.
 - El coste no sube: sigue siendo una llamada por material.
+
+---
+
+## ADR-013 · El apunte es una lista de bloques, y su procedencia la copia el código
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** La nota era `{kind, id, title, markdown}`: un texto que se lee y se cierra. No se puede
+corregir un párrafo, ni añadir lo que dijo el profesor y no está en el PDF, ni saber de qué página
+salió cada idea. Y sin esa procedencia, "explícame esto mejor" obliga a releer el material entero.
+
+**Opciones consideradas.**
+
+- **Dejar el markdown y anotar la procedencia aparte**, por rangos de caracteres. Descartada: cualquier
+  edición del texto desplaza los rangos y las citas apuntan a otra frase sin que nada lo detecte. La
+  unidad de la procedencia tiene que ser la misma que la unidad de la edición.
+- **Mantener `markdown` junto a `blocks`** para no romper lo guardado. Descartada: son dos fuentes de
+  verdad del mismo texto, y la que se quede sin actualizar miente en silencio. Las notas guardadas eran
+  de prueba y se borran.
+- **Que el modelo escriba el fragmento de origen dentro de cada bloque.** Descartada, y es la que más
+  se parece a la buena: sale gratis y ya viene en la misma llamada. Pero entonces el fragmento que
+  "prueba" la cita lo escribe el mismo que hizo la cita, que es verificar al modelo con el modelo
+  (invariante 8).
+
+**Decisión.** El apunte es `{kind, id, title, blocks, proposals}`. Cada bloque lleva identidad,
+autoría (`tutor` o `student`), marca de énfasis y fuente, que puede ser un material con sus páginas o
+una URL. **El fragmento cacheado del origen lo copia el servidor del índice**, nunca el modelo; el
+modelo solo declara qué páginas cita.
+
+Una cita que no se puede comprobar contra el índice (material inexistente, sin indexar, página fuera de
+rango o página fallida) **no se descarta ni se publica como buena**: el bloque se guarda con el motivo
+concreto y la interfaz lo marca.
+
+**Consecuencias.**
+
+- Reescribir un bloque cuesta su fragmento, no el material. Ese es el ahorro que justifica la caché y
+  es medible: la petición de reescritura no lleva ni una imagen.
+- La marca de énfasis vive en el bloque. El perfil de estudio (fase 3) la derivará a temas por las
+  páginas del bloque, que es determinista. Señal separada, nunca sumada (ADR-003).
+- El fragmento es una copia: si el material se reindexa, el fragmento del bloque se queda como estaba.
+  Es deliberado (el apunte no debe cambiar solo bajo los pies del alumno) y el bloque siempre puede
+  abrir la página real, que sí está al día.
+- El esquema de artefactos está duplicado entre `packages/shared` y `packages/server/src/domain`. Este
+  cambio obliga a tocar los dos y **el typecheck no avisa si solo se toca uno**. La deuda es anterior a
+  esta decisión y sigue anotada.
+
+---
+
+## ADR-014 · El tutor propone cambios en los apuntes; aplicarlos es siempre del alumno
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** Editar los apuntes de alguien es una acción sensible: el agente lee páginas de PDF, que
+son entrada no confiable capaz de dirigir herramientas (ADR-008). Y a la vez, "añádeme aquí lo que
+faltaba" es de lo más útil que puede hacer un tutor.
+
+**Opciones consideradas.**
+
+- **Que el comando escriba directamente y el prompt le diga que pida permiso antes.** Descartada: eso
+  pone la confirmación en el prompt, que es exactamente lo que el ADR-008 prohíbe. Una inyección desde
+  el PDF conseguiría reescribir los apuntes del alumno.
+- **Que el tutor no toque los apuntes existentes.** Descartada por producto: deja "el documento vivo"
+  siendo un documento que solo vive por la mano del alumno, y el tutor solo sabe crear notas nuevas.
+- **Numerar revisiones por bloque** para detectar que el bloque cambió desde que se propuso.
+  Descartada: guardar el texto que el tutor vio cuesta lo mismo, no añade estado al bloque y además
+  permite enseñar qué cambió, no solo que cambió.
+
+**Decisión.** El tutor puede proponer insertar, reescribir o borrar un bloque, mediante
+`artifacts note propose`. La propuesta se guarda como pendiente dentro del apunte y **no altera ningún
+bloque**. La aplica o la descarta el alumno desde la interfaz.
+
+**La confirmación está en el código de la forma más fuerte posible: no existe ningún comando que
+acepte, aplique o rechace una propuesta** (ADR-008, barrera 4: lo que no debe hacer, no se le da). Una
+propuesta de reescritura o de borrado guarda `baseMarkdown`, el texto que el tutor vio; si al aceptar
+el bloque ya no coincide, se rechaza con 409 y se enseñan los dos textos.
+
+**Enmienda (2026-08-29).** `baseMarkdown` lo rellena el servidor con el texto actual del bloque en el
+momento de proponer, no lo aporta el tutor. El comando `artifacts note propose` para `replace` y
+`remove` recibe solo el `blockId` (y el texto nuevo si reescribe); un `blockId` que no está en el
+apunte se rechaza con `BlockNotFound`. Dos motivos: (1) obligar al modelo a reproducir un bloque de
+varios párrafos, palabra por palabra, dentro de un argumento JSON de una línea rompía el JSON en la
+práctica y la propuesta no se guardaba; (2) si el modelo parafraseaba mínimamente ese texto, la
+propuesta nacía caducada. La detección de caducada (F2-29) no cambia: sigue comparando el
+`baseMarkdown` guardado con el texto del bloque al aceptar. El `insert` sigue el mismo reparto: el
+tutor manda `markdown` y, si cita material, `{materialId, pages}`; el servidor genera el `id`, pone
+`author: "tutor"`, resuelve el fragmento cacheado desde el índice (invariante 8) y arma el `NoteBlock`
+completo. Por eso `ProposeNoteChangeInput` (lo que el tutor manda) tiene forma más escueta que
+`NoteProposalOperation` (lo que se guarda en el apunte).
+
+**Consecuencias.**
+
+- La peor inyección desde un PDF consigue que aparezca una propuesta que el alumno ve y descarta. No
+  consigue una escritura.
+- Es conservador de más: un espacio añadido a un bloque caduca la propuesta igual que una reescritura
+  completa. Preferimos rechazar de más a aplicar sobre un texto que el tutor no vio.
+- Las propuestas viven dentro del JSON del apunte, así que no hay almacén nuevo y tienen su techo
+  (`maxPendingProposalsPerNote`), como cualquier otra capacidad (invariante 11).
+
+---
+
+## ADR-015 · La URL externa se trae con guardas en código, y una redirección se rechaza
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-28
+
+**Contexto.** Un bloque de apuntes puede tener como fuente una URL. Eso convierte al servidor en un
+cliente HTTP que visita direcciones que elige otro, que es la definición de SSRF. El ADR-007 ya declaró
+los techos (https, 5 s, 2 MB, sin IP privada); esta decisión fija cómo se imponen.
+
+**Opciones consideradas.**
+
+- **Seguir redirecciones** (`redirect: "follow"`, el valor por defecto de `fetch`). Descartada: obliga a
+  revalidar cada salto contra la lista de direcciones privadas, y una revalidación olvidada reabre
+  entero el agujero que la comprobación inicial cerraba. Un redirector público a `127.0.0.1` es trivial
+  de montar.
+- **Filtrar por lista de dominios permitidos.** Descartada por producto: el alumno pega la URL de sus
+  apuntes, de una wiki o del blog del profesor, y una lista blanca la rechazaría casi siempre.
+- **Aceptar cualquier tipo de contenido y extraer lo que se pueda.** Descartada: traer 2 MB de binario
+  para sacar cero texto es gasto sin nada a cambio, y el mensaje de error se vuelve inexplicable.
+
+**Decisión.** Siete guardas, todas en código y todas rechazando en voz alta con el motivo concreto:
+solo `https`; el host se resuelve con `dns.lookup` y se rechaza si **alguna** dirección resuelta es
+privada, de loopback, de enlace local o no enrutable (IPv4, IPv6 y las que embeben una IPv4: mapeadas
+`::ffff:…` en cualquier notación, 6to4 `2002::/16` y NAT64 `64:ff9b::/96`); `redirect: "manual"`,
+así que una redirección se rechaza nombrando el destino; `AbortSignal.timeout`; corte por bytes leídos;
+solo `text/html` y `text/plain`; y extracción de texto con una función pura y probada.
+
+**Consecuencias.**
+
+- **La comprobación de dirección privada expande la IPv6 a sus 16 bytes**, no mira solo el primer
+  hextet ni casa con una regex de la forma con puntos. La pasada de `@guardarrailes` del cierre de fase
+  encontró que `::ffff:7f00:1` (127.0.0.1 en hex) esquivaba el filtro; el arreglo es una función pura
+  con sus tests (`url-guards.ts`, `parseIpv6` + `isPrivateIpv6`).
+- **Queda el DNS rebinding**, y decirlo es parte de la entrega: entre nuestra resolución y la que hace
+  `fetch` por su cuenta, un DNS hostil puede cambiar la respuesta. Cerrarlo bien exige fijar la IP
+  resuelta en la conexión (un dispatcher de undici o un cliente HTTP nuevo) y pasar la cabecera `Host` a
+  mano; sobre una beta y para un riesgo que, sin autenticación, es el propio usuario contra su máquina,
+  no compensa. Se documenta en `NOTES.md`.
+- La extracción de texto no es un parser de HTML y con markup roto puede colar texto que no es
+  contenido. El fragmento se enseña antes de aceptarlo, así que el fallo es visible y reversible.
+- Muchas páginas reales redirigen (de `example.com` a `www.example.com`, de HTTP a HTTPS). El alumno
+  verá el rechazo con el destino y podrá pegar la URL final. Es fricción a cambio de una superficie de
+  ataque que no se puede auditar a ojo.
+
+---
+
+## ADR-016 · El tutor autora lo abierto; transformar un material es un servicio con ruta
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-29
+
+**Contexto.** La fase 2 añade la generación de apuntes. La primera versión la hacía el tutor: un
+`artifacts create` con el JSON del apunte entero, autorado por el modelo de una tacada. Falló de tres
+formas a la vez (un solo bloque plano, JSON frágil, y fallos del agente que la interfaz daba por
+"creado" sin nada detrás, violando la invariante 3). La tercera pasada la sacó del agente:
+`NoteGenerationService` en el dominio pone la estructura (un bloque por tema hoja del índice, en orden,
+cita copiada del índice) y el modelo solo redacta la prosa de cada bloque. Quedaba decidir cómo se
+dispara.
+
+**Opciones consideradas.**
+
+- **Comando del CLI del tutor** (`artifacts note generate <materialId>`), disparado desde la pestaña
+  "Apuntes" mandando un mensaje al chat. Descartada por dos motivos. Uno, comprobado: el arnés está
+  diseñado sin canal de dependencias, los comandos son `Effect<unknown, CliError>` sin `R`
+  (`harness/cli.ts:198`), así que pasar el `LanguageModel` a un comando obliga a enhebrarlo a mano por
+  los tres sitios donde se construye el arnés. Dos, de fondo: generar el apunte no tiene **ninguna
+  decisión** para el modelo (la forma la pone el código, la entrada es solo el `materialId`); poner un
+  LLM no determinista delante de una operación que la persona dispara con un botón añade un salto que
+  puede fallar o alucinar sin aportar nada.
+- **Que el tutor autore el JSON del apunte**, como al principio. Descartada: es exactamente lo que
+  falló y motivó sacar la generación del agente.
+
+**Decisión.** Generar apuntes es un **servicio del dominio con su ruta** (`POST /api/materials/:id/notes`,
+progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `create-study-artifacts` le
+dice que se generan desde la pestaña "Apuntes" del material y que remita ahí a quien se lo pida.
+
+El límite general: **el tutor autora lo que tiene forma abierta y se pide conversando** (quiz y test;
+el modelo decide cuántas preguntas, qué evalúan y la dificultad desde texto libre). **Transformar un
+material en un activo de estudio estructurado es un servicio con ruta** (indexar, generar apuntes): el
+modelo se llama, pero no decide la forma, y la operación tiene que poder correr fuera de una
+conversación.
+
+**Esto no contradice el ADR-004.** El ADR-004 dice que una capacidad **nueva del agente** viaja sobre
+las tools que ya existen, no que todo lo que llama al modelo sea una capacidad del agente. Indexar
+llama a Gemini, no es un comando del tutor y nadie lo discute; generar apuntes es la misma categoría.
+
+**Consecuencias.**
+
+- **La fase 4 lo agradece.** Al subir ficheros, la cadena "indexar y generar apuntes solos" es
+  `IndexingService` y `NoteGenerationService` encadenados en el handler de subida. Si generar apuntes
+  fuese un comando del tutor, subir un PDF tendría que arrancar un turno de agente por material. El
+  servicio con su ruta ya queda listo para encadenar.
+- **El tutor pierde una frase de su repertorio** ("te hago unos apuntes"). A cambio, su frontera es
+  honesta y observable: ante la petición, dice dónde se hace. Donde el agente sube de valor de verdad
+  es en la fase 4, con más materiales, el perfil de estudio (ADR-002) y el selector de contexto, no
+  sellando un clic.
+- **Queda una costura**: el servidor tiene dos caminos que llaman al modelo (el arnés del tutor y los
+  servicios `IndexingService` / `NoteGenerationService`). Es deliberada y está aquí explicada; no se
+  unifica en esta fase.
+
+## ADR-017 · El editor de bloque escribe markdown limpio; lo que no cabe en markdown se queda fuera
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-29
+
+**Contexto.** El tramo 2E cambia el `<textarea>` de markdown de cada bloque por un editor de texto
+enriquecido sobre TipTap: barra flotante al seleccionar y menú «/» estilo Notion. El bloque es la
+unidad que la reescritura manda al modelo y contra la que se compara el `baseMarkdown` de una
+propuesta del tutor (ADR-014); el render de la web es Streamdown sobre ese markdown. Si el editor
+guardara HTML, o markdown con HTML incrustado, esos tres mecanismos trabajarían sobre un texto que ya
+no es markdown limpio.
+
+**Opciones consideradas.**
+
+- **Plantilla oficial "Notion-like" de TipTap.** Descartada en el plan (§11.2): requiere plan de pago
+  y cuenta en TipTap Cloud, y este repo es local, sin nube ni cuentas.
+- **Un editor del documento entero (un TipTap por apunte).** Descartada: rompe el modelo de bloques,
+  donde fuente, autoría y énfasis van por bloque (ADR-013).
+- **Ofrecer todo lo que TipTap trae** (resaltado de color, celdas con formato rico, ecuaciones,
+  desplegables, menciones a bloques). Descartada: cada uno exige HTML en el markdown guardado o un
+  cambio del pipeline de render.
+
+**Decisión.** El editor por bloque (Vía 1 del plan §11.2) monta un TipTap sobre el markdown de *su*
+bloque; `tiptap-markdown` hace el viaje de ida y vuelta con `html: false`. Se ofrecen solo los
+formatos que serializan a markdown limpio: encabezados H2-H6, negrita, cursiva, enlace, listas, cita,
+bloque de código y tabla GFM (con fila de cabecera y celdas de un solo párrafo). Resaltado de color,
+ecuaciones, desplegables y menciones a bloques quedan fuera y se aplazan a la fase 5, cuando se
+valore si compensan tocar el contrato del bloque y el render.
+
+**Consecuencias.**
+
+- Lo que se guarda sigue siendo markdown; la reescritura de un bloque, la comparación de propuestas
+  (ADR-014) y el render no cambian.
+- Round-trip fijado con un test: `packages/web/src/components/note/noteBlockSchema.test.ts` monta un
+  editor con las mismas extensiones que `BlockEditor` (extraídas a `noteBlockSchema.ts` para que no
+  puedan divergir) y comprueba, formato a formato, que serializar es idempotente y que no se cuela
+  HTML. El subrayado quedó fuera del esquema (`StarterKit`, `underline: false`): solo se representa
+  con `<u>` y se perdería en silencio. El `onUpdate` del editor ignora el update cuyo markdown
+  coincide con el de carga, para que la re-serialización del montaje no cuente como edición.
+- La tabla solo se edita dentro de los límites GFM: quitar fila o columna va siempre por el extremo,
+  para no borrar la fila de cabecera ni la primera columna (una tabla sin cabecera se serializaría
+  como HTML). El menú «/» está deshabilitado dentro de una tabla.

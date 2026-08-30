@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { NoteBlock, NoteProposal } from "./note.ts";
 
 export const QuestionOption = Schema.Struct({
   id: Schema.String,
@@ -47,11 +48,15 @@ export const TestQuestion = Schema.Union([
 ]);
 export type TestQuestion = typeof TestQuestion.Type;
 
+// El apunte nace atado a un material y hay como mucho uno por material (fase 2, decisiones 17 y 19).
+// El apunte se ve dentro de la vista de ese material, no en una lista suelta de artefactos.
 export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
   id: Schema.String,
   title: Schema.String,
-  markdown: Schema.String
+  materialId: Schema.String,
+  blocks: Schema.Array(NoteBlock),
+  proposals: Schema.Array(NoteProposal)
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 
@@ -86,12 +91,24 @@ export const ArtifactSummary = Schema.Struct({
     Schema.Literal("quiz"),
     Schema.Literal("test")
   ]),
-  title: Schema.String
+  title: Schema.String,
+  // Presente solo en los apuntes: la interfaz lo usa para colocar el apunte en su material y para no
+  // ofrecer generar otro (fase 2, decisiones 17 a 19).
+  materialId: Schema.optional(Schema.String)
 });
 export type ArtifactSummary = typeof ArtifactSummary.Type;
 
+// Un fichero de artefacto que no se pudo decodificar. Se nombra, nunca se calla: callar cuál falla es
+// el fallo silencioso que prohíbe la invariante 3 (F2-07).
+export const UnreadableArtifact = Schema.Struct({
+  fileName: Schema.String,
+  reason: Schema.String
+});
+export type UnreadableArtifact = typeof UnreadableArtifact.Type;
+
 export const ArtifactListResponse = Schema.Struct({
-  artifacts: Schema.Array(ArtifactSummary)
+  artifacts: Schema.Array(ArtifactSummary),
+  unreadable: Schema.Array(UnreadableArtifact)
 });
 export type ArtifactListResponse = typeof ArtifactListResponse.Type;
 
