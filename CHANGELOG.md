@@ -103,6 +103,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Ningún error en pantalla enseña detalle técnico.** Los mensajes de error de la aplicación dicen
   qué ha fallado y qué se puede hacer, sin nombres de fichero, errores de esquema, `_tag` ni "revisa
   el log". El detalle técnico va al log del servidor o a la consola del navegador.
+- **Los avisos de límite de frecuencia se leen en lenguaje humano.** Al agotar la ventana corta el
+  aviso nombra los minutos que dura; al agotar el tope diario dice que se descanse y se vuelva
+  mañana, en vez de hablar en segundos.
 
 ### Corregido
 
