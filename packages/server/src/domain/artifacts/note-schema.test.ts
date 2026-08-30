@@ -66,7 +66,8 @@ const source = {
   topicId: "cardinalidad",
   pages: [3, 4],
   transcribed: false,
-  unanchoredReason: null
+  unanchoredReason: null,
+  reviewReason: null
 };
 
 const quizJson = JSON.stringify({

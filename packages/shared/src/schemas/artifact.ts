@@ -7,6 +7,17 @@ export const QuestionOption = Schema.Struct({
 });
 export type QuestionOption = typeof QuestionOption.Type;
 
+// El motivo por el que una pregunta entra en una generación de repaso (§6.11, F3-33): la señal del
+// perfil que más pesó en su tema. `null` = la pregunta es de una generación de material, no de
+// repaso. La interfaz lo enseña por pregunta ("entra porque fallaste este tema" / "porque abriste
+// una pista" / "porque lo marcaste"), nunca un número resumen (invariante 5, ADR-003).
+export const QuestionReviewReason = Schema.Union([
+  Schema.Literal("fallada"),
+  Schema.Literal("pista"),
+  Schema.Literal("marcada")
+]);
+export type QuestionReviewReason = typeof QuestionReviewReason.Type;
+
 // La cita de una pregunta. La COPIA el código del índice del material (decisión 5, F2-09), nunca la
 // propone el modelo. `transcribed` marca que alguna página citada viene de una transcripción del
 // modelo (invariante 8); `unanchoredReason` no nulo significa que la cita no se pudo comprobar y la
@@ -16,7 +27,9 @@ export const QuestionSource = Schema.Struct({
   topicId: Schema.String,
   pages: Schema.Array(Schema.Number),
   transcribed: Schema.Boolean,
-  unanchoredReason: Schema.NullOr(Schema.String)
+  unanchoredReason: Schema.NullOr(Schema.String),
+  // `null` salvo en una prueba de repaso: entonces dice qué señal del perfil trajo la pregunta.
+  reviewReason: Schema.NullOr(QuestionReviewReason)
 });
 export type QuestionSource = typeof QuestionSource.Type;
 

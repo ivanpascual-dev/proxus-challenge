@@ -4,7 +4,7 @@ import { LIMITS } from "@proxus/shared";
 import type { MultipleChoiceCorrection, QuestionCorrection, QuestionSource, TestQuestion } from "./artifact.ts";
 import { displayedScore, penalty, timeLimitSeconds } from "./exam-scoring.ts";
 
-const source: QuestionSource = { materialId: "m1", topicId: "t1", pages: [1], transcribed: false, unanchoredReason: null };
+const source: QuestionSource = { materialId: "m1", topicId: "t1", pages: [1], transcribed: false, unanchoredReason: null, reviewReason: null };
 
 const mcCorrection = (id: string, correct: boolean): MultipleChoiceCorrection => ({
   questionType: "multiple-choice",

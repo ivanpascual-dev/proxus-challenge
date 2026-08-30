@@ -134,6 +134,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   la lista de pruebas y sus últimos intentos se carga igual, en vez de romperse entera.
 - **Escribir en una respuesta corta o renombrar unos apuntes ya no deja la página en blanco.** El
   campo leía su valor demasiado tarde y la excepción tumbaba toda la vista.
+- **Los temas marcados como importantes reciben más preguntas al generar una prueba.** El reparto ya
+  pesaba el énfasis, pero la generación no le pasaba qué temas estaban marcados, así que la marca no
+  cambiaba nada. Ahora un tema marcado pesa el doble en el reparto.
 
 ### Eliminado
 

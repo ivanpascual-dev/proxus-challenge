@@ -610,3 +610,21 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   siguiente `sync` o `read`; dejar sin corregir un intento ya corregido por un fallo de disco del
   perfil sería peor. Mismo criterio fail-open que el guard del examen (tramo 3C). Contexto para
   ADR-022 (paso 30).
+
+### Paso 26 · el repaso
+
+- **Deuda saldada (la decisión 2 no estaba cableada):** `assessment-shape.plan()` acepta
+  `emphasizedTopicIds` y pesa un tema marcado el doble desde el paso 8, pero
+  `assessment-generation-service` nunca le pasaba ese dato, así que marcar un tema como importante no
+  cambiaba el reparto de una prueba de material. Se cablea aquí, no en el paso 8, porque el servicio
+  solo empieza a leer el perfil de estudio en este paso (antes no tenía de dónde sacar `emphasis`).
+- **Decisión sobre la marcha (campo `reviewReason` en la cita, no estaba en el plan §5):** §6.11 y
+  F3-32 dan por hecho que cada pregunta de un repaso dice qué señal la trajo, pero el plan §5 no
+  añadió el campo al contrato. Se añade mínimo: `QuestionSource.reviewReason: "fallada" | "pista" |
+  "marcada" | null`, `null` fuera del repaso. Es por tema (todos los huecos de un tema comparten la
+  señal que más pesó, la que ya calcula `assessment-shape`), no por pregunta individual.
+- **Decisión sobre la marcha (el repaso no es fail-open):** una generación de material sigue si el
+  perfil no se puede leer (solo pierde la ponderación por énfasis); una de repaso falla en voz alta,
+  porque sin perfil no hay nada con qué concentrar las preguntas. Distinto del fail-open del guard del
+  examen y del recálculo del perfil (paso 25): allí la alternativa era encerrar o descorregir; aquí es
+  generar un repaso sin foco, que es un repaso inventado (invariante 3).

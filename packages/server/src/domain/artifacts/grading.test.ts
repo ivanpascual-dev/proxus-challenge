@@ -16,7 +16,8 @@ const source: QuestionSource = {
   topicId: "t1",
   pages: [1],
   transcribed: false,
-  unanchoredReason: null
+  unanchoredReason: null,
+  reviewReason: null
 };
 
 const options = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `o${i + 1}`, text: `Opción ${i + 1}` }));

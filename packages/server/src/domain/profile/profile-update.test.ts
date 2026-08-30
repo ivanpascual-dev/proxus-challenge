@@ -16,7 +16,8 @@ const source = (topicId: string): QuestionSource => ({
   topicId,
   pages: [1],
   transcribed: false,
-  unanchoredReason: null
+  unanchoredReason: null,
+  reviewReason: null
 });
 
 // Una prueba mínima: solo importan `id` y `source.topicId` de cada pregunta para el perfil. Un

@@ -6,6 +6,8 @@ import type { GenerateAssessmentInput, MaterialIndex } from "@proxus/shared";
 import { MaterialNotFound, MaterialNotIndexed, MaterialRepository, type PdfMaterial } from "../materials/material.ts";
 import { ArtifactRepository, ArtifactNotFound, type Artifact } from "./artifact.ts";
 import { AssessmentGenerationService, AssessmentGenerationServiceLive } from "./assessment-generation-service.ts";
+import { StudyProfileService } from "../profile/study-profile.ts";
+import type { StudyProfile } from "@proxus/shared";
 
 const material: PdfMaterial = {
   id: "logica",
@@ -69,6 +71,16 @@ const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
     getAttempt: () => Effect.die("not used"),
     listAttempts: () => Effect.succeed([]),
     gradeAttempt: () => Effect.die("not used")
+  })
+);
+
+// El perfil de estudio falso: por defecto vacío (una generación de material no lo necesita). Para el
+// repaso se le pasan señales por tema.
+const fakeProfile = (topics: StudyProfile["topics"] = []) => Layer.succeed(
+  StudyProfileService,
+  StudyProfileService.of({
+    sync: () => Effect.succeed({ materialId: material.id, topics: [], appliedAttemptIds: [], updatedAt: null }),
+    read: () => Effect.succeed({ materialId: material.id, topics, updatedAt: null })
   })
 );
 
@@ -161,14 +173,16 @@ const generate = (
   input: GenerateAssessmentInput,
   store: Artifact[],
   strategy: Parameters<typeof fakeModel>[0],
-  materialsOverride?: Partial<MaterialRepository>
-) => generateWithModel(input, store, fakeModel(strategy), materialsOverride);
+  materialsOverride?: Partial<MaterialRepository>,
+  profileTopics?: StudyProfile["topics"]
+) => generateWithModel(input, store, fakeModel(strategy), materialsOverride, profileTopics);
 
 const generateWithModel = (
   input: GenerateAssessmentInput,
   store: Artifact[],
   modelLayer: Layer.Layer<LanguageModel.LanguageModel>,
-  materialsOverride?: Partial<MaterialRepository>
+  materialsOverride?: Partial<MaterialRepository>,
+  profileTopics?: StudyProfile["topics"]
 ) =>
   Effect.runPromise(
     Effect.gen(function* () {
@@ -178,7 +192,8 @@ const generateWithModel = (
       Effect.provide(Layer.mergeAll(
         AssessmentGenerationServiceLive.pipe(
           Layer.provide(fakeArtifacts(store)),
-          Layer.provide(fakeMaterials(materialsOverride))
+          Layer.provide(fakeMaterials(materialsOverride)),
+          Layer.provide(fakeProfile(profileTopics))
         ),
         modelLayer
       ))
@@ -360,10 +375,40 @@ test("un segundo Control con preguntas distintas se guarda con las 6, y el model
   assert.ok(seen.some((prompt) => prompt.includes("Pregunta fija de opción única número 0")));
 });
 
-test("la generación de repaso todavía no está disponible en este tramo", async () => {
+test("un repaso concentra las preguntas en el tema con señal y les pone el motivo", async () => {
+  const store: Artifact[] = [];
+  const result = await generate(
+    { ...testInput, origin: "review", questionCount: 10 },
+    store,
+    "good",
+    undefined,
+    [
+      { topicId: "cuantificadores", topicLabel: "Cuantificadores", correct: 0, incorrect: 3, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false },
+      { topicId: "sintaxis", topicLabel: "Sintaxis", correct: 5, incorrect: 0, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false }
+    ]
+  );
+
+  if (result.artifact.kind === "test") {
+    assert.equal(result.artifact.origin, "review");
+    // Todo el peso está en "cuantificadores" (sintaxis no tiene fallos ni pistas ni marca).
+    assert.ok(result.artifact.questions.every((question) => question.source.topicId === "cuantificadores"));
+    assert.ok(result.artifact.questions.every((question) => question.source.reviewReason === "fallada"));
+  }
+});
+
+test("un repaso sin nada que repasar en el alcance falla diciéndolo, sin guardar", async () => {
   const store: Artifact[] = [];
   await assert.rejects(
-    generate({ ...quizInput, origin: "review" }, store, "good"),
-    (error: unknown) => /repaso/.test((error as { reason: string }).reason)
+    generate({ ...quizInput, origin: "review" }, store, "good", undefined, []),
+    (error: unknown) => /nada que repasar/.test((error as { reason: string }).reason)
   );
+  assert.equal(store.length, 0);
+});
+
+test("una prueba de material deja reviewReason a null en cada pregunta", async () => {
+  const store: Artifact[] = [];
+  const result = await generate(quizInput, store, "good");
+  if (result.artifact.kind === "quiz") {
+    assert.ok(result.artifact.questions.every((question) => question.source.reviewReason === null));
+  }
 });

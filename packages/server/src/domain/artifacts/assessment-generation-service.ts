@@ -9,10 +9,12 @@ import {
   type MaterialTopic
 } from "@proxus/shared";
 import { MaterialRepository } from "../materials/material.ts";
+import { StudyProfileService } from "../profile/study-profile.ts";
 import {
   ArtifactRepository,
   type Artifact,
   type NoteArtifact,
+  type QuestionReviewReason,
   type QuestionSource,
   type QuizArtifact,
   type QuizQuestion,
@@ -24,7 +26,9 @@ import {
   plan,
   questionCountRange,
   type AssessableQuestionType,
-  type QuestionHole
+  type HoleReason,
+  type QuestionHole,
+  type TopicSignals
 } from "./assessment-shape.ts";
 import { acceptsQuestionType, parseGeneratedQuestions, type ParsedQuestion } from "./question-parse.ts";
 import { shuffleBySeed } from "./question-order.ts";
@@ -125,9 +129,15 @@ const countByType = (holes: readonly QuestionHole[]): Map<AssessableQuestionType
 const promptFingerprint = (prompts: readonly string[]): string =>
   [...prompts].map((prompt) => prompt.trim().toLocaleLowerCase()).sort().join("\u0000");
 
+// El motivo de repaso que se guarda EN LA PREGUNTA (§6.11, F3-33). `null` = generación de material.
+// `assessment-shape` ya devuelve el `HoleReason` por tema; aquí solo se traduce al contrato.
+const toReviewReason = (holeReason: HoleReason): QuestionReviewReason | null =>
+  holeReason === "nueva" ? null : holeReason;
+
 export const make = (
   repository: ArtifactRepository,
-  materials: MaterialRepository
+  materials: MaterialRepository,
+  profile: StudyProfileService
 ): AssessmentGenerationService => {
   const readIndex = (materialId: string) =>
     materials.getIndex(materialId).pipe(
@@ -334,14 +344,6 @@ export const make = (
     Effect.gen(function* () {
       const emit: AssessmentGenerationSink = onProgress ?? (() => Effect.void);
 
-      if (input.origin === "review") {
-        // El repaso necesita el perfil de estudio, que llega en el tramo 3D (plan §8, paso 26). Hasta
-        // entonces la ruta solo genera de material.
-        return yield* new AssessmentGenerationError({
-          reason: "la generación de repaso todavía no está disponible: llega con el perfil de estudio"
-        });
-      }
-
       const material = yield* materials.get(materialId).pipe(
         Effect.catchTag("MaterialNotFound", () => new AssessmentGenerationError({ reason: `no hay ningún material con id ${materialId}` })),
         Effect.catchTag("MaterialRepositoryError", (error) =>
@@ -368,8 +370,32 @@ export const make = (
       }
 
       const note = yield* noteFor(materialId);
-      // Aquí solo se llega con `origin: "material"` (el repaso se ha cortado arriba). El repaso, cuando
-      // llegue en 3D, vuelve sobre lo visto a propósito y no pasará por esta salvaguarda.
+
+      // El perfil de estudio del material. En una generación de repaso da los pesos por tema
+      // (`2×incorrect + hintsRevealed + emphasis`) y el motivo de cada hueco; en una de material da
+      // solo qué temas están marcados, que pesan más en el reparto (decisión 2). Si no se puede leer,
+      // se sigue sin él: el repaso saldría sin foco, así que se corta antes; la generación de
+      // material simplemente no pondera por énfasis.
+      const studyProfile = yield* profile.read(materialId).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning(`generación de prueba: no se pudo leer el perfil de ${materialId}: ${error.reason}`).pipe(
+            Effect.as(null)
+          ))
+      );
+      const signals: readonly TopicSignals[] = (studyProfile?.topics ?? []).map((topic) => ({
+        topicId: topic.topicId,
+        incorrect: topic.incorrect,
+        hintsRevealed: topic.hintsRevealed,
+        emphasis: topic.emphasis
+      }));
+      const emphasizedTopicIds = signals.filter((signal) => signal.emphasis).map((signal) => signal.topicId);
+
+      if (input.origin === "review" && studyProfile === null) {
+        return yield* new AssessmentGenerationError({
+          reason: "no se pudo leer tu perfil de estudio, así que no hay con qué armar un repaso. Vuelve a intentarlo en un momento."
+        });
+      }
+
       const prior = yield* priorAssessments(materialId);
       const priorPromptsByTopic = new Map<string, string[]>();
       for (const assessment of prior) {
@@ -401,13 +427,20 @@ export const make = (
         kind: input.kind,
         origin: input.origin,
         topics: scopeTopics.map((topic) => ({ id: topic.id })),
-        questionCount: input.questionCount
+        questionCount: input.questionCount,
+        ...(input.origin === "review" ? { signals } : { emphasizedTopicIds })
       });
       if (planned.kind === "out-of-range") {
         return yield* new AssessmentGenerationError({ reason: planned.message });
       }
       if (planned.holes.length === 0) {
-        return yield* new AssessmentGenerationError({ reason: "no hay nada de lo que generar preguntas para este alcance" });
+        // En repaso, "sin huecos" significa que el perfil todavía no tiene nada que repasar de este
+        // alcance: no se inventa un repaso (invariante 3, §6.2).
+        return yield* new AssessmentGenerationError({
+          reason: input.origin === "review"
+            ? "todavía no hay nada que repasar de este alcance: no has fallado, consultado con pista ni marcado ningún tema aquí"
+            : "no hay nada de lo que generar preguntas para este alcance"
+        });
       }
 
       const holesByTopic = new Map<string, QuestionHole[]>();
@@ -447,12 +480,15 @@ export const make = (
         }
 
         const excerpt = buildMaterialExcerpt(index, topic.pages);
+        // El motivo de repaso es por tema: todos los huecos de este tema comparten la señal que más
+        // pesó (`assessment-shape.reviewReason`). Se guarda en la cita de cada pregunta.
         const source: QuestionSource = {
           materialId,
           topicId: topic.id,
           pages: [...topic.pages],
           transcribed: excerpt.transcribed,
-          unanchoredReason: excerpt.unanchoredReason
+          unanchoredReason: excerpt.unanchoredReason,
+          reviewReason: toReviewReason(holes[0]?.reason ?? "nueva")
         };
         for (const parsedQuestion of outcome.questions) {
           pending.push({ parsed: parsedQuestion, source });
@@ -473,7 +509,8 @@ export const make = (
         : attached;
 
       // Repetir alguna pregunta de una prueba anterior vale; que salgan TODAS iguales, no (F3-06b).
-      if (priorFingerprints.has(promptFingerprint(questions.map((question) => question.prompt)))) {
+      // El repaso vuelve sobre lo visto a propósito (§6.8), así que no pasa por esta salvaguarda.
+      if (input.origin === "material" && priorFingerprints.has(promptFingerprint(questions.map((question) => question.prompt)))) {
         return yield* new AssessmentGenerationError({
           reason: "la prueba habría salido con las mismas preguntas que otra que ya tienes de este alcance. Sigue repasando con los controles que ya tienes."
         });
@@ -594,6 +631,7 @@ export const AssessmentGenerationServiceLive = Layer.effect(AssessmentGeneration
   Effect.gen(function* () {
     const repository = yield* ArtifactRepository;
     const materials = yield* MaterialRepository;
-    return make(repository, materials);
+    const profile = yield* StudyProfileService;
+    return make(repository, materials, profile);
   })
 );

@@ -18,7 +18,7 @@ import { AttemptService, AttemptServiceLive, toSolvable } from "./attempt-servic
 import { OpenAnswerJudge } from "./open-answer-judge.ts";
 import { StudyProfileService } from "../profile/study-profile.ts";
 
-const source: QuestionSource = { materialId: "m1", topicId: "t1", pages: [1], transcribed: false, unanchoredReason: null };
+const source: QuestionSource = { materialId: "m1", topicId: "t1", pages: [1], transcribed: false, unanchoredReason: null, reviewReason: null };
 
 const quiz: QuizArtifact = {
   kind: "quiz",
