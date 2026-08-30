@@ -31,7 +31,8 @@ import {
   type ShortAnswerCorrection,
   type TestArtifact
 } from "./artifact.ts";
-import { applyHeartbeat, connectedSecondsNow } from "./exam-clock.ts";
+import { applyHeartbeat, connectedSecondsNow, remainingSeconds } from "./exam-clock.ts";
+import { findActiveExam } from "./exam-lockdown.ts";
 import { gradeInProgressAttempt } from "./grading.ts";
 import { buildMaterialExcerpt } from "./note-source.ts";
 import { OpenAnswerJudge, type JudgeQuestion } from "./open-answer-judge.ts";
@@ -359,24 +360,35 @@ export const make = (
           : storageError(`No se pudo leer el intento ${attemptId}`)(error))
     );
 
-  const activeExam = () =>
-    repository.listAttempts().pipe(
-      Effect.mapError(storageError("No se pudo comprobar si hay un examen en curso")),
-      Effect.map((attempts): ActiveAttemptResponse => {
-        const active = attempts.find(
-          (attempt): attempt is InProgressAttempt => attempt.status === "in-progress" && attempt.mode === "exam"
-        );
-        if (active === undefined || active.timeLimitSeconds === null) {
-          return { attemptId: null, artifactId: null, artifactKind: null, remainingSeconds: null };
-        }
-        return {
-          attemptId: active.id,
-          artifactId: active.artifactId,
-          artifactKind: active.artifactKind,
-          remainingSeconds: Math.max(0, active.timeLimitSeconds - active.connectedSeconds)
-        };
-      })
+  const noActiveExam: ActiveAttemptResponse = {
+    attemptId: null,
+    artifactId: null,
+    artifactKind: null,
+    remainingSeconds: null
+  };
+
+  const activeExam = () => Effect.gen(function* () {
+    const attempts = yield* repository.listAttempts().pipe(
+      Effect.mapError(storageError("No se pudo comprobar si hay un examen en curso"))
     );
+    const now = new Date().toISOString();
+    const found = findActiveExam(attempts, now);
+    if (found === null) {
+      return noActiveExam;
+    }
+    // La caducidad se resuelve al mirarla (§5.5): si el tiempo conectado se agotó, se cierra aquí
+    // como `abandoned`/`expired` y la puerta se abre sola.
+    if (found.expired !== null) {
+      yield* save(found.expired, `No se pudo cerrar el examen caducado ${found.attempt.id}`);
+      return noActiveExam;
+    }
+    return {
+      attemptId: found.attempt.id,
+      artifactId: found.attempt.artifactId,
+      artifactKind: found.attempt.artifactKind,
+      remainingSeconds: remainingSeconds(found.attempt, now)
+    };
+  });
 
   const heartbeat = (attemptId: string) => Effect.gen(function* () {
     const attempt = yield* getInProgress(attemptId);

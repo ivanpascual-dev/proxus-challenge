@@ -9,6 +9,7 @@ import {
   AttemptNotGraded,
   QuestionNotFound
 } from "../errors/assessment-errors.ts";
+import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 // Endpoints de intento que no cuelgan de una prueba concreta (§5.6). `/active` es lo que la interfaz
 // pregunta al arrancar para volver a un examen tras una recarga.
@@ -55,5 +56,6 @@ export class AttemptsApi extends HttpApiGroup.make("attempts")
       ]
     })
   )
+  .middleware(ExamLockdownGuard)
   .prefix("/attempts")
 {}

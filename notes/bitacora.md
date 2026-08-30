@@ -558,3 +558,10 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   cual `submit()` todavía acepta una entrega pasada del límite; más allá, `TimeLimitExceeded` 409. El
   plan §5.6 solo declaraba el error: cómo distingue el servidor la entrega automática del cliente (cabe
   en la holgura) de un `curl` tardío (no cabe) se decidió aquí. Contexto para ADR-019/021 (paso 30).
+- **Decisión sobre la marcha (el guard no cachea y falla abierto):** `ExamLockdownGuard` mira si hay
+  examen en curso leyendo todos los intentos de disco, en cada petición que cae en la lista cerrada.
+  No hay caché: un examen recién empezado tiene que cerrar la puerta al instante, y una caché con
+  invalidación repartida entre el middleware y las cuatro rutas NDJSON sueltas era más complejidad de
+  la que el ahorro justifica a esta escala (ficheros de intento acotados por los techos de §5.7). Si
+  el listado falla, la puerta se **abre** (fail-open) y el motivo va al log: encerrar al alumno por un
+  fallo de disco es peor que dejar pasar una petición. Contexto para ADR-018 (paso 30).

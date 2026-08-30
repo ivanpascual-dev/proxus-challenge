@@ -1,6 +1,7 @@
 export * from "./api/Api.ts";
 export * from "./api/artifacts.ts";
 export * from "./api/attempts.ts";
+export * from "./api/exam-lockdown.ts";
 export * from "./api/materials.ts";
 export * from "./api/tutor.ts";
 export * from "./errors/artifact-errors.ts";

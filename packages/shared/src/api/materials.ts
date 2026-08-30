@@ -4,6 +4,7 @@ import { MaterialListResponse, PageImage, PdfMaterial } from "../schemas/materia
 import { MaterialIndex } from "../schemas/material-index.ts";
 import { MaterialAssessmentsResponse } from "../schemas/attempt-api.ts";
 import { MaterialNotFound, MaterialNotIndexed, MaterialStorageError, PageOutOfRange } from "../errors/material-errors.ts";
+import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 export class MaterialsApi extends HttpApiGroup.make("materials")
   .add(
@@ -55,5 +56,6 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
       ]
     })
   )
+  .middleware(ExamLockdownGuard)
   .prefix("/materials")
 {}

@@ -36,6 +36,7 @@ import {
   TimeLimitExceeded
 } from "../errors/assessment-errors.ts";
 import { RateLimited } from "../errors/limit-exceeded.ts";
+import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 const ArtifactKindQuery = Schema.Struct({
   kind: Schema.optional(Schema.Union([
@@ -231,5 +232,6 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
       ]
     })
   )
+  .middleware(ExamLockdownGuard)
   .prefix("/artifacts")
 {}

@@ -6,6 +6,7 @@ import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
 import {
   AssessmentGenerationStreamEvent,
+  ExamInProgress,
   GenerateAssessmentInput,
   LimitExceeded,
   MaterialIndexStreamEvent,
@@ -41,11 +42,13 @@ import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
+import { ExamLockdownGuardLive, rawRouteLockdownRejection } from "./exam-lockdown-guard.ts";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
 }).pipe(
-  Layer.provide(HttpHandlersLive)
+  Layer.provide(HttpHandlersLive),
+  Layer.provide(ExamLockdownGuardLive)
 );
 
 const DocsRoute = HttpApiScalar.layer(ProxusApi, {
@@ -59,9 +62,23 @@ const encodeNdjson = (event: TutorChatStreamEvent) =>
 
 const encodeLimitExceeded = Schema.encodeSync(LimitExceeded);
 const encodeRateLimited = Schema.encodeSync(RateLimited);
+const encodeExamInProgress = Schema.encodeSync(ExamInProgress);
+
+// La puerta cerrada del examen (decisión 18) para las rutas NDJSON sueltas: no pasan por `HttpApi`,
+// así que el middleware `ExamLockdownGuard` no las cubre y comprueban a mano. Sale como JSON con
+// `message` antes de abrir el stream, igual que `RateLimited`.
+const examLockdownCheck = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  return yield* rawRouteLockdownRejection(request.method, request.url);
+});
 
 const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
   Effect.gen(function* () {
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
+
     const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest);
 
     const limitExceeded = checkChatRequestLimits(input);
@@ -123,6 +140,11 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
@@ -187,6 +209,11 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
@@ -274,6 +301,11 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
 
     const request = yield* HttpServerRequest.schemaBodyJson(GenerateAssessmentInput).pipe(
       Effect.catch(() => Effect.succeed(null))
