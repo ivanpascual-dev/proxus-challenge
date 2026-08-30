@@ -457,3 +457,11 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   un círculo "＋" de radio fijo en la esquina superior derecha del `rect` no lo toca. El `onClick` de
   abrir página baja del `<g>` al `<rect>` y los `<text>` llevan `pointerEvents="none"` para que el
   "＋" quede encima y clicable.
+
+### Paso 15 · la pestaña Pruebas se caía al abrirla
+
+- **Causa raíz:** `GET /materials/:id/assessments` devolvía `SchemaError(Missing key at ["mode"])`
+  crudo en pantalla. `listAttempts` (`file-artifact-repository.ts`) leía todos los ficheros de intento
+  con `Effect.all`: un solo fichero con el esquema viejo (sin `mode`, anterior a la fase 3) tumbaba el
+  listado entero. Ahora usa `Effect.partition` + `Effect.logWarning` y salta el fichero ilegible,
+  igual que `listArtifacts`. Hay 3 ficheros de intento pre-fase-3 en `.data` que se pueden borrar.

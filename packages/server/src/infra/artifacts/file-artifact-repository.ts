@@ -179,14 +179,20 @@ export const FileArtifactRepository = {
       return attempt;
     });
 
+    // Igual que `listArtifacts`: un fichero de intento ilegible (por ejemplo de una versión anterior
+    // del esquema) se salta y se registra con su motivo crudo en el log del servidor, en vez de
+    // tumbar el listado entero (invariante 3). El motivo técnico no viaja al cliente.
     const listAttempts = (artifactId?: string) => Effect.gen(function* () {
-      const files = yield* listFiles(attemptsDirectory);
-      const attempts = yield* Effect.all(
-        files.filter((file) => file.endsWith(".json")).map((file) => {
-          const attemptId = decodeURIComponent(file.replace(/\.json$/, ""));
-          return readAttemptFile(attemptId);
-        })
-      );
+      const files = (yield* listFiles(attemptsDirectory)).filter((file) => file.endsWith(".json"));
+      const [, attempts] = yield* Effect.partition(files, (file) => {
+        const attemptId = decodeURIComponent(file.replace(/\.json$/, ""));
+        return readAttemptFile(attemptId).pipe(
+          Effect.tapError((error) => Effect.logWarning(
+            `intento ilegible ${file}: ${String("reason" in error ? error.reason : error._tag)}`
+          )),
+          Effect.mapError(() => file)
+        );
+      });
       return attempts.filter((attempt) => artifactId === undefined || attempt.artifactId === artifactId);
     });
 

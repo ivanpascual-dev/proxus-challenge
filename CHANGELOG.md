@@ -102,6 +102,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 - **Las insignias de estado se leen en el tema claro.** "Sin indexar", "transcrito por el modelo" y
   las marcas de acierto usaban un color que sobre su fondo claro no llegaba al mínimo de contraste.
+- **La pestaña "Pruebas" ya no se cae por un intento antiguo en disco.** Si un fichero de intento
+  guardado tiene un formato de una versión anterior, se ignora y se registra en el log del servidor;
+  la lista de pruebas y sus últimos intentos se carga igual, en vez de romperse entera.
 
 ### Eliminado
 
