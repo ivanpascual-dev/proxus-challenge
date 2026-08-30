@@ -1,4 +1,4 @@
-import { Context, Data, Effect, Layer } from "effect";
+import { Context, Data, Effect, Layer, Option } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
 import { LIMITS, type MaterialIndex, type MaterialTopic } from "@proxus/shared";
 import { MaterialRepository } from "../materials/material.ts";
@@ -33,6 +33,9 @@ export interface NoteGenerationService {
     materialId: string,
     onProgress?: NoteGenerationSink
   ) => Effect.Effect<NoteArtifact, NoteGenerationError | MaterialAlreadyHasNote, LanguageModel.LanguageModel>;
+  // El id del apunte que ya tiene el material, si lo tiene. La ruta lo consulta antes de abrir el
+  // stream para responder 409 en vez de un evento `failed` a mitad (fase 2, F2-34).
+  readonly existingNoteId: (materialId: string) => Effect.Effect<Option.Option<string>, NoteGenerationError>;
 }
 
 export const NoteGenerationService = Context.Service<NoteGenerationService>(
@@ -166,7 +169,12 @@ export const make = (
     return note;
   });
 
-  return { forMaterial };
+  const existingNoteId = (materialId: string) =>
+    existingNoteFor(materialId).pipe(
+      Effect.map((note) => (note === undefined ? Option.none<string>() : Option.some(note.id)))
+    );
+
+  return { forMaterial, existingNoteId };
 };
 
 export const NoteGenerationServiceLive = Layer.effect(NoteGenerationService)(

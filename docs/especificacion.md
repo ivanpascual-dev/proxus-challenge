@@ -215,8 +215,8 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 #### El apunte y su material (tramo 2B, tras probar Iván)
 
 - **F2-34.** EL sistema DEBERÁ atar cada apunte a un material mediante `materialId`, y NO DEBERÁ
-  permitir más de un apunte por material: el segundo intento de generar uno DEBERÁ rechazarse
-  nombrando el material, sin crear nada.
+  permitir más de un apunte por material: el segundo intento de generar uno DEBERÁ rechazarse con
+  409 antes de abrir el stream, nombrando el material y el apunte que ya existe, sin crear nada.
 - **F2-35.** La interfaz DEBERÁ mostrar el apunte de un material dentro de la vista de ese material, y
   NO DEBERÁ listar los apuntes en la barra lateral de artefactos.
 - **F2-36.** CUANDO el alumno pulse "Crear apuntes" en la pestaña Apuntes de un material, EL sistema

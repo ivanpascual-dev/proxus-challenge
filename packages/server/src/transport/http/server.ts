@@ -7,6 +7,7 @@ import { LanguageModel } from "effect/unstable/ai";
 import {
   LimitExceeded,
   MaterialIndexStreamEvent,
+  NoteAlreadyExists,
   NoteGenerationStreamEvent,
   ProxusApi,
   RateLimited,
@@ -159,6 +160,7 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
   })
 );
 
+const encodeNoteAlreadyExists = Schema.encodeSync(NoteAlreadyExists);
 const encodeNoteGenEvent = Schema.encodeSync(NoteGenerationStreamEvent);
 const encodeNoteGenNdjson = (event: NoteGenerationStreamEvent) =>
   encoder.encode(`${JSON.stringify(encodeNoteGenEvent(event))}\n`);
@@ -191,6 +193,25 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     }
 
     const noteGen = yield* NoteGenerationService;
+
+    // El material ya tiene un apunte: es un conflicto, no un fallo de generación. Se responde 409
+    // antes de abrir el stream (F2-34). El guardarraíl de carrera dentro de `forMaterial` sigue ahí
+    // para la ventana estrecha entre esta comprobación y el guardado.
+    const existingNote = yield* noteGen.existingNoteId(id).pipe(
+      Effect.catchTag("NoteGenerationError", () => Effect.succeed(Option.none<string>()))
+    );
+    if (Option.isSome(existingNote)) {
+      yield* rateLimiter.release(key);
+      return yield* HttpServerResponse.json(
+        encodeNoteAlreadyExists(new NoteAlreadyExists({
+          materialId: id,
+          noteId: existingNote.value,
+          message: `El material ${id} ya tiene un apunte. Bórralo desde la pestaña Apuntes para volver a generarlo.`
+        })),
+        { status: 409 }
+      );
+    }
+
     const languageModel = yield* LanguageModel.LanguageModel;
 
     const events = Stream.callback<NoteGenerationStreamEvent, never, LanguageModel.LanguageModel>((queue) =>

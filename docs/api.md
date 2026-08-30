@@ -39,7 +39,9 @@ Los materiales representan PDFs disponibles para el tutor. El server puede rende
 `POST /:id/index` y `POST /:id/notes` devuelven NDJSON con el progreso. `/notes` genera los apuntes del
 material (un bloque por tema del índice, prosa redactada por el modelo) como un servicio del dominio
 con ruta, igual que la indexación y sin pasar por el tutor (ADR-016). Emite el progreso tema a tema y
-termina con `done` (el resumen del apunte) o `failed` (el motivo).
+termina con `done` (el resumen del apunte) o `failed` (el motivo). Si el material ya tiene un apunte
+responde **409 `NoteAlreadyExists`** (con `noteId`) antes de abrir el stream: es un conflicto, no un
+fallo de generación. También responde `429` si se supera la frecuencia.
 
 ### Artifacts
 

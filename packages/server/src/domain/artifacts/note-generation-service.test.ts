@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Option, Stream } from "effect";
 import { LanguageModel, Response } from "effect/unstable/ai";
 import type { MaterialIndex } from "@proxus/shared";
 import { MaterialNotFound, MaterialNotIndexed, MaterialRepository, type PdfMaterial } from "../materials/material.ts";
@@ -140,6 +140,40 @@ test("el segundo intento sobre el mismo material se rechaza con MaterialAlreadyH
     (error: unknown) => (error as { _tag?: string })._tag === "MaterialAlreadyHasNote"
       && (error as { noteId?: string }).noteId === first.id
   );
+});
+
+test("existingNoteId: none antes de generar, el id del apunte después (F2-34, para el 409 previo al stream)", async () => {
+  const store: Artifact[] = [];
+  const layer = Layer.mergeAll(
+    NoteGenerationServiceLive.pipe(Layer.provide(fakeArtifacts(store)), Layer.provide(fakeMaterials())),
+    fakeModel
+  );
+
+  const before = await run(
+    Effect.gen(function* () {
+      const service = yield* NoteGenerationService;
+      return yield* service.existingNoteId(material.id);
+    }),
+    layer
+  );
+  assert.equal(Option.isNone(before), true);
+
+  const note = await run(
+    Effect.gen(function* () {
+      const service = yield* NoteGenerationService;
+      return yield* service.forMaterial(material.id);
+    }),
+    layer
+  );
+
+  const after = await run(
+    Effect.gen(function* () {
+      const service = yield* NoteGenerationService;
+      return yield* service.existingNoteId(material.id);
+    }),
+    layer
+  );
+  assert.deepEqual(after, Option.some(note.id));
 });
 
 test("un material sin indexar falla con un motivo claro, sin crear nada", async () => {
