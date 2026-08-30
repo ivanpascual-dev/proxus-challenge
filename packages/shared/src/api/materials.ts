@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { MaterialListResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
 import { MaterialIndex } from "../schemas/material-index.ts";
+import { MaterialAssessmentsResponse } from "../schemas/attempt-api.ts";
 import { MaterialNotFound, MaterialNotIndexed, MaterialStorageError, PageOutOfRange } from "../errors/material-errors.ts";
 
 export class MaterialsApi extends HttpApiGroup.make("materials")
@@ -25,6 +26,18 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
       error: [
         MaterialNotFound.pipe(HttpApiSchema.status(404)),
         MaterialNotIndexed.pipe(HttpApiSchema.status(409)),
+        MaterialStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Controles y Exámenes de ese material, con su último intento (§5.6). Lo que la pestaña Pruebas
+    // necesita para pintar la lista sin descargar cada prueba entera.
+    HttpApiEndpoint.get("assessments", "/:id/assessments", {
+      params: {
+        id: Schema.String
+      },
+      success: MaterialAssessmentsResponse,
+      error: [
+        MaterialNotFound.pipe(HttpApiSchema.status(404)),
         MaterialStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),

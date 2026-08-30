@@ -13,12 +13,14 @@ import {
   ProxusApi
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
+import { GeminiJsonLanguageModelLive } from "../../domain/agents/gemini.ts";
 import {
   ArtifactRepository,
   type Artifact,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
+import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts/attempt-service.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
@@ -78,12 +80,36 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
   "materials",
   Effect.fn(function* (handlers) {
     const materials = yield* MaterialRepository;
+    const artifacts = yield* ArtifactRepository;
 
     return handlers
       .handle("list", () => materials.list().pipe(
         Effect.map((items) => ({ materials: items })),
         Effect.orDie
       ))
+      // Controles y Exámenes del material, con su último intento (§5.6). Verifica que el material
+      // existe; la prueba anclada a un material sin índice es un caso del riesgo 5, no un error aquí.
+      .handle("assessments", ({ params }) => Effect.gen(function* () {
+        yield* materials.get(params.id).pipe(
+          Effect.catchTag("MaterialRepositoryError", (error) => Effect.fail(storageError(params.id, error.reason))),
+          Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
+        );
+        const listing = yield* artifacts.listArtifacts().pipe(
+          Effect.mapError((error) => storageError(params.id, "reason" in error ? error.reason : error._tag))
+        );
+        const attempts = yield* artifacts.listAttempts().pipe(
+          Effect.mapError((error) => storageError(params.id, "reason" in error ? error.reason : error._tag))
+        );
+        const own = listing.artifacts.filter(
+          (artifact): artifact is Extract<Artifact, { kind: "quiz" | "test" }> =>
+            (artifact.kind === "quiz" || artifact.kind === "test") && artifact.scope.materialId === params.id
+        );
+        return {
+          assessments: own
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .map((artifact) => buildAssessmentListEntry(artifact, attempts))
+        };
+      }))
       .handle("get", ({ params }) => materials.get(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", Effect.die),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
@@ -116,8 +142,18 @@ const artifactSummary = (artifact: Artifact) => ({
   id: artifact.id,
   kind: artifact.kind,
   title: artifact.title,
-  // Solo los apuntes lo llevan: la interfaz los coloca en su material (fase 2, decisiones 17 a 19).
-  ...(artifact.kind === "note" ? { materialId: artifact.materialId } : {})
+  // El apunte lleva su `materialId` desde la fase 2; los Controles y Exámenes lo llevan dentro del
+  // alcance, más lo que la pestaña Pruebas necesita para pintar la lista sin descargar cada prueba
+  // entera (§5.4).
+  ...(artifact.kind === "note"
+    ? { materialId: artifact.materialId }
+    : {
+        materialId: artifact.scope.materialId,
+        createdAt: artifact.createdAt,
+        scope: artifact.scope,
+        origin: artifact.origin,
+        questionCount: artifact.questions.length
+      })
 });
 
 // 500 con cuerpo y motivo, nunca un orDie mudo (invariante 6, F2-08).
@@ -135,6 +171,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const artifacts = yield* ArtifactRepository;
     const notes = yield* NoteService;
+    const attempts = yield* AttemptService;
     const rateLimiter = yield* RateLimiter;
 
     return handlers
@@ -171,6 +208,32 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
           }
         })
       ))
+      // La prueba SIN clave de respuesta (decisión 9). Lo que se sirve mientras se resuelve.
+      .handle("solvable", ({ params }) => attempts.solvable(params.id))
+      // Empezar un intento. El techo (`maxPracticeAttemptsPerAssessment` / `maxExamAttemptsPerAssessment`)
+      // cuenta también los cancelados y caducados (decisión 22).
+      .handle("startAttempt", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        return yield* attempts.start(params.id, payload.mode);
+      }))
+      // Registrar que se abrió una pista y devolver su texto (solo en práctica, decisión 10).
+      .handle("revealHint", ({ params, payload }) => attempts.revealHint(params.id, params.attemptId, payload.questionId))
+      // Entregar y corregir. Gasta llamadas al juez: cuenta contra el cubo `artifacts` y toma un
+      // permiso de concurrencia. La capa JSON del adaptador se provee solo aquí.
+      .handle("submitAttempt", ({ params, payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        yield* rateLimiter.acquire(key);
+        return yield* attempts.submit(params.id, params.attemptId, payload.answers).pipe(
+          Effect.provide(GeminiJsonLanguageModelLive),
+          Effect.ensuring(rateLimiter.release(key))
+        );
+      }))
+      // Cancelar el intento y abrir la puerta (decisión 19).
+      .handle("abandonAttempt", ({ params }) => attempts.abandon(params.attemptId, "cancelled"))
+      // El historial de una prueba: todos sus intentos, con los abandonados y su motivo.
+      .handle("attemptHistory", ({ params }) => attempts.history(params.id).pipe(Effect.map((list) => [...list])))
       // Escribe el apunte entero (hasta ~1 MB con los techos de bloque). No es una operación cara ni
       // destructiva (el último que guarda manda, por diseño), pero pasa por el fusible de frecuencia
       // para que no se pueda martillear: cubo de mensajes, holgado para una sesión de edición.
@@ -246,8 +309,24 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   })
 );
 
+export const AttemptsHttpHandlers = HttpApiBuilder.group(
+  ProxusApi,
+  "attempts",
+  Effect.fn(function* (handlers) {
+    const attempts = yield* AttemptService;
+
+    return handlers
+      // Lo que la interfaz pregunta al arrancar para volver a un examen tras una recarga (§6.11).
+      .handle("active", () => attempts.activeExam())
+      .handle("get", ({ params }) => attempts.get(params.attemptId))
+      // "Esto sí lo dije" (§6.7, defensa 1): la pregunta pasa a `disputed` y deja de mover el perfil.
+      .handle("dispute", ({ params, payload }) => attempts.dispute(params.attemptId, payload.questionId));
+  })
+);
+
 export const HttpHandlersLive = Layer.mergeAll(
   TutorHttpHandlers,
   MaterialsHttpHandlers,
-  ArtifactsHttpHandlers
+  ArtifactsHttpHandlers,
+  AttemptsHttpHandlers
 );

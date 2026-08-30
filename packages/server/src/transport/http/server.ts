@@ -36,6 +36,8 @@ import {
   AssessmentGenerationServiceLive,
   summarizeAssessment
 } from "../../domain/artifacts/assessment-generation-service.ts";
+import { AttemptServiceLive } from "../../domain/artifacts/attempt-service.ts";
+import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
@@ -360,7 +362,8 @@ const DomainLive = Layer.mergeAll(
   GeminiModel,
   NoteServiceLive,
   NoteGenerationServiceLive,
-  AssessmentGenerationServiceLive
+  AssessmentGenerationServiceLive,
+  AttemptServiceLive.pipe(Layer.provide(OpenAnswerJudgeLive))
 ).pipe(
   Layer.provideMerge(RateLimiterLive())
 );

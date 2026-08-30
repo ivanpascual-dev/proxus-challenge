@@ -1,5 +1,6 @@
 export * from "./api/Api.ts";
 export * from "./api/artifacts.ts";
+export * from "./api/attempts.ts";
 export * from "./api/materials.ts";
 export * from "./api/tutor.ts";
 export * from "./errors/artifact-errors.ts";
@@ -14,3 +15,4 @@ export * from "./schemas/material.ts";
 export * from "./schemas/material-index.ts";
 export * from "./schemas/note-generation.ts";
 export * from "./schemas/assessment-generation.ts";
+export * from "./schemas/attempt-api.ts";

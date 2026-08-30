@@ -2,6 +2,13 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { Artifact, ArtifactAttempt, ArtifactListResponse, SubmitAttemptInput } from "../schemas/artifact.ts";
 import {
+  RevealHintInput,
+  RevealHintResult,
+  SolvableAssessment,
+  StartAttemptInput,
+  SubmitAttemptAnswersInput
+} from "../schemas/attempt-api.ts";
+import {
   FetchUrlSourceInput,
   RewriteBlockInput,
   RewrittenBlock,
@@ -21,6 +28,13 @@ import {
   UrlFetchFailed,
   UrlRejected
 } from "../errors/artifact-errors.ts";
+import {
+  AttemptAlreadyClosed,
+  AttemptLimitExceeded,
+  AttemptNotFound,
+  HintNotAvailable,
+  TimeLimitExceeded
+} from "../errors/assessment-errors.ts";
 import { RateLimited } from "../errors/limit-exceeded.ts";
 
 const ArtifactKindQuery = Schema.Struct({
@@ -54,6 +68,81 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
       },
       payload: SubmitAttemptInput,
       success: ArtifactAttempt,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // La prueba SIN clave de respuesta (decisión 9): se sirve mientras se resuelve. Ni
+    // `correctOptionId`, ni `expectedAnswer`, ni rúbrica, ni explicación, ni el texto de la pista.
+    HttpApiEndpoint.get("solvable", "/:id/solvable", {
+      params: { id: Schema.String },
+      success: SolvableAssessment,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // El intento se crea en el servidor al empezarlo (decisión 8): da `startedAt` con autoridad.
+    HttpApiEndpoint.post("startAttempt", "/:id/attempts", {
+      params: { id: Schema.String },
+      payload: StartAttemptInput,
+      success: ArtifactAttempt,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        AttemptLimitExceeded.pipe(HttpApiSchema.status(400)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Registrar que se abrió una pista y devolver su texto. Solo en modo práctica: en examen el
+    // endpoint la rechaza (decisión 10). Si no se pudo registrar, no se sirve (§6.11).
+    HttpApiEndpoint.post("revealHint", "/:id/attempts/:attemptId/hint", {
+      params: { id: Schema.String, attemptId: Schema.String },
+      payload: RevealHintInput,
+      success: RevealHintResult,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        AttemptNotFound.pipe(HttpApiSchema.status(404)),
+        AttemptAlreadyClosed.pipe(HttpApiSchema.status(409)),
+        HintNotAvailable.pipe(HttpApiSchema.status(409)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Entregar y corregir. El juez corrige el desarrollo corto; la aritmética la hace el código.
+    HttpApiEndpoint.post("submitAttempt", "/:id/attempts/:attemptId/submit", {
+      params: { id: Schema.String, attemptId: Schema.String },
+      payload: SubmitAttemptAnswersInput,
+      success: ArtifactAttempt,
+      error: [
+        ArtifactNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),
+        AttemptNotFound.pipe(HttpApiSchema.status(404)),
+        AttemptAlreadyClosed.pipe(HttpApiSchema.status(409)),
+        TimeLimitExceeded.pipe(HttpApiSchema.status(409)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Cancelar el intento y abrir la puerta (decisión 19). Se guarda como `abandoned` y se ve en el
+    // historial; no mueve el perfil (decisión 22).
+    HttpApiEndpoint.post("abandonAttempt", "/:id/attempts/:attemptId/abandon", {
+      params: { id: Schema.String, attemptId: Schema.String },
+      success: ArtifactAttempt,
+      error: [
+        AttemptNotFound.pipe(HttpApiSchema.status(404)),
+        AttemptAlreadyClosed.pipe(HttpApiSchema.status(409)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // El historial de una prueba: todos sus intentos, incluidos los abandonados con su motivo.
+    HttpApiEndpoint.get("attemptHistory", "/:id/attempts", {
+      params: { id: Schema.String },
+      success: Schema.Array(ArtifactAttempt),
       error: [
         ArtifactNotFound.pipe(HttpApiSchema.status(404)),
         ArtifactTypeMismatch.pipe(HttpApiSchema.status(409)),

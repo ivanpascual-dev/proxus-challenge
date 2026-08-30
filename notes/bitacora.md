@@ -432,3 +432,8 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   alcance y genera para `origin: "practice"` y `"exam"`; con `"review"` falla a propósito porque
   necesita el perfil de estudio (temas flojos del alumno) que llega en el tramo 3D. La pestaña Pruebas
   que consume la ruta es el paso 15, todavía no cablea "review".
+- **Deuda (`POST /artifacts/:id/submit` sigue vivo):** el plan §5.6 lo da por retirado. No se ha
+  quitado porque lo usa el solucionador viejo de `ArtifactWorkspace.tsx`. Hasta el paso 15 conviven
+  el endpoint viejo (`/:id/submit`, con `makeInProgressAttempt` sintético) y el nuevo del ciclo de
+  intento (`/:id/attempts/:attemptId/submit`); el paso 15 trae el `AssessmentSolver` nuevo y retira
+  el resto viejo.
