@@ -360,3 +360,31 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   conexión) necesita un dispatcher de undici (no es dependencia directa de `@proxus/server`, solo
   transitiva vía `@effect/platform-node`) o un cliente HTTP nuevo. Sobre una beta y para un riesgo
   autoinfligido sin autenticación, no compensa. A `NOTES.md`.
+
+## 2026-08-30 · Fase 2 · cierre: hallazgos de la pasada del verifier
+
+- **F2-34 pasa a 409 (antes era un evento `failed` del stream):** generar un segundo apunte sobre un
+  material que ya tiene uno se rechazaba con `{"type":"failed",…}` y HTTP 200, porque la comprobación
+  vivía dentro de `forMaterial`, ya con el stream abierto. Ahora la ruta consulta
+  `NoteGenerationService.existingNoteId` **antes** de abrir el stream y responde **409
+  `NoteAlreadyExists`** (nuevo error en `packages/shared`, con `noteId`). Es un conflicto, no un fallo
+  a mitad de generación, y el cliente puede distinguirlo por el código. El guardarraíl de carrera
+  dentro de `forMaterial` (segunda comprobación justo antes de guardar) se queda para la ventana
+  estrecha entre la comprobación previa y el guardado; ahí sigue emitiendo `failed`.
+- **Restricción "un apunte por material", posible sobre-diseño:** Iván anota que quizá el tope de uno
+  por material sea innecesario. No se toca en fase 2 (decisión 19); queda como posible revisión futura.
+- **La guía de `artifacts note propose` acabó en su propia skill (`propose-note-changes.ts`), no
+  plegada en `create-study-artifacts` como decía el plan §4.9/§6.2.** Es lo correcto: una skill por
+  capacidad, y proponer cambios a un apunte es una capacidad distinta de autorar un quiz. Se anota
+  aquí porque el plan no lo recogió como decisión.
+- **Checklist de invariantes de la skill `proxus-verifier` desactualizado:** listaba 10, `AGENTS.md`
+  tiene 11. Añadida la #11 ("Ningún límite implícito") al `SKILL.md`.
+- **F2-41 sin test automático (deuda saldada en esta sesión):** ver la entrada del tramo 2E; el
+  round-trip markdown→editor→markdown solo se había comprobado a mano contra el corpus. Se extraen
+  las extensiones del esquema del bloque de `BlockEditor.tsx` a `noteBlockSchema.ts` (para que el
+  editor real y el test partan de la misma configuración y no puedan divergir) y se añade
+  `packages/web/src/components/note/noteBlockSchema.test.ts` con `happy-dom` como devDependency
+  (única forma de instanciar un `Editor` de TipTap fuera del navegador: `tiptap-markdown` necesita
+  `window.DOMParser` y una vista de ProseMirror montada). MIT, solo test, fuera del runtime. De paso,
+  el subrayado sale del esquema (`underline: false`): solo se representa con `<u>` y `tiptap-markdown`
+  lo perdía en silencio al guardar.

@@ -640,7 +640,11 @@ apunte se rechaza con `BlockNotFound`. Dos motivos: (1) obligar al modelo a repr
 varios párrafos, palabra por palabra, dentro de un argumento JSON de una línea rompía el JSON en la
 práctica y la propuesta no se guardaba; (2) si el modelo parafraseaba mínimamente ese texto, la
 propuesta nacía caducada. La detección de caducada (F2-29) no cambia: sigue comparando el
-`baseMarkdown` guardado con el texto del bloque al aceptar.
+`baseMarkdown` guardado con el texto del bloque al aceptar. El `insert` sigue el mismo reparto: el
+tutor manda `markdown` y, si cita material, `{materialId, pages}`; el servidor genera el `id`, pone
+`author: "tutor"`, resuelve el fragmento cacheado desde el índice (invariante 8) y arma el `NoteBlock`
+completo. Por eso `ProposeNoteChangeInput` (lo que el tutor manda) tiene forma más escueta que
+`NoteProposalOperation` (lo que se guarda en el apunte).
 
 **Consecuencias.**
 

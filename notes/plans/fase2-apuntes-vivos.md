@@ -606,7 +606,8 @@ guardas, recargas y el markdown está intacto.
 ### Tramo 2F · Cierre
 
 28. Toda la interfaz a español: `Sidebar`, `Chat`, `ArtifactWorkspace` y el solucionador de ejercicios.
-29. La barra lateral separa Apuntes, Quizzes y Tests con `artifactsByKindQuery`.
+29. La barra lateral separa Quizzes y Tests con `artifactsByKindQuery`. Los apuntes no van en la
+    barra: viven en la pestaña Apuntes de su material (F2-35, decisión 26).
 30. `docs/especificacion.md` con los criterios F2, `docs/ai-agent.md` con los comandos nuevos,
     `docs/api.md` con los endpoints, `CHANGELOG.md`, `NOTES.md`, `notes/bitacora.md`.
 31. `pnpm test` y los tres checks del repo.

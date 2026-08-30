@@ -88,6 +88,10 @@ aparece abajo, es que este checklist se quedó atrás y eso ya es un hallazgo.
 [ ] 9. Nada que la interfaz mande al agente y el usuario no haya escrito viaja sin verse antes en
        pantalla y sin poder quitarse
 [ ] 10. No hay `Tool.make` nuevo: las capacidades añadidas son comandos del CLI que ya existía
+[ ] 11. Ningún límite implícito: todo lo que el sistema procesa (páginas, caracteres, mensajes por
+        ventana, bytes, pasos del agente, preguntas o bloques de un artefacto) tiene su techo en
+        `packages/shared/src/limits.ts` y se comprueba antes de gastar nada; cruzarlo se rechaza en
+        voz alta, nunca se recorta en silencio. Los presupuestos son por turno, no por llamada
 ```
 
 ## De dónde sale tu checklist
@@ -109,7 +113,7 @@ prueba, porque una prueba improvisada verifica lo que a ti te parece, no lo que 
 1. Salida literal de los tres checks.
 2. Tabla de la fase: criterio EARS · resultado (✅/❌) · evidencia (comando y su respuesta, fichero en
    `.data`, o "comprobado a mano" si fue interfaz).
-3. Puerta de invariantes: las siete, una a una, con evidencia (`fichero:línea`).
+3. Puerta de invariantes: todas las de `AGENTS.md`, una a una, con evidencia (`fichero:línea`).
 4. **Lo no verificable desde el repo**, aparte, para que no se confunda con verde.
 5. Veredicto: ✅ CIERRA / ⚠️ CIERRA CON DEUDA (qué queda y dónde está anotado) / 🚨 NO CIERRA (qué
    criterio o qué invariante).
