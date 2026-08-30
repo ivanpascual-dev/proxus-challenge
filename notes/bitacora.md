@@ -422,3 +422,13 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   20b/20c), pero la normalización vieja sigue viva: la usa el comando `artifacts create`, que no se
   retira hasta el tramo 3D (paso 27). Hasta entonces conviven las dos rutas de parseo. Los pasos 8
   (`assessment-shape.ts`) y 11 (capa JSON del adaptador de Gemini) salieron como el plan decía.
+- **No hizo falta parar en §6.7.1:** el plan avisaba de que, si la capa JSON de Gemini no se podía
+  proveer limpia en el punto de llamada, había que detenerse y replantear. Sí se pudo:
+  `AssessmentGenerationRoute` hace `Effect.provide(GeminiJsonLanguageModelLive)` solo en ese handler y
+  el `Stream.callback` recibe el `LanguageModel` por `Stream.provideService` desde el mismo scope. Sin
+  enhebrado manual por los constructores del arnés (el problema que sí tuvo la generación de apuntes,
+  ADR-016) y sin tocar la capa del tutor.
+- **Deuda (`origin: "review"` es stub hasta 3D):** `assessment-generation-service.ts` resuelve el
+  alcance y genera para `origin: "practice"` y `"exam"`; con `"review"` falla a propósito porque
+  necesita el perfil de estudio (temas flojos del alumno) que llega en el tramo 3D. La pestaña Pruebas
+  que consume la ruta es el paso 15, todavía no cablea "review".

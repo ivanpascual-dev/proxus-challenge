@@ -13,3 +13,4 @@ export * from "./schemas/note.ts";
 export * from "./schemas/material.ts";
 export * from "./schemas/material-index.ts";
 export * from "./schemas/note-generation.ts";
+export * from "./schemas/assessment-generation.ts";
