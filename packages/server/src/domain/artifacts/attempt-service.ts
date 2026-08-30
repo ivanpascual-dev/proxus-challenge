@@ -391,6 +391,7 @@ export const make = (
     attemptId: null,
     artifactId: null,
     artifactKind: null,
+    title: null,
     remainingSeconds: null
   };
 
@@ -409,10 +410,18 @@ export const make = (
       yield* save(found.expired, `No se pudo cerrar el examen caducado ${found.attempt.id}`);
       return noActiveExam;
     }
+    // El título es para nombrar el examen en el diálogo de "tienes un examen a medias"; si la prueba
+    // no se puede leer, el diálogo sigue saliendo sin nombre, que es preferible a dejar la puerta
+    // cerrada por un fallo de lectura del título.
+    const title = yield* repository.getArtifact(found.attempt.artifactId).pipe(
+      Effect.map((artifact): string | null => artifact.title),
+      Effect.catch(() => Effect.succeed(null))
+    );
     return {
       attemptId: found.attempt.id,
       artifactId: found.attempt.artifactId,
       artifactKind: found.attempt.artifactKind,
+      title,
       remainingSeconds: remainingSeconds(found.attempt, now)
     };
   });

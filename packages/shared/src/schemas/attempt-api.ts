@@ -92,11 +92,13 @@ export const DisputeQuestionInput = Schema.Struct({
 export type DisputeQuestionInput = typeof DisputeQuestionInput.Type;
 
 // El examen en curso, si lo hay. La interfaz lo consulta al arrancar para volver a él tras una
-// recarga (§6.11). `null` = no hay ninguno.
+// recarga (§6.11). `null` en cada campo = no hay ninguno. `title` es el de la prueba, para que el
+// diálogo de "tienes un examen a medias" (decisión 19d) la pueda nombrar sin descargarla entera.
 export const ActiveAttemptResponse = Schema.Struct({
   attemptId: Schema.NullOr(Schema.String),
   artifactId: Schema.NullOr(Schema.String),
   artifactKind: Schema.NullOr(Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")])),
+  title: Schema.NullOr(Schema.String),
   remainingSeconds: Schema.NullOr(Schema.Number)
 });
 export type ActiveAttemptResponse = typeof ActiveAttemptResponse.Type;
