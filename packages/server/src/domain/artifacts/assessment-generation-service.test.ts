@@ -82,6 +82,25 @@ const goodMultipleChoice = (n: number) =>
     hint: "piensa en la definición"
   }));
 
+const goodMultipleResponse = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    type: "multiple-response",
+    prompt: `¿Cuáles valen para el caso ${i} ${Math.random()}?`,
+    options: ["Alfa", "Beta", "Gamma", "Delta"],
+    correctIndexes: [0, 2],
+    explanation: "porque la teoría lo dice",
+    hint: "descarta las imposibles"
+  }));
+
+const goodTrueFalse = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    type: "true-false",
+    prompt: `El enunciado ${i} ${Math.random()} es cierto.`,
+    correctAnswer: i % 2 === 0,
+    explanation: "porque la teoría lo dice",
+    hint: "vuelve a la definición"
+  }));
+
 const goodShortAnswer = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
     type: "short-answer",
@@ -117,7 +136,10 @@ const fakeModel = (strategy: "good" | "half-then-good" | "always-broken" | "insu
         call += 1;
         const prompt = JSON.stringify(options.prompt);
         const wantMc = countFromPrompt(prompt, "de opción única \\(multiple-choice\\)");
+        const wantMr = countFromPrompt(prompt, "de opción múltiple \\(multiple-response\\)");
+        const wantTf = countFromPrompt(prompt, "de verdadero/falso \\(true-false\\)");
         const wantSa = countFromPrompt(prompt, "de desarrollo corto \\(short-answer\\)");
+        const rest = () => [...goodMultipleResponse(wantMr), ...goodTrueFalse(wantTf)];
 
         if (strategy === "insufficient") {
           return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ insufficientContent: true, maxPossible: 2 }) })]);
@@ -126,9 +148,9 @@ const fakeModel = (strategy: "good" | "half-then-good" | "always-broken" | "insu
           return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc).map((q) => ({ ...q, options: ["A", "A", "B", "C"] })), ...brokenShortAnswer(wantSa)] }) })]);
         }
         if (strategy === "half-then-good" && call === 1) {
-          return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc), ...brokenShortAnswer(wantSa)] }) })]);
+          return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc), ...rest(), ...brokenShortAnswer(wantSa)] }) })]);
         }
-        return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc), ...goodShortAnswer(wantSa)] }) })]);
+        return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc), ...rest(), ...goodShortAnswer(wantSa)] }) })]);
       },
       streamText: () => Stream.empty
     })
@@ -234,6 +256,30 @@ test("un Control sale completo, con cada pregunta anclada a su tema y páginas",
     assert.ok(result.artifact.questions.every((question) => question.source.pages.length > 0));
     assert.deepEqual(result.artifact.questions.map((question) => question.id), ["q1", "q2", "q3", "q4", "q5", "q6"]);
     assert.equal(result.artifact.scope.topicLabel, "Cuantificadores");
+  }
+});
+
+const testInput: GenerateAssessmentInput = {
+  kind: "test",
+  topicId: null,
+  origin: "material",
+  questionCount: 10,
+  mode: "practice"
+};
+
+test("el Examen real se genera sin pistas (ADR-018); el de prueba las conserva", async () => {
+  const realStore: Artifact[] = [];
+  const real = await generate({ ...testInput, mode: "exam" }, realStore, "good");
+  assert.equal(real.artifact.kind, "test");
+  if (real.artifact.kind === "test") {
+    assert.equal(real.artifact.mode, "exam");
+    assert.ok(real.artifact.questions.every((question) => question.hint === null));
+  }
+
+  const practiceStore: Artifact[] = [];
+  const practice = await generate(testInput, practiceStore, "good");
+  if (practice.artifact.kind === "test") {
+    assert.ok(practice.artifact.questions.some((question) => question.hint !== null));
   }
 });
 

@@ -462,9 +462,15 @@ export const make = (
       // El reparto agrupa las preguntas por tema y por tipo. Se barajan con una permutación sembrada
       // por el id de la prueba (question-order.ts) para que la posición no delate el tipo. Los ids
       // `q1`, `q2`, … se ponen ya sobre el orden final.
-      const questions: (QuizQuestion | TestQuestion)[] = shuffleBySeed(pending, assessmentId).map(
+      const attached: (QuizQuestion | TestQuestion)[] = shuffleBySeed(pending, assessmentId).map(
         (item, slot) => attachMetadata(item.parsed, `q${slot + 1}`, item.source)
       );
+
+      // El Examen real se genera sin pistas (ADR-018): el modelo las escribe igual (el prompt es
+      // canónico y no se toca), pero no se guardan. En práctica y en el Control se conservan.
+      const questions = input.kind === "test" && input.mode === "exam"
+        ? attached.map((question) => ({ ...question, hint: null }))
+        : attached;
 
       // Repetir alguna pregunta de una prueba anterior vale; que salgan TODAS iguales, no (F3-06b).
       if (priorFingerprints.has(promptFingerprint(questions.map((question) => question.prompt)))) {
