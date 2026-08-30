@@ -265,6 +265,12 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   alcance, dentro de `maxQuestionsPerAssessment` y sin superar nunca `maxQuestionsPerArtifact`.
 - **F3-06.** CUANDO se pida dos veces una prueba del mismo alcance con el mismo origen y el mismo perfil,
   EL sistema DEBERÁ producir el mismo reparto de temas y tipos, aunque los enunciados difieran.
+- **F3-06b.** CUANDO se genere una prueba de material de un alcance que ya tiene otras, EL sistema DEBERÁ
+  pasarle al modelo los enunciados existentes de ese alcance para empujarlo a variar. DOS pruebas del
+  mismo alcance PODRÁN solapar preguntas (iguales o reformuladas), pero NO DEBERÁN tener el mismo
+  conjunto entero de enunciados: SI la prueba generada coincide pregunta por pregunta con una
+  existente, ENTONCES la generación DEBERÁ fallar diciéndolo, sin guardarla. Una generación de repaso
+  NO tiene esta restricción.
 - **F3-06c.** EL orden en que una prueba presenta sus preguntas NO DEBERÁ agruparlas por tipo ni por tema;
   DEBERÁ quedar fijado al generarse (sembrado por el identificador de la prueba), de modo que las
   sucesivas lecturas de esa misma prueba lo respeten. DOS pruebas distintas, con identificadores

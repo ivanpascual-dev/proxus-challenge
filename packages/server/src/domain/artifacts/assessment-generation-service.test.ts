@@ -140,6 +140,13 @@ const generate = (
   store: Artifact[],
   strategy: Parameters<typeof fakeModel>[0],
   materialsOverride?: Partial<MaterialRepository>
+) => generateWithModel(input, store, fakeModel(strategy), materialsOverride);
+
+const generateWithModel = (
+  input: GenerateAssessmentInput,
+  store: Artifact[],
+  modelLayer: Layer.Layer<LanguageModel.LanguageModel>,
+  materialsOverride?: Partial<MaterialRepository>
 ) =>
   Effect.runPromise(
     Effect.gen(function* () {
@@ -151,10 +158,60 @@ const generate = (
           Layer.provide(fakeArtifacts(store)),
           Layer.provide(fakeMaterials(materialsOverride))
         ),
-        fakeModel(strategy)
+        modelLayer
       ))
     ) as Effect.Effect<{ artifact: Artifact; questionCount: number; retries: number }, { reason: string }>
   );
+
+// Un modelo que siempre devuelve los mismos enunciados fijos. Sirve para probar que un Control nuevo
+// no puede repetir las preguntas de uno anterior.
+const fixedPromptModel = () => Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: (options) => {
+      const prompt = JSON.stringify(options.prompt);
+      const wantMc = countFromPrompt(prompt, "de opción única \\(multiple-choice\\)");
+      const wantSa = countFromPrompt(prompt, "de desarrollo corto \\(short-answer\\)");
+      const questions = [
+        ...Array.from({ length: wantMc }, (_, i) => ({
+          type: "multiple-choice",
+          prompt: `Pregunta fija de opción única número ${i}`,
+          options: ["Alfa", "Beta", "Gamma", "Delta"],
+          correctIndex: 0,
+          explanation: "porque sí",
+          hint: null
+        })),
+        ...Array.from({ length: wantSa }, (_, i) => ({
+          type: "short-answer",
+          prompt: `Pregunta fija de desarrollo número ${i}`,
+          expectedAnswer: "una respuesta modelo",
+          rubric: ["menciona la definición"],
+          explanation: "toca el criterio",
+          hint: null
+        }))
+      ];
+      return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions }) })]);
+    },
+    streamText: () => Stream.empty
+  })
+);
+
+// Captura los prompts que ve el modelo y responde bien, con enunciados nuevos cada vez.
+const capturingModel = (seen: string[]) => Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: (options) => {
+      const prompt = JSON.stringify(options.prompt);
+      seen.push(prompt);
+      const wantMc = countFromPrompt(prompt, "de opción única \\(multiple-choice\\)");
+      const wantSa = countFromPrompt(prompt, "de desarrollo corto \\(short-answer\\)");
+      return Effect.succeed([Response.makePart("text", {
+        text: JSON.stringify({ questions: [...goodMultipleChoice(wantMc), ...goodShortAnswer(wantSa)] })
+      })]);
+    },
+    streamText: () => Stream.empty
+  })
+);
 
 const quizInput: GenerateAssessmentInput = {
   kind: "quiz",
@@ -221,6 +278,39 @@ test("fuera de rango: pedir 3 preguntas se rechaza nombrando el rango", async ()
     generate({ ...quizInput, questionCount: 3 }, store, "good"),
     (error: unknown) => /entre 4 y 8/.test((error as { reason: string }).reason)
   );
+});
+
+test("si un segundo Control del mismo tema saldría idéntico pregunta por pregunta, la generación falla", async () => {
+  const store: Artifact[] = [];
+  const first = await generateWithModel(quizInput, store, fixedPromptModel());
+  assert.equal(store.length, 1);
+  const firstPrompts = first.artifact.kind === "quiz" ? first.artifact.questions.map((question) => question.prompt) : [];
+
+  // El modelo insiste en los mismos seis enunciados: el conjunto entero coincide con la prueba
+  // anterior y la generación falla sin guardar un segundo Control.
+  await assert.rejects(
+    generateWithModel(quizInput, store, fixedPromptModel()),
+    (error: unknown) => /mismas preguntas/.test((error as { reason: string }).reason)
+  );
+  assert.equal(store.length, 1);
+  assert.deepEqual(
+    (store[0]?.kind === "quiz" ? store[0].questions.map((question) => question.prompt) : []),
+    firstPrompts
+  );
+});
+
+test("un segundo Control con preguntas distintas se guarda con las 6, y el modelo ve los enunciados anteriores", async () => {
+  const store: Artifact[] = [];
+  await generateWithModel(quizInput, store, fixedPromptModel());
+
+  const seen: string[] = [];
+  const second = await generateWithModel(quizInput, store, capturingModel(seen));
+
+  assert.equal(store.length, 2);
+  assert.equal(second.questionCount, 6);
+  // El primer control usó enunciados "Pregunta fija ... número N": deben aparecer en el prompt del
+  // segundo como referencia para variar.
+  assert.ok(seen.some((prompt) => prompt.includes("Pregunta fija de opción única número 0")));
 });
 
 test("la generación de repaso todavía no está disponible en este tramo", async () => {

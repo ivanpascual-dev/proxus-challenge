@@ -120,6 +120,11 @@ const countByType = (holes: readonly QuestionHole[]): Map<AssessableQuestionType
   return counts;
 };
 
+// Huella de una prueba por el conjunto de sus enunciados, sin importar el orden. Dos pruebas con la
+// misma huella son la misma prueba (F3-06b): repetir alguna pregunta vale, repetirlas todas no.
+const promptFingerprint = (prompts: readonly string[]): string =>
+  [...prompts].map((prompt) => prompt.trim().toLocaleLowerCase()).sort().join("\u0000");
+
 export const make = (
   repository: ArtifactRepository,
   materials: MaterialRepository
@@ -143,6 +148,18 @@ export const make = (
             (artifact.kind === "quiz" || artifact.kind === "test") && artifact.scope.materialId === materialId
         )
       )
+    );
+
+  // Las pruebas que ya existen del material. Sirven para dos cosas al generar una nueva: enseñarle al
+  // modelo los enunciados de ese tema para que varíe, y descartar una prueba entera idéntica a otra
+  // del mismo alcance. Si el listado falla, se sigue sin ellas: son una salvaguarda, no un requisito,
+  // y su fallo no debe tumbar la generación.
+  const priorAssessments = (materialId: string) =>
+    existingAssessments(materialId).pipe(
+      Effect.catch(() =>
+        Effect.logWarning(`generación de prueba: no se pudieron leer las pruebas previas de ${materialId}; se generará sin comprobar repeticiones`).pipe(
+          Effect.as([] as readonly (QuizArtifact | TestArtifact)[])
+        ))
     );
 
   const noteFor = (materialId: string) =>
@@ -209,7 +226,13 @@ export const make = (
     holes: readonly QuestionHole[],
     index: MaterialIndex,
     noteMarkdown: string | null,
-    kind: "quiz" | "test"
+    kind: "quiz" | "test",
+    // Enunciados de las pruebas que ya existen de este tema. Se le enseñan al modelo para empujarlo a
+    // variar (otras preguntas, o las mismas dichas de otra forma). Repetir una pregunta no es un
+    // problema; lo que no puede salir es una prueba entera idéntica a otra, y eso lo comprueba quien
+    // llama con el resultado completo. El repaso, que vuelve sobre lo visto a propósito, no pasa por
+    // aquí.
+    priorPrompts: readonly string[]
   ): Effect.Effect<
     { readonly questions: readonly ParsedQuestion[]; readonly retries: number; readonly insufficient: number | null },
     AssessmentGenerationError,
@@ -223,6 +246,7 @@ export const make = (
 
     const deficit = countByType(holes);
     const collected: ParsedQuestion[] = [];
+    // Solo evita que el modelo repita una pregunta DENTRO de esta misma generación (entre reintentos).
     const seenPrompts = new Set<string>();
     let retries = 0;
 
@@ -238,9 +262,13 @@ export const make = (
       const request = stillNeeded
         .map(([type, count]) => `- ${count} preguntas ${QUESTION_TYPE_LABEL[type]}`)
         .join("\n");
-      const already = collected.length === 0
+      const offLimits = [
+        ...priorPrompts.map((prompt) => `- ${prompt}`),
+        ...collected.map((question) => `- ${question.prompt}`)
+      ];
+      const already = offLimits.length === 0
         ? ""
-        : `\n\nYa tienes estas preguntas, no las repitas:\n${collected.map((question) => `- ${question.prompt}`).join("\n")}`;
+        : `\n\nEstas preguntas ya se han usado en otras pruebas de este tema o ya las tienes en esta. Intenta plantear otras, sobre aspectos distintos del texto; si vuelves sobre una idea, dila de otra forma:\n${offLimits.join("\n")}`;
 
       const response = yield* LanguageModel.generateText({
         prompt: [
@@ -336,6 +364,24 @@ export const make = (
       }
 
       const note = yield* noteFor(materialId);
+      // Aquí solo se llega con `origin: "material"` (el repaso se ha cortado arriba). El repaso, cuando
+      // llegue en 3D, vuelve sobre lo visto a propósito y no pasará por esta salvaguarda.
+      const prior = yield* priorAssessments(materialId);
+      const priorPromptsByTopic = new Map<string, string[]>();
+      for (const assessment of prior) {
+        for (const question of assessment.questions) {
+          const list = priorPromptsByTopic.get(question.source.topicId) ?? [];
+          list.push(question.prompt);
+          priorPromptsByTopic.set(question.source.topicId, list);
+        }
+      }
+      const priorFingerprints = new Set(
+        prior
+          .filter((assessment) => input.kind === "test"
+            ? assessment.kind === "test"
+            : assessment.kind === "quiz" && assessment.scope.topicId === input.topicId)
+          .map((assessment) => promptFingerprint(assessment.questions.map((question) => question.prompt)))
+      );
       const noteBlocksByTopic = (topic: MaterialTopic): string | null => {
         if (note === undefined) {
           return null;
@@ -379,7 +425,9 @@ export const make = (
         });
 
         const holes = holesByTopic.get(topic.id) ?? [];
-        const outcome = yield* generateForTopic(topic, holes, index, noteBlocksByTopic(topic), input.kind);
+        const outcome = yield* generateForTopic(
+          topic, holes, index, noteBlocksByTopic(topic), input.kind, priorPromptsByTopic.get(topic.id) ?? []
+        );
         totalRetries += outcome.retries;
 
         if (outcome.insufficient !== null) {
@@ -387,6 +435,7 @@ export const make = (
             reason: `el tema "${topic.label}" solo da para ${outcome.insufficient} preguntas de las ${holes.length} que pedía el reparto. Genera una prueba más corta.`
           });
         }
+
         if (outcome.questions.length < holes.length) {
           return yield* new AssessmentGenerationError({
             reason: `no se pudieron generar las ${holes.length} preguntas del tema "${topic.label}" (salieron ${outcome.questions.length}) tras ${LIMITS.maxGenerationRetriesPerTopic} reintentos. Vuelve a intentarlo.`
@@ -412,6 +461,13 @@ export const make = (
       const questions: (QuizQuestion | TestQuestion)[] = shuffleBySeed(pending, assessmentId).map(
         (item, slot) => attachMetadata(item.parsed, `q${slot + 1}`, item.source)
       );
+
+      // Repetir alguna pregunta de una prueba anterior vale; que salgan TODAS iguales, no (F3-06b).
+      if (priorFingerprints.has(promptFingerprint(questions.map((question) => question.prompt)))) {
+        return yield* new AssessmentGenerationError({
+          reason: "la prueba habría salido con las mismas preguntas que otra que ya tienes de este alcance. Sigue repasando con los controles que ya tienes."
+        });
+      }
 
       yield* emit({ topic: null, topicCount: topicsWithHoles.length, message: "guardando la prueba" });
 

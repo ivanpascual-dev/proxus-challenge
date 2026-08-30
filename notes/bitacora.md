@@ -489,3 +489,11 @@ Iván probó el tramo y pidió tres arreglos. Lo que no se ve en el diff:
   Fisher-Yates sembrada por el id de la prueba (`question-order.ts`); es reproducible sin
   `Math.random()` porque el id vive en el JSON guardado. F3-06c nuevo. No se crea ADR: el plan reserva
   ADR-018..021 para el paso 30, esto es contexto para cuando se escriba ADR-018.
+- **Decisión sobre la marcha (F3-06b, de una conversación de diseño con Iván):** primero rechazó atar
+  el orden a algo que hiciera dos controles iguales; luego aclaró que 6 pedidas siguen siendo 6
+  entregadas, que repetir preguntas sueltas (iguales o reformuladas) vale, y que lo único a evitar es
+  un control o examen entero idéntico a uno anterior. Implementado: al generar una prueba de un alcance
+  que ya tiene otras se le pasan al modelo los enunciados previos de ese tema para empujarlo a variar,
+  y si la huella del conjunto (enunciados normalizados, sin orden) coincide con la de una prueba
+  existente del mismo alcance, la generación falla sin guardar nada. `priorAssessments` es tolerante:
+  si el listado falla, se genera sin comprobar. El repaso (3D) no pasará por esta salvaguarda.
