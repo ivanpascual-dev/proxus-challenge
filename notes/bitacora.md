@@ -533,3 +533,15 @@ positivo frente a una pregunta de disonancia cognitiva): el juez lo daba por `gr
 sin cumplir en vez de `gradable: false`. Es defendible (misma disciplina); se cambió el caso del
 fixture por uno inequívocamente ajeno (tectónica de placas) y pasó. La cifra y la redacción del
 riesgo 1 van a `NOTES.md` en el cierre de fase.
+
+### Escribir en una respuesta corta dejaba la página en blanco
+
+- **Causa raíz:** el `onChange` del textarea de respuesta corta (`AssessmentSolver`, `QuestionInput`)
+  leía `event.currentTarget.value` dentro del updater de `setAnswers`. React pone `currentTarget` a
+  `null` en cuanto el handler retorna, y el updater corre después, en el render siguiente: leía
+  `null`, lanzaba, y como no hay ErrorBoundary la interfaz entera se quedaba en blanco. Se arregla
+  leyendo el valor antes de `setAnswers`. El título de los apuntes (`NoteWorkspace`) tenía el patrón
+  exacto, latente: renombrar unos apuntes lo habría disparado. Mismo arreglo en los dos sitios.
+- **Deuda (no hay ErrorBoundary):** cualquier excepción en render tumba toda la interfaz sin dejar
+  nada en pantalla. Lo desbloquea un ErrorBoundary raíz con mensaje genérico y recarga. Sin dueño de
+  paso todavía.

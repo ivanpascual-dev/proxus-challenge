@@ -115,7 +115,9 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
           className="w-full rounded-2xl border border-border-strong bg-canvas p-2 font-bold text-2xl text-heading outline-none focus:border-brand"
           value={draft.title}
           onChange={(event) => {
-            setDraft((current) => ({ ...current, title: event.currentTarget.value }));
+            // Se lee ya, no dentro del updater: React anula `currentTarget` al retornar el handler.
+            const title = event.currentTarget.value;
+            setDraft((current) => ({ ...current, title }));
             setDirty(true);
           }}
           aria-label="Título de los apuntes"

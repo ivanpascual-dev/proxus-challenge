@@ -393,10 +393,15 @@ function QuestionInput({
         value={text}
         disabled={disabled}
         maxLength={LIMITS.maxOpenAnswerCharacters}
-        onChange={(event) => setAnswers((current) => ({
-          ...current,
-          text: { ...current.text, [question.id]: event.currentTarget.value }
-        }))}
+        onChange={(event) => {
+          // El valor se lee ya, no dentro del updater: React anula `currentTarget` en cuanto el
+          // handler retorna, y el updater de `setAnswers` corre después.
+          const value = event.currentTarget.value;
+          setAnswers((current) => ({
+            ...current,
+            text: { ...current.text, [question.id]: value }
+          }));
+        }}
         placeholder="Escribe tu respuesta…"
       />
       <p className="mt-1 text-muted text-xs">
