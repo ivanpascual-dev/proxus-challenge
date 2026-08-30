@@ -64,14 +64,22 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   interna, redirigen, pesan de más, tardan de más o no son texto), guarda un fragmento de la página
   como fuente y redacta un borrador del bloque. Antes de añadirlo se ven el borrador y el fragmento
   extraído; si no se pudo redactar el borrador, el bloque se añade vacío con el fragmento como fuente.
+- **Pruebas dentro del material.** Un material indexado tiene una pestaña "Pruebas": se genera un
+  Examen del material entero desde su cabecera, o un Control de un tema pulsando el "＋" de ese tema en
+  el mapa mental. Se elige el número de preguntas dentro del rango y la generación enseña el progreso
+  tema a tema. Cada prueba de la lista dice su alcance, su número de preguntas y su último intento.
+- **Practicar una prueba.** Desde la lista, "Practicar" abre la prueba en modo práctica: sin reloj ni
+  penalización, con las pistas a mano, el material consultable en las otras pestañas y la corrección al
+  entregar (nota sobre 10, puntuación bruta y corrección pregunta a pregunta con su cita). Cada
+  pregunta de desarrollo tiene "Esto sí lo dije" para retirar su corrección del perfil.
 
 ### Cambiado
 
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
 - **Toda la interfaz habla español.** El chat (cabecera, sugerencias de inicio, botones, mensajes), la
-  barra lateral y el solucionador de quizzes y tests (enunciados, tipos de pregunta, correcciones,
-  botones) pasan de inglés a español, además de la zona de apuntes que ya lo estaba.
+  barra lateral y las pruebas (enunciados, tipos de pregunta, correcciones, botones) pasan de inglés a
+  español, además de la zona de apuntes que ya lo estaba.
 - **El tutor ya no crea apuntes.** Los apuntes se generan desde la pestaña "Apuntes" de cada material,
   no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña. El tutor sigue creando
   quizzes y tests.

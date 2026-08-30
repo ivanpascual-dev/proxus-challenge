@@ -451,3 +451,9 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
 - **Deuda (`artifactsByKindQuery` queda sin usar):** la barra lateral pasa a `artifactsQuery` (ya no
   lista quiz/test). El atom sigue exportado en `packages/web/src/domain/artifacts/atoms.ts`; lo usa (o
   lo retira) el paso 29 del tramo 3D, cuando se decide qué queda de artefactos en la barra lateral.
+- **Decisión sobre la marcha (el botón de generar en el mapa mental es un "＋" en la esquina del
+  nodo):** `mindmap-layout.ts` calcula el tamaño de cada nodo para que quepa solo su etiqueta y sus
+  páginas (layout puro, sin medir botones). Un botón con texto obliga a reservar sitio en ese layout;
+  un círculo "＋" de radio fijo en la esquina superior derecha del `rect` no lo toca. El `onClick` de
+  abrir página baja del `<g>` al `<rect>` y los `<text>` llevan `pointerEvents="none"` para que el
+  "＋" quede encima y clicable.
