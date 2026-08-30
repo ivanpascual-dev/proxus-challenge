@@ -2,10 +2,19 @@ import {
   LIMITS,
   type GradedAttempt,
   type QuestionCorrection,
+  type QuestionReviewReason,
   type SolvableQuestion,
   type TestAnswer
 } from "@proxus/shared";
 import { QuestionSourceLine } from "./QuestionSourceLine.tsx";
+
+// El motivo de repaso, por pregunta (§6.11, F3-33): la señal del perfil que trajo la pregunta. Nunca
+// un número resumen (invariante 5).
+const reviewReasonLabel: Record<QuestionReviewReason, string> = {
+  fallada: "Está en el repaso porque fallaste este tema",
+  pista: "Está en el repaso porque abriste una pista en este tema",
+  marcada: "Está en el repaso porque marcaste este tema como importante"
+};
 
 // La vista de una pregunta y su corrección. La comparten el solucionador de práctica
 // (`AssessmentSolver`) y el panel de examen a pantalla completa (`ExamRun`): la corrección es idéntica
@@ -64,6 +73,12 @@ export function QuestionCard({
         </div>
         {correction !== undefined && <CorrectionBadge correction={correction} />}
       </div>
+
+      {showSource && question.source.reviewReason !== null && (
+        <p className="mb-3 inline-block rounded-full bg-brand-soft px-3 py-1 text-heading text-xs">
+          {reviewReasonLabel[question.source.reviewReason]}
+        </p>
+      )}
 
       <QuestionInput question={question} answers={answers} setAnswers={setAnswers} disabled={locked} />
 

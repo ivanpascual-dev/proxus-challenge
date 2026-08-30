@@ -1,8 +1,9 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import { LIMITS, type AssessmentListEntry, type GenerateAssessmentInput } from "@proxus/shared";
+import { LIMITS, type AssessmentListEntry, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
 import { useEffect, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
+import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
@@ -226,6 +227,17 @@ function GenerateCard({
   const [count, setCount] = useState<number>(range.default);
   // El modo solo se elige para el Examen; el Control es siempre de práctica.
   const [mode, setMode] = useState<"practice" | "exam">("practice");
+  // De dónde salen las preguntas: "material" (nuevas) o "review" (concentradas en lo que llevas peor
+  // de este alcance). El repaso solo se ofrece si el perfil tiene algo que repasar (F3-32).
+  const [origin, setOrigin] = useState<"material" | "review">("material");
+  const profile = AsyncResult.getOrElse(
+    useAtomValue(studyProfileQuery(materialId)),
+    () => ({ materialId, topics: [], updatedAt: null }) as StudyProfile
+  );
+  const canReview = profile.topics.some(
+    (topic) => topic.incorrect > 0 || topic.hintsRevealed > 0 || topic.emphasis
+  );
+  const effectiveOrigin: "material" | "review" = canReview ? origin : "material";
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -237,8 +249,8 @@ function GenerateCard({
     setLines([]);
     setDone(false);
     const input: GenerateAssessmentInput = target.kind === "test"
-      ? { kind: "test", topicId: null, origin: "material", questionCount: count, mode }
-      : { kind: "quiz", topicId: target.topicId, origin: "material", questionCount: count, mode: "practice" };
+      ? { kind: "test", topicId: null, origin: effectiveOrigin, questionCount: count, mode }
+      : { kind: "quiz", topicId: target.topicId, origin: effectiveOrigin, questionCount: count, mode: "practice" };
     try {
       for await (const event of streamGenerateAssessment(materialId, input)) {
         if (event.type === "progress") {
@@ -287,6 +299,33 @@ function GenerateCard({
 
       {!running && !done && (
         <div className="mt-3 grid gap-3">
+          <div className="text-sm">
+            <span className="block text-muted">Preguntas</span>
+            {canReview
+              ? (
+                  <>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <ModeChip active={origin === "material"} onClick={() => setOrigin("material")}>
+                        Nuevas
+                      </ModeChip>
+                      <ModeChip active={origin === "review"} onClick={() => setOrigin("review")}>
+                        De repaso
+                      </ModeChip>
+                    </div>
+                    <p className="mt-1 text-muted text-xs">
+                      {origin === "review"
+                        ? "Vuelve sobre lo que llevas peor de este alcance: lo que fallaste, lo que consultaste con pista y lo que marcaste."
+                        : "Preguntas nuevas sobre todo el alcance."}
+                    </p>
+                  </>
+                )
+              : (
+                  <p className="mt-1 text-muted text-xs">
+                    El repaso se activa cuando el perfil de este material tenga algo que repasar: un
+                    tema fallado, uno consultado con pista o uno marcado como importante.
+                  </p>
+                )}
+          </div>
           {target.kind === "test" && (
             <div className="text-sm">
               <span className="block text-muted">Modo</span>

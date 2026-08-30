@@ -89,6 +89,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   con las preguntas, lo que respondió el alumno, la corrección de cada una con su cita, y el "Esto sí
   lo dije" de las de desarrollo. Un intento cancelado o caducado no se corrige: enseña por qué se
   cerró y, si el examen se interrumpió, cuántas veces y en qué franjas.
+- **Pruebas de repaso.** Al generar un Control o un Examen, si el perfil del material tiene algo que
+  repasar (un tema fallado, uno consultado con pista o uno marcado como importante) se puede elegir
+  "De repaso" en vez de "Nuevas": las preguntas se concentran en esos temas y cada una dice por qué
+  entró ("porque fallaste este tema", "porque abriste una pista", "porque lo marcaste como
+  importante"). Si no hay nada que repasar, el interruptor no se ofrece y en su lugar se explica
+  cuándo se activará. En el Examen real el motivo de cada pregunta no se muestra.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
