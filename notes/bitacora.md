@@ -413,3 +413,12 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
     por comas, sin pistas, sin modos). Lo sustituye `AssessmentSolver` (paso 15, tramo 3B).
   - `artifact-authoring.eval.ts` con shim para pasar el typecheck; se reescribe entera (paso 27,
     tramo 3D).
+
+## 2026-08-30 · Fase 3 · tramo 3B · generar y practicar
+
+- **Desviación de secuencia (pasos 9-10):** el plan pedía que `question-parse.ts` absorbiera la
+  normalización de opciones de `artifact-commands.ts:170-212`. El parseo nuevo ya deja los ids de
+  opción (`a`/`b`/`c`/`d`) y de criterio (`c1..`) fuera del contrato con el modelo (decisiones
+  20b/20c), pero la normalización vieja sigue viva: la usa el comando `artifacts create`, que no se
+  retira hasta el tramo 3D (paso 27). Hasta entonces conviven las dos rutas de parseo. Los pasos 8
+  (`assessment-shape.ts`) y 11 (capa JSON del adaptador de Gemini) salieron como el plan decía.
