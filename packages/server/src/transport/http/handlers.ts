@@ -308,6 +308,8 @@ export const AttemptsHttpHandlers = HttpApiBuilder.group(
       // Lo que la interfaz pregunta al arrancar para volver a un examen tras una recarga (§6.11).
       .handle("active", () => attempts.activeExam())
       .handle("get", ({ params }) => attempts.get(params.attemptId))
+      // El latido del examen (decisión 19c): acumula tiempo conectado y devuelve el que queda.
+      .handle("heartbeat", ({ params }) => attempts.heartbeat(params.attemptId))
       // "Esto sí lo dije" (§6.7, defensa 1): la pregunta pasa a `disputed` y deja de mover el perfil.
       .handle("dispute", ({ params, payload }) => attempts.dispute(params.attemptId, payload.questionId));
   })

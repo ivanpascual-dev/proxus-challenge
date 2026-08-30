@@ -101,6 +101,20 @@ export const ActiveAttemptResponse = Schema.Struct({
 });
 export type ActiveAttemptResponse = typeof ActiveAttemptResponse.Type;
 
+// El latido del examen (decisión 19c). El panel lo manda cada `examHeartbeatIntervalMs` mientras
+// está abierto: el servidor acumula el tiempo conectado y cierra el hueco de interrupción si venía de
+// uno. Devuelve el estado del intento (si el tiempo se agotó, ya está `abandoned`) y los segundos que
+// quedan, para que el reloj del cliente se sincronice con la autoridad del servidor.
+export const HeartbeatResponse = Schema.Struct({
+  attemptStatus: Schema.Union([
+    Schema.Literal("in-progress"),
+    Schema.Literal("graded"),
+    Schema.Literal("abandoned")
+  ]),
+  remainingSeconds: Schema.Number
+});
+export type HeartbeatResponse = typeof HeartbeatResponse.Type;
+
 // Lo que la pestaña Pruebas necesita: cada prueba del material con su último intento.
 export const AssessmentListEntry = Schema.Struct({
   id: Schema.String,

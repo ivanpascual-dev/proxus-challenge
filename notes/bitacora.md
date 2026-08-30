@@ -548,3 +548,13 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   `MaterialPanel` se mueve al boundary que lo envuelve: sigue forzando el remonte al cambiar de
   material y de paso resetea el boundary. El detalle técnico va a `console.error` con el
   `componentStack`, nunca a pantalla.
+
+## 2026-08-30 · Fase 3 · tramo 3C · el examen (lado servidor)
+
+- **Decisión sobre la marcha (dos constantes que el plan no fijaba):** `examInterruptionThresholdMs`
+  (45 s, tres latidos perdidos) es la raya entre "sigue conectado" y "hubo un hueco": un silencio del
+  latido más corto cuenta entero como tiempo conectado, uno más largo no cuenta y se guarda en
+  `interruptions`. `examSubmitGraceSeconds` (15 s) es el margen de red y desfase de reloj dentro del
+  cual `submit()` todavía acepta una entrega pasada del límite; más allá, `TimeLimitExceeded` 409. El
+  plan §5.6 solo declaraba el error: cómo distingue el servidor la entrega automática del cliente (cabe
+  en la holgura) de un `curl` tardío (no cabe) se decidió aquí. Contexto para ADR-019/021 (paso 30).

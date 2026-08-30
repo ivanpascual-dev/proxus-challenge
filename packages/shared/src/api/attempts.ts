@@ -1,9 +1,14 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { ArtifactAttempt } from "../schemas/artifact.ts";
-import { ActiveAttemptResponse, DisputeQuestionInput } from "../schemas/attempt-api.ts";
+import { ActiveAttemptResponse, DisputeQuestionInput, HeartbeatResponse } from "../schemas/attempt-api.ts";
 import { ArtifactStorageError } from "../errors/artifact-errors.ts";
-import { AttemptNotFound, AttemptNotGraded, QuestionNotFound } from "../errors/assessment-errors.ts";
+import {
+  AttemptAlreadyClosed,
+  AttemptNotFound,
+  AttemptNotGraded,
+  QuestionNotFound
+} from "../errors/assessment-errors.ts";
 
 // Endpoints de intento que no cuelgan de una prueba concreta (§5.6). `/active` es lo que la interfaz
 // pregunta al arrancar para volver a un examen tras una recarga.
@@ -19,6 +24,19 @@ export class AttemptsApi extends HttpApiGroup.make("attempts")
       success: ArtifactAttempt,
       error: [
         AttemptNotFound.pipe(HttpApiSchema.status(404)),
+        ArtifactStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // El latido del examen (decisión 19c): acumula el tiempo conectado, cierra el hueco de
+    // interrupción si venía de uno, y devuelve el tiempo que queda. El reloj de pared no cuenta; el
+    // hueco en que no estabas, tampoco. No cancela nada: si el tiempo conectado se agotó, el intento
+    // ya está `abandoned` cuando el latido lo mira.
+    HttpApiEndpoint.post("heartbeat", "/:attemptId/heartbeat", {
+      params: { attemptId: Schema.String },
+      success: HeartbeatResponse,
+      error: [
+        AttemptNotFound.pipe(HttpApiSchema.status(404)),
+        AttemptAlreadyClosed.pipe(HttpApiSchema.status(409)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),

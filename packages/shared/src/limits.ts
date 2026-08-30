@@ -46,6 +46,13 @@ export const LIMITS = {
   },
   examReviewSeconds: 300,
   examHeartbeatIntervalMs: 15_000, // mide el tiempo conectado; no cancela nada (decisión 19c)
+  // Un silencio del latido más largo que esto es una interrupción: el hueco no cuenta como tiempo
+  // conectado y se guarda en `interruptions` (decisión 19c). Tres latidos perdidos.
+  examInterruptionThresholdMs: 45_000,
+  // Margen sobre el tiempo límite dentro del cual el servidor todavía acepta una entrega: cubre la
+  // latencia de red y el desfase de reloj de la entrega automática del cliente. Pasado esto, 409
+  // `TimeLimitExceeded` (decisión 9: quien decide si llegó tarde es el servidor).
+  examSubmitGraceSeconds: 15,
 
   // Tamaño de salida
   maxQuestionsPerArtifact: 50,

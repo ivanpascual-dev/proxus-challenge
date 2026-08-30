@@ -11,9 +11,11 @@ import {
   HintNotAvailable,
   LIMITS,
   QuestionNotFound,
+  TimeLimitExceeded,
   type ActiveAttemptResponse,
   type AssessmentListEntry,
   type AttemptMode,
+  type HeartbeatResponse,
   type SolvableAssessment,
   type SolvableQuestion,
   type TestAnswer
@@ -29,6 +31,7 @@ import {
   type ShortAnswerCorrection,
   type TestArtifact
 } from "./artifact.ts";
+import { applyHeartbeat, connectedSecondsNow } from "./exam-clock.ts";
 import { gradeInProgressAttempt } from "./grading.ts";
 import { buildMaterialExcerpt } from "./note-source.ts";
 import { OpenAnswerJudge, type JudgeQuestion } from "./open-answer-judge.ts";
@@ -55,11 +58,18 @@ export interface AttemptService {
   >;
   readonly submit: (artifactId: string, attemptId: string, answers: readonly TestAnswer[]) => Effect.Effect<
     GradedAttempt,
-    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptNotFound | AttemptAlreadyClosed | ApiArtifactStorageError,
+    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptNotFound | AttemptAlreadyClosed | TimeLimitExceeded | ApiArtifactStorageError,
     LanguageModel.LanguageModel
   >;
   readonly abandon: (attemptId: string, reason: "cancelled" | "expired") => Effect.Effect<
     ArtifactAttempt,
+    AttemptNotFound | AttemptAlreadyClosed | ApiArtifactStorageError
+  >;
+  // El latido del examen (decisión 19c): acumula tiempo conectado, cierra el hueco de interrupción si
+  // venía de uno, y devuelve el tiempo que queda. Si el tiempo conectado se agotó, cierra el intento
+  // como `abandoned`/`expired` y lo dice.
+  readonly heartbeat: (attemptId: string) => Effect.Effect<
+    HeartbeatResponse,
     AttemptNotFound | AttemptAlreadyClosed | ApiArtifactStorageError
   >;
   readonly history: (artifactId: string) => Effect.Effect<
@@ -269,8 +279,25 @@ export const make = (
     );
 
   const submit = (artifactId: string, attemptId: string, answers: readonly TestAnswer[]) => Effect.gen(function* () {
-    const attempt = yield* getInProgress(attemptId);
+    const inProgress = yield* getInProgress(attemptId);
     const artifact = yield* getAssessment(artifactId);
+
+    // El reloj lo cierra el servidor (decisión 9). En modo examen se acumula un último tramo de
+    // tiempo conectado y, si la entrega llega pasado el límite más la holgura de red, se rechaza:
+    // la entrega automática del cliente cabe dentro de la holgura; un `curl` tardío, no.
+    const now = new Date().toISOString();
+    const finalStep = inProgress.mode === "exam" ? applyHeartbeat(inProgress, now) : null;
+    const attempt = finalStep === null ? inProgress : { ...inProgress, ...finalStep };
+    if (
+      attempt.mode === "exam" &&
+      attempt.timeLimitSeconds !== null &&
+      connectedSecondsNow(attempt, now) > attempt.timeLimitSeconds + LIMITS.examSubmitGraceSeconds
+    ) {
+      return yield* new TimeLimitExceeded({
+        attemptId,
+        message: "El tiempo del examen se agotó. Este intento ya no se puede entregar."
+      });
+    }
 
     // El juez corrige el desarrollo corto; la aritmética la hace el código (ADR-019). Solo se le
     // manda lo respondido: una en blanco es una corrección `blank`, la hace `grading.ts`.
@@ -351,6 +378,34 @@ export const make = (
       })
     );
 
+  const heartbeat = (attemptId: string) => Effect.gen(function* () {
+    const attempt = yield* getInProgress(attemptId);
+    if (attempt.mode !== "exam" || attempt.timeLimitSeconds === null) {
+      // Una práctica no tiene reloj: el latido no hace nada (decisión 4).
+      return { attemptStatus: "in-progress", remainingSeconds: 0 } satisfies HeartbeatResponse;
+    }
+    const now = new Date().toISOString();
+    const step = applyHeartbeat(attempt, now);
+    const ticked: InProgressAttempt = { ...attempt, ...step };
+
+    if (step.connectedSeconds >= attempt.timeLimitSeconds) {
+      const expired: ArtifactAttempt = {
+        ...ticked,
+        status: "abandoned",
+        reason: "expired",
+        abandonedAt: now
+      };
+      yield* save(expired, `No se pudo cerrar el examen caducado ${attemptId}`);
+      return { attemptStatus: "abandoned", remainingSeconds: 0 } satisfies HeartbeatResponse;
+    }
+
+    yield* save(ticked, `No se pudo registrar el latido del intento ${attemptId}`);
+    return {
+      attemptStatus: "in-progress",
+      remainingSeconds: Math.max(0, attempt.timeLimitSeconds - step.connectedSeconds)
+    } satisfies HeartbeatResponse;
+  });
+
   const dispute = (attemptId: string, questionId: string) => Effect.gen(function* () {
     const attempt = yield* get(attemptId);
     if (attempt.status !== "graded") {
@@ -382,7 +437,7 @@ export const make = (
     return disputed;
   });
 
-  return { solvable, start, revealHint, submit, abandon, history, get, activeExam, dispute };
+  return { solvable, start, revealHint, submit, abandon, heartbeat, history, get, activeExam, dispute };
 };
 
 export const AttemptServiceLive = Layer.effect(AttemptService)(
