@@ -75,6 +75,15 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   penalización, con las pistas a mano, el material consultable en las otras pestañas y la corrección al
   entregar (nota sobre 10, puntuación bruta y corrección pregunta a pregunta con su cita). Cada
   pregunta de desarrollo tiene "Esto sí lo dije" para retirar su corrección del perfil.
+- **Hacer un Examen real.** Al generar un Examen se elige el modo: "De prueba" (a libro abierto, como
+  un Control) o "Real". Un Examen real se lanza con "Empezar el examen" y ocupa la aplicación entera:
+  no hay barra lateral, ni pestañas del material, ni chat, solo las preguntas (sin su cita de tema y
+  páginas), el reloj y los botones de entregar y cancelar. Antes de empezar hay un aviso de cómo
+  funciona: cuántas preguntas y minutos, que el reloj solo corre mientras el examen esté abierto, que
+  cada rato fuera queda registrado como una interrupción y que el resto de la aplicación queda cerrado
+  mientras dure. El reloj se para al cerrar la pestaña y se retoma donde se dejó; al agotarse, el
+  examen se entrega solo. Recargar o cerrar la página con un examen abierto pide confirmación, y al
+  volver a abrir la aplicación un diálogo ofrece volver al examen a medias o cancelarlo.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del

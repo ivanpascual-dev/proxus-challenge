@@ -36,6 +36,7 @@ export function QuestionCard({
   hint,
   hintError,
   onRevealHint,
+  showSource = true,
   correction,
   onDispute
 }: {
@@ -48,6 +49,9 @@ export function QuestionCard({
   readonly hint?: string | undefined;
   readonly hintError?: string | undefined;
   readonly onRevealHint?: (() => void) | undefined;
+  // La cita (tema y páginas) se pinta en práctica y en el Control; en el Examen real solo van las
+  // preguntas.
+  readonly showSource?: boolean;
   readonly correction: QuestionCorrection | undefined;
   readonly onDispute: () => void;
 }) {
@@ -76,7 +80,7 @@ export function QuestionCard({
         <CorrectionDetails correction={correction} question={question} onDispute={onDispute} />
       )}
 
-      <QuestionSourceLine source={question.source} />
+      {showSource && <QuestionSourceLine source={question.source} />}
     </section>
   );
 }
@@ -351,6 +355,10 @@ function ShortAnswerCorrectionBody({
   );
 }
 
+// La nota mostrada ya viene redondeada del servidor; la bruta y la penalización pueden traer
+// decimales largos (un tercio por fallo en examen). Se enseñan con dos decimales como mucho.
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+
 export function AttemptSummary({ attempt }: { readonly attempt: GradedAttempt }) {
   return (
     <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
@@ -358,8 +366,8 @@ export function AttemptSummary({ attempt }: { readonly attempt: GradedAttempt })
         Nota: {attempt.displayedScore} / 10
       </p>
       <p className="mt-1 text-success-ink text-sm">
-        Puntuación bruta {attempt.rawScore} / {attempt.maxScore}
-        {attempt.penalty > 0 && ` · penalización ${attempt.penalty}`}
+        Puntuación bruta {round2(attempt.rawScore)} / {attempt.maxScore}
+        {attempt.penalty > 0 && ` · penalización ${round2(attempt.penalty)}`}
       </p>
       <p className="mt-2 text-success-ink">{attempt.summary}</p>
     </section>

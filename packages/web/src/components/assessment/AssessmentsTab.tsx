@@ -20,14 +20,25 @@ type GenTarget =
   | { readonly kind: "test" }
   | { readonly kind: "quiz"; readonly topicId: string; readonly topicLabel: string };
 
+// Cómo se resuelve una prueba, a partir de su tipo y su modo. Un Control y un Examen de prueba se
+// resuelven en el mismo sitio (a libro abierto); un Examen real toma la aplicación entera.
+function rowKindLabel(entry: AssessmentListEntry): string {
+  if (entry.kind === "quiz") {
+    return "Control";
+  }
+  return entry.mode === "exam" ? "Examen real" : "Examen de prueba";
+}
+
 export function AssessmentsTab({
   materialId,
   pendingControl,
-  onPendingControlConsumed
+  onPendingControlConsumed,
+  onStartExam
 }: {
   readonly materialId: string;
   readonly pendingControl: PendingControl | null;
   readonly onPendingControlConsumed: () => void;
+  readonly onStartExam: (artifactId: string, title: string) => void;
 }) {
   const assessments = useAtomValue(materialAssessmentsQuery(materialId));
   const refresh = useAtomRefresh(materialAssessmentsQuery(materialId));
@@ -95,7 +106,8 @@ export function AssessmentsTab({
                   <AssessmentRow
                     key={entry.id}
                     entry={entry}
-                    onPractice={() => setView({ kind: "solve", id: entry.id, title: entry.title })}
+                    onOpen={() => setView({ kind: "solve", id: entry.id, title: entry.title })}
+                    onStartExam={() => onStartExam(entry.id, entry.title)}
                   />
                 ))}
               </ul>
@@ -107,17 +119,21 @@ export function AssessmentsTab({
 
 function AssessmentRow({
   entry,
-  onPractice
+  onOpen,
+  onStartExam
 }: {
   readonly entry: AssessmentListEntry;
-  readonly onPractice: () => void;
+  readonly onOpen: () => void;
+  readonly onStartExam: () => void;
 }) {
+  const isRealExam = entry.kind === "test" && entry.mode === "exam";
+
   return (
     <li className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="mb-1 text-muted text-xs uppercase tracking-widest">
-            {entry.kind === "quiz" ? "Control" : "Examen"}
+            {rowKindLabel(entry)}
             {entry.origin === "review" && " · de repaso"}
           </p>
           <h3 className="font-semibold text-heading">{entry.title}</h3>
@@ -125,13 +141,25 @@ function AssessmentRow({
             {entry.scope.topicLabel} · {entry.questionCount} {entry.questionCount === 1 ? "pregunta" : "preguntas"}
           </p>
         </div>
-        <button
-          type="button"
-          className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-          onClick={onPractice}
-        >
-          Practicar
-        </button>
+        {isRealExam
+          ? (
+              <button
+                type="button"
+                className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
+                onClick={onStartExam}
+              >
+                Empezar el examen
+              </button>
+            )
+          : (
+              <button
+                type="button"
+                className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+                onClick={onOpen}
+              >
+                {entry.kind === "quiz" ? "Practicar" : "Abrir"}
+              </button>
+            )}
       </div>
       <p className="mt-2 text-muted text-sm">
         {entry.lastAttempt === null
@@ -168,6 +196,8 @@ function GenerateCard({
 }) {
   const range = target.kind === "test" ? LIMITS.questionsPerTest : LIMITS.questionsPerQuiz;
   const [count, setCount] = useState<number>(range.default);
+  // El modo solo se elige para el Examen; el Control es siempre de práctica.
+  const [mode, setMode] = useState<"practice" | "exam">("practice");
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -179,7 +209,7 @@ function GenerateCard({
     setLines([]);
     setDone(false);
     const input: GenerateAssessmentInput = target.kind === "test"
-      ? { kind: "test", topicId: null, origin: "material", questionCount: count, mode: "practice" }
+      ? { kind: "test", topicId: null, origin: "material", questionCount: count, mode }
       : { kind: "quiz", topicId: target.topicId, origin: "material", questionCount: count, mode: "practice" };
     try {
       for await (const event of streamGenerateAssessment(materialId, input)) {
@@ -228,25 +258,45 @@ function GenerateCard({
       </div>
 
       {!running && !done && (
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <label className="text-sm">
-            <span className="block text-muted">Número de preguntas ({range.min} a {range.max})</span>
-            <input
-              type="number"
-              min={range.min}
-              max={range.max}
-              value={count}
-              onChange={(event) => setCount(clamp(Number(event.currentTarget.value), range.min, range.max))}
-              className="mt-1 w-24 rounded-xl border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
-            />
-          </label>
-          <button
-            type="button"
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
-            onClick={() => void run()}
-          >
-            Generar
-          </button>
+        <div className="mt-3 grid gap-3">
+          {target.kind === "test" && (
+            <div className="text-sm">
+              <span className="block text-muted">Modo</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <ModeChip active={mode === "practice"} onClick={() => setMode("practice")}>
+                  De prueba
+                </ModeChip>
+                <ModeChip active={mode === "exam"} onClick={() => setMode("exam")}>
+                  Real
+                </ModeChip>
+              </div>
+              <p className="mt-1 text-muted text-xs">
+                {mode === "practice"
+                  ? "A libro abierto: pistas, material a la vista y el tutor. Corrige al entregar."
+                  : "A puerta cerrada: reloj, penalización y sin pistas. El resto de la aplicación se bloquea mientras dure."}
+              </p>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm">
+              <span className="block text-muted">Número de preguntas ({range.min} a {range.max})</span>
+              <input
+                type="number"
+                min={range.min}
+                max={range.max}
+                value={count}
+                onChange={(event) => setCount(clamp(Number(event.currentTarget.value), range.min, range.max))}
+                className="mt-1 w-24 rounded-xl border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
+              />
+            </label>
+            <button
+              type="button"
+              className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
+              onClick={() => void run()}
+            >
+              Generar
+            </button>
+          </div>
         </div>
       )}
 
@@ -267,6 +317,29 @@ function GenerateCard({
         </button>
       )}
     </div>
+  );
+}
+
+function ModeChip({
+  active,
+  onClick,
+  children
+}: {
+  readonly active: boolean;
+  readonly onClick: () => void;
+  readonly children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full px-4 py-1.5 text-sm ${
+        active ? "border border-brand bg-brand-soft text-heading" : "border border-border text-muted hover:text-heading"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

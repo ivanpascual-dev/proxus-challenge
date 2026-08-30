@@ -23,6 +23,9 @@ interface MaterialPanelProps {
   readonly indexState: "indexed" | "not-indexed";
   readonly title: string;
   readonly pageCount: number;
+  // Empezar un Examen real saca de aquí: la aplicación entera pasa a ser el panel del examen
+  // (decisión 18).
+  readonly onStartExam: (artifactId: string, title: string) => void;
 }
 
 type Tab = "pdf" | "mindmap" | "notes" | "assessments";
@@ -30,7 +33,7 @@ type Tab = "pdf" | "mindmap" | "notes" | "assessments";
 // Marca de procedencia de una página, tal como la pinta el visor.
 type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
-export function MaterialPanel({ materialId, indexState, title, pageCount }: MaterialPanelProps) {
+export function MaterialPanel({ materialId, indexState, title, pageCount, onStartExam }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
   const [pendingPage, setPendingPage] = useState<number | null>(null);
@@ -94,6 +97,7 @@ export function MaterialPanel({ materialId, indexState, title, pageCount }: Mate
             materialId={materialId}
             pendingControl={pendingControl}
             onPendingControlConsumed={() => setPendingControl(null)}
+            onStartExam={onStartExam}
           />
         </div>
       )}

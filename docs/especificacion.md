@@ -317,6 +317,9 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   `examSecondsPerQuestion` y `examReviewSeconds`.
 - **F3-19.** MIENTRAS un intento en modo examen esté sin entregar, EL sistema NO DEBERÁ mostrar ninguna
   corrección ni la puntuación de ninguna pregunta.
+- **F3-19b.** EN el panel del Examen real la interfaz NO DEBERÁ mostrar la cita de tema y páginas de las
+  preguntas: en ese modo solo se presentan los enunciados y sus opciones. La cita se sigue guardando en
+  cada pregunta según F3-01.
 - **F3-20.** CUANDO se entregue un intento en modo examen, EL sistema DEBERÁ restar por cada fallo de
   pregunta de opciones o de verdadero/falso el valor de un acierto dividido entre el número de opciones
   menos uno, NO DEBERÁ restar nada por una pregunta en blanco, y DEBERÁ escalar la nota a 10 con suelo

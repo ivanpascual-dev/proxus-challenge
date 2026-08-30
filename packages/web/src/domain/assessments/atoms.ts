@@ -52,7 +52,7 @@ export const attemptQuery = Atom.family((attemptId: string) =>
 );
 
 // El examen en curso, si lo hay. La interfaz lo consulta al arrancar para volver a él tras una
-// recarga (§6.11). El panel de examen a pantalla completa llega en el tramo 3C.
+// recarga (§6.11): es lo que dispara el diálogo de "tienes un examen a medias" (decisión 19d).
 export const activeAttemptQuery = apiRuntime
   .atom(
     ApiClient.use((client) =>
@@ -60,6 +60,18 @@ export const activeAttemptQuery = apiRuntime
     ).pipe(Effect.withSpan("attempts.active", { kind: "client" }))
   )
   .pipe(Atom.keepAlive, Atom.withReactivity(["attempts"]));
+
+// El latido del examen (decisión 19c). El panel a pantalla completa lo manda cada
+// `examHeartbeatIntervalMs` mientras está abierto: el servidor acumula el tiempo conectado y devuelve
+// el que queda, más el estado del intento (si el tiempo se agotó, ya está `abandoned`). No invalida
+// nada por etiqueta: el panel usa la respuesta directamente y refresca `activeAttemptQuery` a mano
+// solo cuando el latido dice que el examen se cerró.
+export const heartbeatAction = apiRuntime.fn(
+  (attemptId: string) =>
+    ApiClient.use((client) =>
+      client.attempts.heartbeat({ params: { attemptId } })
+    ).pipe(Effect.withSpan("attempts.heartbeat", { kind: "client" }))
+);
 
 // Empezar un intento. El servidor pone `startedAt` con autoridad (decisión 8), deriva el modo del
 // artefacto y comprueba el techo de intentos (decisión 22).

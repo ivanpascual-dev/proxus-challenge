@@ -581,3 +581,13 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   prueba + 2 reales. Los ADR reservados del plan §11 corren un número (018 lo toma esta inversión). El
   selector al generar y el panel del Examen real llegan en commits posteriores del mismo tramo; este
   solo mueve contrato y servidor y adapta la web para que compile.
+
+## 2026-08-30 · Fase 3 · tramo 3C · el examen (lado cliente)
+
+- **Desviación (la cita no se pinta en el Examen real):** el plan daba por hecho que la cita de tema y
+  páginas se ve al resolver cualquier prueba (§6, «toda pregunta enseña su cita»; tabla §9, fila
+  Anclaje). Iván la retira del Examen real: «solo las preguntas». Un examen de verdad no te entrega
+  las páginas donde está la respuesta. `QuestionCard` gana `showSource` (default `true`, así práctica
+  y Control no cambian) y `ExamRun` lo pasa a `false`, también sobre el intento ya entregado. El dato
+  sigue en la pregunta (F3-01 intacto); criterio nuevo F3-19b. No mueve ningún registro de decisiones:
+  es presentación, no contrato.
