@@ -808,3 +808,55 @@ valore si compensan tocar el contrato del bloque y el render.
 - La tabla solo se edita dentro de los límites GFM: quitar fila o columna va siempre por el extremo,
   para no borrar la fila de cabecera ni la primera columna (una tabla sin cabecera se serializaría
   como HTML). El menú «/» está deshabilitado dentro de una tabla.
+
+## ADR-018 · El modo de una prueba lo fija su generación y vive en el artefacto
+
+- **Estado:** aceptada (anula la decisión 6 del plan de fase 3)
+- **Fecha:** 2026-08-30
+
+**Contexto.** El plan de la fase 3 cerró en su decisión 6 que «el modo (práctica o examen) es del
+intento, no del artefacto»: el mismo Control se practicaría hoy y se examinaría mañana, y el artefacto
+solo guardaría los parámetros de examen que el código deriva del reparto de preguntas. Al construir el
+tramo 3C (el examen) esa forma se reveló equivocada:
+
+- Un Examen real se genera **sin pistas** (F3-15). La ausencia de pistas es una propiedad del
+  artefacto, no del intento: si el modo lo elige quien empieza, un Examen «real» abierto tendría
+  pistas guardadas que no se sirven, y un Control «examinado» no tendría ninguna que ocultar. Los dos
+  objetos no son el mismo con otro reloj.
+- El techo `maxTestsPerMaterial` no distinguía Examen de prueba de Examen real, cuando son cantidades
+  con intención distinta.
+- La pestaña Pruebas necesita enrutar desde el listado (`AssessmentListEntry`): el Examen real va a un
+  panel a pantalla completa, y eso hay que saberlo antes de abrir ningún intento.
+
+**Opciones consideradas.**
+
+- **Mantener la decisión 6** (modo del intento). Descartada: obliga a generar toda prueba con pistas y
+  a decidir «sin pistas» en tiempo de intento, lo que choca con F3-15 y con que la pista es contenido
+  que el modelo redacta al generar.
+- **Dos `kind` de artefacto distintos** (`test` y `exam`). Descartada: duplica los esquemas espejo y
+  el enrutado, cuando el reparto de preguntas, la cita y la corrección son idénticos.
+
+**Decisión.** El modo lo fija la **generación** y vive en el artefacto.
+
+- `AssessmentMode` = `"practice" | "exam"`, en el contrato compartido (`schemas/artifact.ts`) y su
+  espejo del servidor.
+- El **Control** (`quiz`) es siempre de práctica: no lleva `mode`.
+- El **Examen** (`test`) lleva `mode`: `"practice"` es un Examen **de prueba** (a libro abierto, con
+  pistas); `"exam"` es un Examen **real** (puerta cerrada, reloj, penalización, generado sin pistas).
+- `GenerateAssessmentInput` gana `mode`, que elige quien genera el Examen.
+- El **intento** sigue teniendo su `mode`, pero lo **hereda** del artefacto (`test` → `artifact.mode`;
+  `quiz` → `"practice"`). `AttemptMode` pasa a ser un alias de `AssessmentMode`.
+- Empezar un intento **no lleva cuerpo**: `StartAttemptInput` se elimina y `POST /:id/attempts` se
+  queda sin payload.
+- `maxTestsPerMaterial` baja de 4 a 2 y cuenta **por modo**: 2 Exámenes de prueba y 2 reales por
+  material.
+
+**Consecuencias.**
+
+- El generador sin pistas del Examen real (siguiente commit del tramo) se apoya en `artifact.mode`.
+- `AssessmentListEntry` gana `mode` y la pestaña Pruebas puede enrutar el Examen real a pantalla
+  completa sin abrir el intento.
+- El plan de fase 3 §11 corre sus ADR reservados un número: ADR-018 lo toma esta decisión, y los que
+  eran 018-021 pasan a 019-022.
+- Este commit mueve el contrato y el servidor y adapta la web para que compile. El selector de
+  prueba/real al generar y el panel del Examen real llegan en commits posteriores del tramo.

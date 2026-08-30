@@ -114,6 +114,7 @@ const testJson = JSON.stringify({
   origin: "review",
   createdAt: "2026-08-30T11:00:00.000Z",
   examTimeLimitSeconds: 1500,
+  mode: "exam",
   questions: [
     {
       type: "multiple-response",

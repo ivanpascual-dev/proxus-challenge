@@ -11,7 +11,8 @@ import {
   type Artifact,
   type ArtifactAttempt,
   type QuestionSource,
-  type QuizArtifact
+  type QuizArtifact,
+  type TestArtifact
 } from "./artifact.ts";
 import { AttemptService, AttemptServiceLive, toSolvable } from "./attempt-service.ts";
 import { OpenAnswerJudge } from "./open-answer-judge.ts";
@@ -33,6 +34,27 @@ const quiz: QuizArtifact = {
     { type: "true-false", id: "q2", prompt: "¿V?", correctAnswer: true, explanation: "es V", hint: null, source },
     ...Array.from({ length: 8 }, (_, i) => ({
       type: "true-false" as const, id: `q${i + 3}`, prompt: `¿${i}?`, correctAnswer: true, explanation: "e", hint: null, source
+    }))
+  ]
+};
+
+// Un Examen real: modo `exam`, generado sin pistas (ADR que anula la decisión 6). El modo lo lleva el
+// artefacto; el intento lo hereda.
+const examReal: TestArtifact = {
+  kind: "test",
+  id: "test-1",
+  title: "Examen real de Material",
+  scope: { materialId: "m1", topicId: null, topicLabel: "Material" },
+  origin: "material",
+  createdAt: "2026-08-20T00:00:00.000Z",
+  examTimeLimitSeconds: 600,
+  mode: "exam",
+  questions: [
+    { type: "multiple-choice", id: "q1", prompt: "¿1?", options: [
+      { id: "a", text: "A" }, { id: "b", text: "B" }, { id: "c", text: "C" }, { id: "d", text: "D" }
+    ], correctOptionId: "a", explanation: "es A", hint: null, source },
+    ...Array.from({ length: 9 }, (_, i) => ({
+      type: "true-false" as const, id: `q${i + 2}`, prompt: `¿${i}?`, correctAnswer: true, explanation: "e", hint: null, source
     }))
   ]
 };
@@ -124,39 +146,46 @@ test("la proyección resoluble no lleva clave de respuesta ni pista ni explicaci
   assert.equal(solvable.questions[1]?.hasHint, false);
 });
 
-test("empezar cuenta contra el techo de intentos del modo, incluidos los abandonados", async () => {
+test("empezar cuenta contra el techo de intentos, incluidos los abandonados", async () => {
   const attempts: ArtifactAttempt[] = [];
   // Solo se puede tener uno abierto a la vez: se abandona cada uno antes de empezar el siguiente.
   for (let i = 0; i < 3; i += 1) {
-    const started = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+    const started = await run((s) => s.start("quiz-1"), [quiz], attempts);
     await run((s) => s.abandon(started.id, "cancelled"), [quiz], attempts);
   }
   await assert.rejects(
-    run((s) => s.start("quiz-1", "practice"), [quiz], attempts),
+    run((s) => s.start("quiz-1"), [quiz], attempts),
     (e: unknown) => (e as { _tag?: string })._tag === "AttemptLimitExceeded"
   );
 });
 
-test("empezar la misma prueba en el mismo modo retoma el intento a medias, no crea otro", async () => {
+test("empezar de nuevo la misma prueba retoma el intento a medias, no crea otro", async () => {
   const attempts: ArtifactAttempt[] = [];
-  const first = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
-  const again = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  const first = await run((s) => s.start("quiz-1"), [quiz], attempts);
+  const again = await run((s) => s.start("quiz-1"), [quiz], attempts);
   assert.equal(again.id, first.id);
   assert.equal(attempts.filter((a) => a.status === "in-progress").length, 1);
 });
 
-test("no se puede empezar un intento con otro a medias (otra prueba o otro modo)", async () => {
+test("no se puede empezar un intento de otra prueba con uno a medias", async () => {
   const attempts: ArtifactAttempt[] = [];
-  await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  await run((s) => s.start("quiz-1"), [quiz, examReal], attempts);
   await assert.rejects(
-    run((s) => s.start("quiz-1", "exam"), [quiz], attempts),
+    run((s) => s.start("test-1"), [quiz, examReal], attempts),
     (e: unknown) => (e as { _tag?: string })._tag === "AttemptInProgress"
   );
 });
 
+test("el intento hereda el modo del artefacto: el Examen real es modo examen", async () => {
+  const attempts: ArtifactAttempt[] = [];
+  const started = await run((s) => s.start("test-1"), [examReal], attempts);
+  assert.equal(started.mode, "exam");
+  assert.equal(started.timeLimitSeconds, 600);
+});
+
 test("entregar 2 respuestas de 10 preguntas da 2/10, no 2/2 (regresión del bug de §3)", async () => {
   const attempts: ArtifactAttempt[] = [];
-  const started = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  const started = await run((s) => s.start("quiz-1"), [quiz], attempts);
   const answers: readonly TestAnswer[] = [
     { questionType: "multiple-choice", questionId: "q1", selectedOptionId: "a" },
     { questionType: "true-false", questionId: "q2", answer: true }
@@ -169,16 +198,16 @@ test("entregar 2 respuestas de 10 preguntas da 2/10, no 2/2 (regresión del bug 
 
 test("una pista en examen se rechaza en el código", async () => {
   const attempts: ArtifactAttempt[] = [];
-  const started = await run((s) => s.start("quiz-1", "exam"), [quiz], attempts);
+  const started = await run((s) => s.start("test-1"), [examReal], attempts);
   await assert.rejects(
-    run((s) => s.revealHint("quiz-1", started.id, "q1"), [quiz], attempts),
+    run((s) => s.revealHint("test-1", started.id, "q1"), [examReal], attempts),
     (e: unknown) => (e as { _tag?: string })._tag === "HintNotAvailable"
   );
 });
 
 test("una pista en práctica se registra en hintsRevealed y devuelve el texto", async () => {
   const attempts: ArtifactAttempt[] = [];
-  const started = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  const started = await run((s) => s.start("quiz-1"), [quiz], attempts);
   const result = await run((s) => s.revealHint("quiz-1", started.id, "q1"), [quiz], attempts);
   assert.equal(result.hint, "piensa en A");
   const stored = attempts.find((a) => a.id === started.id);
@@ -187,7 +216,7 @@ test("una pista en práctica se registra en hintsRevealed y devuelve el texto", 
 
 test("abandonar deja el intento como abandoned con su motivo, sin corregir", async () => {
   const attempts: ArtifactAttempt[] = [];
-  const started = await run((s) => s.start("quiz-1", "practice"), [quiz], attempts);
+  const started = await run((s) => s.start("quiz-1"), [quiz], attempts);
   const abandoned = await run((s) => s.abandon(started.id, "cancelled"), [quiz], attempts);
   assert.equal(abandoned.status, "abandoned");
   assert.equal(abandoned.status === "abandoned" ? abandoned.reason : null, "cancelled");

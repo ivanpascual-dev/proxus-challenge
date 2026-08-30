@@ -199,12 +199,13 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
       ))
       // La prueba SIN clave de respuesta (decisión 9). Lo que se sirve mientras se resuelve.
       .handle("solvable", ({ params }) => attempts.solvable(params.id))
-      // Empezar un intento. El techo (`maxPracticeAttemptsPerAssessment` / `maxExamAttemptsPerAssessment`)
-      // cuenta también los cancelados y caducados (decisión 22).
-      .handle("startAttempt", ({ params, payload }) => Effect.gen(function* () {
+      // Empezar un intento. El modo lo deriva el servicio del artefacto. El techo
+      // (`maxPracticeAttemptsPerAssessment` / `maxExamAttemptsPerAssessment`) cuenta también los
+      // cancelados y caducados (decisión 22).
+      .handle("startAttempt", ({ params }) => Effect.gen(function* () {
         const key = yield* clientKey;
         yield* rateLimiter.check(key, "artifacts");
-        return yield* attempts.start(params.id, payload.mode);
+        return yield* attempts.start(params.id);
       }))
       // Registrar que se abrió una pista y devolver su texto (solo en práctica, decisión 10).
       .handle("revealHint", ({ params, payload }) => attempts.revealHint(params.id, params.attemptId, payload.questionId))

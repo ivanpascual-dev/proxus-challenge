@@ -194,6 +194,14 @@ export const NoteArtifact = Schema.Struct({
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 
+// El modo de una prueba lo fija su generación y vive en el artefacto (ADR que anula la decisión 6 del
+// plan de fase 3). El intento hereda su `mode` de aquí, no lo elige quien empieza.
+export const AssessmentMode = Schema.Union([
+  Schema.Literal("practice"),
+  Schema.Literal("exam")
+]);
+export type AssessmentMode = typeof AssessmentMode.Type;
+
 export const QuizArtifact = Schema.Struct({
   kind: Schema.Literal("quiz"),
   id: Schema.String,
@@ -202,6 +210,7 @@ export const QuizArtifact = Schema.Struct({
   scope: AssessmentScope,
   origin: AssessmentOrigin,
   createdAt: Schema.String,
+  // El Control es siempre de práctica: no lleva `mode`.
   examTimeLimitSeconds: Schema.Number
 });
 export type QuizArtifact = typeof QuizArtifact.Type;
@@ -214,7 +223,9 @@ export const TestArtifact = Schema.Struct({
   scope: AssessmentScope,
   origin: AssessmentOrigin,
   createdAt: Schema.String,
-  examTimeLimitSeconds: Schema.Number
+  examTimeLimitSeconds: Schema.Number,
+  // "practice" = de prueba (a libro abierto); "exam" = real (puerta cerrada, sin pistas).
+  mode: AssessmentMode
 });
 export type TestArtifact = typeof TestArtifact.Type;
 
@@ -388,11 +399,10 @@ export const QuestionCorrection = Schema.Union([
 ]);
 export type QuestionCorrection = typeof QuestionCorrection.Type;
 
-export const AttemptMode = Schema.Union([
-  Schema.Literal("practice"),
-  Schema.Literal("exam")
-]);
-export type AttemptMode = typeof AttemptMode.Type;
+// El modo del intento es el de su prueba (`AssessmentMode`, arriba): el intento lo hereda del
+// artefacto.
+export const AttemptMode = AssessmentMode;
+export type AttemptMode = AssessmentMode;
 
 export const AttemptInterruption = Schema.Struct({
   from: Schema.String,
@@ -583,7 +593,7 @@ export const makeArtifact = (input: CreateArtifactInput): Artifact => {
     case "quiz":
       return { ...input, ...shared };
     case "test":
-      return { ...input, ...shared };
+      return { ...input, ...shared, mode: "practice" };
   }
 };
 

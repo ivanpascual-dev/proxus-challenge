@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AssessmentOrigin, ArtifactSummary } from "./artifact.ts";
+import { AssessmentMode, AssessmentOrigin, ArtifactSummary } from "./artifact.ts";
 
 // Contrato de POST /api/materials/:id/assessments, la ruta con progreso de la fase 3 (§5.6, §6.8).
 // Espejo de la de generación de apuntes: transformar un material en un activo estructurado es un
@@ -8,12 +8,14 @@ import { AssessmentOrigin, ArtifactSummary } from "./artifact.ts";
 // El cuerpo de la petición. `questionCount` lo elige el alumno dentro de su rango
 // (`questionsPerQuiz` / `questionsPerTest`); el reparto por tipo lo pone el código (§6.2). `topicId`
 // es obligatorio para un Control (su alcance es un tema) y `null` para un Examen (el material
-// entero, decisión 1).
+// entero, decisión 1). `mode` solo cuenta para el Examen: "practice" = de prueba, "exam" = real
+// (generado sin pistas). El Control lo ignora, siempre es de práctica.
 export const GenerateAssessmentInput = Schema.Struct({
   kind: Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")]),
   topicId: Schema.NullOr(Schema.String),
   origin: AssessmentOrigin,
-  questionCount: Schema.Number
+  questionCount: Schema.Number,
+  mode: AssessmentMode
 });
 export type GenerateAssessmentInput = typeof GenerateAssessmentInput.Type;
 

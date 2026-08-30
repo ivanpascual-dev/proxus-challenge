@@ -217,7 +217,8 @@ const quizInput: GenerateAssessmentInput = {
   kind: "quiz",
   topicId: "cuantificadores",
   origin: "material",
-  questionCount: 6
+  questionCount: 6,
+  mode: "practice"
 };
 
 test("un Control sale completo, con cada pregunta anclada a su tema y páginas", async () => {

@@ -179,8 +179,8 @@ function GenerateCard({
     setLines([]);
     setDone(false);
     const input: GenerateAssessmentInput = target.kind === "test"
-      ? { kind: "test", topicId: null, origin: "material", questionCount: count }
-      : { kind: "quiz", topicId: target.topicId, origin: "material", questionCount: count };
+      ? { kind: "test", topicId: null, origin: "material", questionCount: count, mode: "practice" }
+      : { kind: "quiz", topicId: target.topicId, origin: "material", questionCount: count, mode: "practice" };
     try {
       for await (const event of streamGenerateAssessment(materialId, input)) {
         if (event.type === "progress") {

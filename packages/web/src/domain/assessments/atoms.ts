@@ -1,4 +1,4 @@
-import type { AttemptMode, TestAnswer } from "@proxus/shared";
+import type { TestAnswer } from "@proxus/shared";
 import { Effect } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { ApiClient } from "../../api-client/client.ts";
@@ -61,12 +61,12 @@ export const activeAttemptQuery = apiRuntime
   )
   .pipe(Atom.keepAlive, Atom.withReactivity(["attempts"]));
 
-// Empezar un intento. El servidor pone `startedAt` con autoridad (decisión 8) y comprueba el techo
-// de intentos del modo (decisión 22).
+// Empezar un intento. El servidor pone `startedAt` con autoridad (decisión 8), deriva el modo del
+// artefacto y comprueba el techo de intentos (decisión 22).
 export const startAttemptAction = apiRuntime.fn(
-  ({ artifactId, mode }: { readonly artifactId: string; readonly mode: AttemptMode }) =>
+  ({ artifactId }: { readonly artifactId: string }) =>
     ApiClient.use((client) =>
-      client.artifacts.startAttempt({ params: { id: artifactId }, payload: { mode } })
+      client.artifacts.startAttempt({ params: { id: artifactId } })
     ).pipe(Effect.withSpan("artifacts.startAttempt", { kind: "client" })),
   { reactivityKeys: ["attempts", "assessments"] }
 );

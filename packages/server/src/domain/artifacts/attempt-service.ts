@@ -50,7 +50,7 @@ export interface AttemptService {
     SolvableAssessment,
     ApiArtifactNotFound | ApiArtifactTypeMismatch | ApiArtifactStorageError
   >;
-  readonly start: (artifactId: string, mode: AttemptMode) => Effect.Effect<
+  readonly start: (artifactId: string) => Effect.Effect<
     InProgressAttempt,
     ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptLimitExceeded | AttemptInProgress | ApiArtifactStorageError
   >;
@@ -146,6 +146,8 @@ export const buildAssessmentListEntry = (
     id: artifact.id,
     kind: artifact.kind,
     title: artifact.title,
+    // El Control es siempre de práctica; el Examen lleva su modo en el artefacto.
+    mode: artifact.kind === "test" ? artifact.mode : "practice",
     scope: artifact.scope,
     origin: artifact.origin,
     createdAt: artifact.createdAt,
@@ -206,8 +208,11 @@ export const make = (
 
   const solvable = (artifactId: string) => getAssessment(artifactId).pipe(Effect.map(toSolvable));
 
-  const start = (artifactId: string, mode: AttemptMode) => Effect.gen(function* () {
+  const start = (artifactId: string) => Effect.gen(function* () {
     const artifact = yield* getAssessment(artifactId);
+    // El modo lo fija el artefacto, no quien empieza (ADR que anula la decisión 6): un Control es
+    // siempre de práctica; un Examen, lo que se eligió al generarlo.
+    const mode: AttemptMode = artifact.kind === "test" ? artifact.mode : "practice";
     const allAttempts = yield* repository.listAttempts().pipe(
       Effect.mapError(storageError(`No se pudo leer los intentos de ${artifactId}`))
     );

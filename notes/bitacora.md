@@ -557,17 +557,27 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   `interruptions`. `examSubmitGraceSeconds` (15 s) es el margen de red y desfase de reloj dentro del
   cual `submit()` todavía acepta una entrega pasada del límite; más allá, `TimeLimitExceeded` 409. El
   plan §5.6 solo declaraba el error: cómo distingue el servidor la entrega automática del cliente (cabe
-  en la holgura) de un `curl` tardío (no cabe) se decidió aquí. Contexto para ADR-019/021 (paso 30).
+  en la holgura) de un `curl` tardío (no cabe) se decidió aquí. Contexto para ADR-020/022 (paso 30).
 - **Decisión sobre la marcha (el guard no cachea y falla abierto):** `ExamLockdownGuard` mira si hay
   examen en curso leyendo todos los intentos de disco, en cada petición que cae en la lista cerrada.
   No hay caché: un examen recién empezado tiene que cerrar la puerta al instante, y una caché con
   invalidación repartida entre el middleware y las cuatro rutas NDJSON sueltas era más complejidad de
   la que el ahorro justifica a esta escala (ficheros de intento acotados por los techos de §5.7). Si
   el listado falla, la puerta se **abre** (fail-open) y el motivo va al log: encerrar al alumno por un
-  fallo de disco es peor que dejar pasar una petición. Contexto para ADR-018 (paso 30).
+  fallo de disco es peor que dejar pasar una petición. Contexto para ADR-021 (paso 30).
 - **Regla nueva pedida a mitad (un solo intento a medias a la vez):** Iván la pidió durante la sesión,
   no estaba en el plan. `start()` ya no solo mira el techo: si hay otro intento `in-progress` (de otra
   prueba o de otro modo) lo rechaza con `AttemptInProgress` 409 nombrando cuál; si el que hay abierto
   es de la misma prueba y el mismo modo, lo retoma en vez de crear otro. El techo de intentos por modo
   se mantiene y ahora se cuenta sobre todos los intentos del artefacto (`listAttempts()` sin filtro,
   luego `filter`), no sobre `listAttempts(artifactId)`. Contexto para un ADR nuevo (paso 30).
+- **Desviación (decisión 6 reabierta, con el OK de Iván):** el plan la cerró como «el modo es del
+  intento, no del artefacto» (el mismo Control se practica hoy y se examina mañana). Al montar el
+  examen se vio que no se sostiene: el Examen real se genera **sin pistas**, y eso es una propiedad
+  del artefacto, no de quien lo abre. Modelo nuevo ([ADR-018](../docs/decisiones.md)): el Control es
+  siempre de práctica; el Examen se genera «de prueba» (`mode: "practice"`) o «real» (`mode: "exam"`);
+  el intento hereda el modo del artefacto y empezar ya no lleva cuerpo (`StartAttemptInput` fuera). El
+  techo de Exámenes por material pasa a contarse por modo: `maxTestsPerMaterial` de 4 a 2, o sea 2 de
+  prueba + 2 reales. Los ADR reservados del plan §11 corren un número (018 lo toma esta inversión). El
+  selector al generar y el panel del Examen real llegan en commits posteriores del mismo tramo; este
+  solo mueve contrato y servidor y adapta la web para que compile.

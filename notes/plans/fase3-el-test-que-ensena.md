@@ -70,6 +70,12 @@ para, no se mejora por cuenta propia.
 6. **El modo (práctica o examen) es del intento, no del artefacto.** El mismo Control se puede practicar
    hoy y examinar mañana. El artefacto solo guarda los parámetros de examen que el código deriva de su
    reparto de preguntas.
+
+   > **Sustituida en el tramo 3C por el [ADR-018](../../docs/decisiones.md), con el OK de Iván.** El
+   > modo lo fija la generación y vive en el artefacto: el Control es siempre de práctica; el Examen se
+   > genera «de prueba» o «real»; el intento hereda su modo del artefacto y empezar ya no lleva cuerpo.
+   > Motivo: el Examen real se genera **sin pistas**, y eso es una propiedad del artefacto, no del
+   > intento. El techo de Exámenes por material pasa a contarse por modo (2 + 2).
 7. **El tutor pierde `artifacts submit` y `artifacts grade`.** Solo el alumno, desde la interfaz, genera
    intentos que muevan el perfil. Es la invariante 4 impuesta en el código (§1.3). El tutor gana
    `profile show`, que es de solo lectura.
@@ -905,16 +911,19 @@ No se amplía la fase por cuenta propia. Cada cosa, con su destino:
 
 ## 11. ADR que escribe esta fase
 
-Se redactan en `docs/decisiones.md` durante el paso 30, no antes:
+**El [ADR-018](../../docs/decisiones.md) ya está escrito** (tramo 3C): anula la decisión 6, el modo lo
+fija la generación y vive en el artefacto. Los demás se redactan en `docs/decisiones.md` durante el
+paso 30, no antes, y corren un número respecto a la numeración original del plan:
 
-- **ADR-018 · El código pone la forma de la prueba; el modelo redacta las preguntas.** Recoge §1.2 y las
+- **ADR-019 · El código pone la forma de la prueba; el modelo redacta las preguntas.** Recoge §1.2 y las
   decisiones 3, 4 y 5, y explica por qué el reparto es determinista y no aleatorio.
-- **ADR-019 · El juez dice qué criterios se cumplen; la nota la calcula el código.** Recoge la decisión
+- **ADR-020 · El juez dice qué criterios se cumplen; la nota la calcula el código.** Recoge la decisión
   12 y por qué `unevaluated` no es cero.
-- **ADR-020 · El modo es del intento, la clave no viaja al navegador y el examen cierra la puerta.**
-  Recoge las decisiones 6, 8, 9, 18, 19 y 20: qué hace de un examen un examen y no una práctica con
-  reloj, por qué las tres barreras están en el servidor, y por qué la salida tiene que ser visible.
-- **ADR-021 · El perfil se mueve solo con intentos del alumno.** Recoge §1.3 y la decisión 7: por qué
+- **ADR-021 · La clave no viaja al navegador y el examen cierra la puerta.**
+  Recoge las decisiones 8, 9, 18, 19 y 20: qué hace de un examen un examen y no una práctica con
+  reloj, por qué las tres barreras están en el servidor, y por qué la salida tiene que ser visible. El
+  modo (decisión 6) ya lo cubre el ADR-018.
+- **ADR-022 · El perfil se mueve solo con intentos del alumno.** Recoge §1.3 y la decisión 7: por qué
   quitarle `submit` y `grade` al tutor es la invariante 4 y no una simplificación.
 
 ---

@@ -86,7 +86,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
     setStarting(true);
     setError(undefined);
     try {
-      const result = await start({ artifactId: assessment.id, mode: "practice" });
+      const result = await start({ artifactId: assessment.id });
       if (result.status === "in-progress") {
         setAttempt(result);
       } else {

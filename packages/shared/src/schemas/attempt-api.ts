@@ -63,10 +63,9 @@ export type SolvableAssessment = typeof SolvableAssessment.Type;
 
 // --- Entradas de los endpoints --------------------------------------------------------------------
 
-export const StartAttemptInput = Schema.Struct({
-  mode: AttemptMode
-});
-export type StartAttemptInput = typeof StartAttemptInput.Type;
+// Empezar un intento no lleva cuerpo: el modo (práctica o examen) lo deriva el servidor del artefacto
+// (un Control siempre es práctica; un Examen, lo que se eligió al generarlo). El endpoint se queda
+// sin payload.
 
 // La entrega. Las respuestas se validan contra sus preguntas en la corrección (`grading.ts`), no en
 // el esquema. Se acepta el formato de un Examen (superconjunto del de un Control).
@@ -122,6 +121,9 @@ export const AssessmentListEntry = Schema.Struct({
   id: Schema.String,
   kind: Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")]),
   title: Schema.String,
+  // El modo de la prueba: un Control siempre es "practice"; un Examen es "practice" (de prueba) o
+  // "exam" (real). La pestaña enruta con esto: el Examen real va al panel a pantalla completa.
+  mode: AttemptMode,
   scope: Schema.Struct({
     materialId: Schema.String,
     topicId: Schema.NullOr(Schema.String),

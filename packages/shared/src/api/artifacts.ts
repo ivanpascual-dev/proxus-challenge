@@ -5,7 +5,6 @@ import {
   RevealHintInput,
   RevealHintResult,
   SolvableAssessment,
-  StartAttemptInput,
   SubmitAttemptAnswersInput
 } from "../schemas/attempt-api.ts";
 import {
@@ -75,10 +74,10 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
-    // El intento se crea en el servidor al empezarlo (decisión 8): da `startedAt` con autoridad.
+    // El intento se crea en el servidor al empezarlo (decisión 8): da `startedAt` con autoridad. Sin
+    // cuerpo: el modo lo deriva el servidor del artefacto, no lo elige quien empieza.
     HttpApiEndpoint.post("startAttempt", "/:id/attempts", {
       params: { id: Schema.String },
-      payload: StartAttemptInput,
       success: ArtifactAttempt,
       error: [
         ArtifactNotFound.pipe(HttpApiSchema.status(404)),

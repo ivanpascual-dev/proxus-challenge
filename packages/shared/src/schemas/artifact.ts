@@ -124,6 +124,14 @@ export const NoteArtifact = Schema.Struct({
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 
+// El modo de una prueba lo fija su generación y vive en el artefacto (ADR que anula la decisión 6 del
+// plan de fase 3). El intento sigue llevando su `mode`, pero lo deriva de aquí, no de la petición.
+export const AssessmentMode = Schema.Union([
+  Schema.Literal("practice"),
+  Schema.Literal("exam")
+]);
+export type AssessmentMode = typeof AssessmentMode.Type;
+
 export const QuizArtifact = Schema.Struct({
   kind: Schema.Literal("quiz"),
   id: Schema.String,
@@ -132,8 +140,8 @@ export const QuizArtifact = Schema.Struct({
   scope: AssessmentScope,
   origin: AssessmentOrigin,
   createdAt: Schema.String,
-  // Parámetros de examen que el código deriva del reparto de preguntas (decisión 6). El modo lo elige
-  // el intento, no el artefacto.
+  // El Control es siempre de práctica: no lleva `mode`. `examTimeLimitSeconds` lo deriva el código del
+  // reparto de preguntas por si se practica a reloj, pero no hay penalización ni puerta cerrada.
   examTimeLimitSeconds: Schema.Number
 });
 export type QuizArtifact = typeof QuizArtifact.Type;
@@ -146,7 +154,10 @@ export const TestArtifact = Schema.Struct({
   scope: AssessmentScope,
   origin: AssessmentOrigin,
   createdAt: Schema.String,
-  examTimeLimitSeconds: Schema.Number
+  examTimeLimitSeconds: Schema.Number,
+  // "de prueba" (a libro abierto, con pistas) o "real" (`exam`: puerta cerrada, reloj, penalización,
+  // generado sin pistas). Se elige al generar el Examen.
+  mode: AssessmentMode
 });
 export type TestArtifact = typeof TestArtifact.Type;
 
@@ -335,11 +346,10 @@ export const QuestionCorrection = Schema.Union([
 ]);
 export type QuestionCorrection = typeof QuestionCorrection.Type;
 
-export const AttemptMode = Schema.Union([
-  Schema.Literal("practice"),
-  Schema.Literal("exam")
-]);
-export type AttemptMode = typeof AttemptMode.Type;
+// El modo del intento es el mismo que el de su prueba (`AssessmentMode`, definido arriba): el intento
+// lo hereda del artefacto, no lo elige quien empieza.
+export const AttemptMode = AssessmentMode;
+export type AttemptMode = AssessmentMode;
 
 // Un hueco en el que el alumno no estaba conectado durante un examen. El reloj cuenta el tiempo
 // conectado, no el de pared (decisión 19c); los huecos se guardan y el historial los enseña.

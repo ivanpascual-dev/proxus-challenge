@@ -27,7 +27,7 @@ export const LIMITS = {
 
   // Cuántas pruebas y cuántos intentos.
   maxQuizzesPerTopic: 2, // por tema, no por material: el techo va donde va el alcance del Control
-  maxTestsPerMaterial: 4,
+  maxTestsPerMaterial: 2, // por modo: 2 Exámenes de prueba y 2 Exámenes reales por material
   maxPracticeAttemptsPerAssessment: 3,
   maxExamAttemptsPerAssessment: 3,
 

@@ -191,11 +191,15 @@ export const make = (
           existingAssessments(materialId).pipe(
             Effect.map((current) => {
               if (input.kind === "test") {
-                const count = current.filter((artifact) => artifact.kind === "test").length;
+                // El techo cuenta por modo: 2 Exámenes de prueba y 2 reales por material.
+                const label = input.mode === "exam" ? "Exámenes reales" : "Exámenes de prueba";
+                const count = current.filter(
+                  (artifact) => artifact.kind === "test" && artifact.mode === input.mode
+                ).length;
                 return count >= LIMITS.maxTestsPerMaterial
                   ? Option.some<GenerationRejection>({
                       status: 400,
-                      message: `Este material ya tiene ${count} Exámenes (el máximo es ${LIMITS.maxTestsPerMaterial}). Borra alguno desde la pestaña Pruebas para generar otro.`
+                      message: `Este material ya tiene ${count} ${label} (el máximo es ${LIMITS.maxTestsPerMaterial}). Borra alguno desde la pestaña Pruebas para generar otro.`
                     })
                   : Option.none<GenerationRejection>();
               }
@@ -493,12 +497,13 @@ export const make = (
         : {
             kind: "test",
             id: assessmentId,
-            title: `Examen de ${material.title}`,
+            title: `Examen ${input.mode === "exam" ? "real" : "de prueba"} de ${material.title}`,
             questions: questions as readonly TestQuestion[],
             scope,
             origin: input.origin,
             createdAt: new Date().toISOString(),
-            examTimeLimitSeconds: timeLimitSeconds(questions)
+            examTimeLimitSeconds: timeLimitSeconds(questions),
+            mode: input.mode
           };
 
       yield* repository.saveArtifact(artifact as Artifact).pipe(
