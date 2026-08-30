@@ -473,3 +473,13 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   único camino del error a la interfaz; un `defect` siempre como texto genérico). Queda como enmienda
   a ADR-005 (2026-08-30); generaliza el comentario "fase 2, decisión 28" de
   `file-artifact-repository.ts`.
+
+### Retoques tras probar el tramo 3B
+
+Iván probó el tramo y pidió tres arreglos. Lo que no se ve en el diff:
+
+- **Causa raíz (no se podía responder en práctica):** en `AssessmentSolver` el bloqueo de los campos
+  era `attempt !== null`, heredado de cuando la práctica corregía pregunta a pregunta. Tras reescribir
+  F3-11 en el paso 15 (la práctica corrige al entregar), "hay intento" dejó de significar "ya
+  corregido", así que al empezar la práctica todos los inputs nacían deshabilitados y no se podía
+  marcar ninguna respuesta, de ningún tipo. Pasa a `graded !== null`.

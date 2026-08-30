@@ -86,7 +86,9 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
   const dispute = useAtomSet(disputeAction, { mode: "promise" });
 
   const graded = attempt?.status === "graded" ? attempt : null;
-  const locked = attempt !== null;
+  // Se responde mientras el intento está en curso; solo se congela al corregir (§F3-11: la corrección
+  // sale al entregar, no antes).
+  const locked = graded !== null;
 
   const onStart = async () => {
     if (starting) {
