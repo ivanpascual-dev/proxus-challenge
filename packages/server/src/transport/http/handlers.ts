@@ -20,6 +20,7 @@ import {
 } from "../../domain/artifacts/artifact.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts/attempt-service.ts";
+import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
@@ -89,6 +90,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const materials = yield* MaterialRepository;
     const artifacts = yield* ArtifactRepository;
+    const profile = yield* StudyProfileService;
 
     return handlers
       .handle("list", () => materials.list().pipe(
@@ -118,6 +120,12 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
             .map((artifact) => buildAssessmentListEntry(artifact, attempts))
         };
       }))
+      // El perfil de estudio del material, tema a tema, con las señales por separado (§5.6, ADR-002).
+      .handle("profile", ({ params }) => profile.read(params.id).pipe(
+        Effect.catchTag("StudyProfileError", (error) => Effect.fail(
+          error.notFound ? notFound(params.id) : storageError(params.id)
+        ))
+      ))
       .handle("get", ({ params }) => materials.get(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", Effect.die),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))

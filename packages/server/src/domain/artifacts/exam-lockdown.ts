@@ -43,6 +43,7 @@ export const CLOSED_ROUTES: readonly string[] = [
   "GET /api/materials/:id",
   "GET /api/materials/:id/index",
   "GET /api/materials/:id/assessments",
+  "GET /api/materials/:id/profile",
   "GET /api/materials/:id/pages/:page",
   "POST /api/materials/:id/index",
   "POST /api/materials/:id/notes",

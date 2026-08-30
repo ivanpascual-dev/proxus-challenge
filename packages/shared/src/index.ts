@@ -17,3 +17,4 @@ export * from "./schemas/material-index.ts";
 export * from "./schemas/note-generation.ts";
 export * from "./schemas/assessment-generation.ts";
 export * from "./schemas/attempt-api.ts";
+export * from "./schemas/study-profile.ts";

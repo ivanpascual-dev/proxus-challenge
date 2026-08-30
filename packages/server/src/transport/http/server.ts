@@ -39,6 +39,8 @@ import {
 } from "../../domain/artifacts/assessment-generation-service.ts";
 import { AttemptServiceLive } from "../../domain/artifacts/attempt-service.ts";
 import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts";
+import { StudyProfileServiceLive } from "../../domain/profile/study-profile.ts";
+import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
@@ -398,6 +400,9 @@ const DomainLive = Layer.mergeAll(
   AssessmentGenerationServiceLive,
   AttemptServiceLive.pipe(Layer.provide(OpenAnswerJudgeLive))
 ).pipe(
+  // El perfil de estudio lo usan el `AttemptService` (al entregar y al discrepar) y el handler de
+  // `GET /materials/:id/profile`: se provee a los dos con `provideMerge` y queda en la salida.
+  Layer.provideMerge(StudyProfileServiceLive),
   Layer.provideMerge(RateLimiterLive())
 );
 
@@ -407,7 +412,8 @@ const InfraLive = Layer.mergeAll(
     Layer.provide(FileMaterialIndexRepository.layer(".data/materials/index")),
     Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer)))
   ),
-  FileArtifactRepository.layer(".data/artifacts")
+  FileArtifactRepository.layer(".data/artifacts"),
+  FileStudyProfileRepository.layer(".data/profile")
 );
 
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(

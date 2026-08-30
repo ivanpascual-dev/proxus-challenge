@@ -3,6 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/ht
 import { MaterialListResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
 import { MaterialIndex } from "../schemas/material-index.ts";
 import { MaterialAssessmentsResponse } from "../schemas/attempt-api.ts";
+import { StudyProfile } from "../schemas/study-profile.ts";
 import { MaterialNotFound, MaterialNotIndexed, MaterialStorageError, PageOutOfRange } from "../errors/material-errors.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
@@ -37,6 +38,18 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
         id: Schema.String
       },
       success: MaterialAssessmentsResponse,
+      error: [
+        MaterialNotFound.pipe(HttpApiSchema.status(404)),
+        MaterialStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // El perfil de estudio de ese material, tema a tema (§5.6, ADR-002). Solo lectura: el modelo
+    // nunca lo escribe, y esta ruta tampoco. Cada tema trae sus señales POR SEPARADO (invariante 5).
+    HttpApiEndpoint.get("profile", "/:id/profile", {
+      params: {
+        id: Schema.String
+      },
+      success: StudyProfile,
       error: [
         MaterialNotFound.pipe(HttpApiSchema.status(404)),
         MaterialStorageError.pipe(HttpApiSchema.status(500))
