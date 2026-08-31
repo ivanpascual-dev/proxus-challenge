@@ -15,16 +15,37 @@ nadie sabe lo que cuesta.
 
 Medido sobre las sesiones reales de `packages/server/.data/agent-sessions`:
 
-| Sesión                | Mensajes | Historial en disco | Bytes enviados a Gemini en **un turno** |
-| --------------------- | -------- | ------------------ | --------------------------------------- |
-| `verifier-f105b`      | 10       | 8,73 MB            | **22,85 MB**                            |
-| `academic-tutor-demo` | 10       | 4,32 MB            | 8,64 MB                                 |
+Medición reproducible con `scripts/measure-tokens.mjs` sobre `verifier-f105b` (9,15 MB en disco, 10
+mensajes, un turno de 5 llamadas):
+
+| Paso | Entrada | Cacheados  | Salida | Bytes de la petición |
+| ---- | ------- | ---------- | ------ | -------------------- |
+| 0    | 456     | 0          | 20     | ~0 MB                |
+| 1    | 684     | 0          | 15     | ~0 MB                |
+| 2    | 843     | 0          | 58     | ~0 MB                |
+| 3    | 14.033  | 0          | 28     | 5,66 MB              |
+| 4    | 22.865  | **12.226** | 186    | 9,15 MB              |
+| **Turno** | **38.881** | 12.226 | 307 | **14,82 MB** |
 
 El **99,98%** de ese historial son imágenes base64 dentro de los `tool-result` de `materials view`.
 La causa está en dos sitios del mismo fichero: [`session.ts:83`](../../packages/server/src/domain/agents/harness/session.ts)
 reconstruye el prompt entero en cada iteración del bucle de pasos, y `session.ts:183-188` vuelve a
-adjuntar cada imagen cada vez. En `verifier-f105b` la imagen del paso 6 (5,5 MB) viajó tres veces y
-la del paso 8 (3,4 MB) dos.
+adjuntar cada imagen cada vez. Se ve en los pasos 3 y 4: la primera imagen (5,66 MB) viaja dos veces,
+y la segunda llega encima.
+
+> **Corrección.** Una versión anterior de esta tabla decía 22,85 MB para este mismo turno, y 8,64 MB
+> para `academic-tutor-demo`. Eran cifras **derivadas a mano** (multiplicar el peso de cada imagen por
+> las veces que el código la readjunta), no bytes de petición medidos, y sobrestimaban. Las de arriba
+> salen de correr el guion, que se puede volver a correr. La fila de `academic-tutor-demo` se retira
+> por no estar re-medida. **La conclusión no cambia**: el reenvío de imágenes domina el turno, y las
+> decisiones 1, 10 y 11 se sostienen igual.
+
+Dos cosas más que salen de esta medición y que no estaban en el plan original:
+
+- **Los tres primeros pasos son baratísimos** (456, 684 y 843 tokens de entrada). Todo el coste entra
+  con la primera imagen. Refuerza la palanca 1 y quita presión a cualquier ahorro sobre el prompt.
+- **La caché implícita saltó dentro del mismo turno**, en la 5ª llamada: 12.226 cacheados de 22.865
+  (53%). Confirma la palanca 2 en condiciones reales, no solo en la sonda de laboratorio.
 
 **No se arregla mandando el prompt "solo al principio": no existe tal cosa.** La API de Gemini es sin
 estado, cada `generateContent` es una petición HTTP independiente que lleva `systemInstruction` y
@@ -36,7 +57,7 @@ reenvía y **a qué precio**.
 
 **Palanca 1, que lo caro no se quede residente.** Una imagen de página es cara y de un solo uso.
 Vive el turno en que se pide y después queda como texto. En los datos de arriba: el turno siguiente
-arranca con ~9 KB en vez de con 8,73 MB.
+arranca con ~9 KB en vez de con 9,15 MB.
 
 **Palanca 2, la caché implícita de Gemini.** Verificado contra la API real con tres llamadas de
 prefijo idéntico (17.800 tokens):
@@ -67,7 +88,7 @@ de 8 viaja 7 veces (~6.300 tokens por 900 útiles).
 ya lo llevan dentro (`use-uploaded-materials.ts:11-14` y `37-43`), y lo llevan **con el contexto que
 una línea de descripción no puede dar**: `materials read` antes que `materials view` porque la imagen
 gasta presupuesto, `transcribed` puede tener errores, y el aviso de que el texto de las páginas son
-datos y no instrucciones. Poner las 21 líneas sueltas en el prompt duplicaría lo que ya está dicho, y
+datos y no instrucciones. Poner las 9 líneas sueltas en el prompt duplicaría lo que ya está dicho, y
 tentaría al modelo a lanzar comandos saltándose el orden de preferencia y los guardarraíles que solo
 existen en el cuerpo de la skill. Se ahorra **dentro** del mecanismo, no quitándolo.
 
@@ -122,15 +143,17 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
     y ahí rompería la caché de todo lo demás.
 12. **Palanca 3: la divulgación progresiva se queda intacta y se ahorra dentro de ella.** El árbol de
     comandos **no** sube al system prompt y `load_skill` sigue siendo la única puerta al cuerpo de una
-    skill. Motivo: ese mecanismo es la tesis de diseño del harness, y las 21 descripciones sueltas
+    skill. Motivo: ese mecanismo es la tesis de diseño del harness, y las 9 descripciones sueltas
     duplicarían lo que la skill ya dice mejor y con contexto. Tres medidas que sí ahorran:
     - **a. El cuerpo de una skill se envía una vez por sesión.** Si el modelo vuelve a pedir una skill
       ya cargada, el `tool-result` devuelve `Already loaded above. Re-read it there.` en lugar del
       cuerpo. Y en el rearmado del historial, el cuerpo se conserva solo en su **primera** aparición.
       Ahorro medido sobre el caso real: ~6.300 tokens en un turno de 8 pasos.
-    - **b. Los cuerpos se recortan y se deduplican entre sí.** Hoy son 12.849 bytes en tres skills
-      (`skills/*.ts`) con solapamiento evidente (las tres reexplican los ids de artefacto). Objetivo:
-      lo compartido baja al system prompt canónico **una vez**, y cada skill se queda con lo suyo.
+    - **b. Los cuerpos se recortan y la lectura de apuntes se saca a su propia skill.** Hoy son 12.849
+      bytes en tres skills y **dos de ellas enseñan a leer un apunte**: `use-uploaded-materials.ts:30-51`
+      (1.704 bytes, el 39% de esa skill) y `propose-note-changes.ts:16-19` y `:51-52`, las dos con la
+      misma secuencia `artifacts list note` → `show` → `block`. Se extrae a **`use-study-notes`**
+      (decisión 16).
     - **c. La caché implícita cubre lo que quede.** El cuerpo de la skill entra en el prefijo estable
       y a partir de la tercera llamada se cachea (69% medido), así que lo que sobreviva a (a) y (b)
       se paga barato.
@@ -202,6 +225,50 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
 15. **Nada de model routing con clasificador.** Añade una llamada por turno solo para decidir, y hoy
     no hay datos de dónde falla el modelo porque el adaptador los tira. El enrutado que sí entra es el
     determinista por camino, extendiendo el patrón que ya existe con `GeminiJsonLanguageModelLive`.
+16. **Cuarta skill: `use-study-notes`, leer los apuntes.** Motivo de producto: el apunte no es un
+    reflejo del material, **lo adelanta**. Acumula bloques que el alumno escribe (`author: student`),
+    bloques con `source` de una URL, y el énfasis que marca. A las pocas semanas de uso es el artefacto
+    con más información del sistema, y hoy leerlo está escondido dentro de la skill de materiales.
+
+    Motivo técnico, medido: leer un apunte ya está explicado **en dos skills a la vez**, con la misma
+    secuencia `artifacts list note` → `artifacts show` → `artifacts block`, en
+    `use-uploaded-materials.ts:30-51` (1.704 bytes, el 39% de esa skill) y en
+    `propose-note-changes.ts:16-19` y `:51-52`. Extraerla **no suma una skill, resuelve una
+    duplicación**: `use-uploaded-materials` baja a ~2,7 KB, `propose-note-changes` pierde su copia, y
+    una pregunta sobre bloques deja de arrastrar todo el manual de `materials view`.
+
+    Coste: una línea más en el catálogo del system prompt, ~25 tokens. Es la palanca 3b hecha bien.
+
+    Reparto, sin solapamiento: **`use-study-notes`** lee (`artifacts list note`, `show`, `block`) y
+    explica qué es un bloque, quién lo escribió y de dónde sale. **`propose-note-changes`** solo
+    propone, y para leer remite a la otra. **`use-uploaded-materials`** se queda con el PDF: `read`,
+    `view`, procedencia y presupuesto de imágenes. Su descripción pierde el `or read the study note`,
+    que era la señal de que ahí dentro había dos skills.
+17. **Quinta skill: `use-study-assessments` se parte en dos.** Hoy (3.828 bytes) contesta a dos
+    preguntas que no se parecen: _"enséñame el Examen 3"_ y _"¿qué llevo peor?"_. La primera es leer un
+    artefacto; la segunda es un diagnóstico con la invariante 5 encima (las tres señales nunca se
+    funden), y arrastrarla entera para enseñar una prueba es pagar el manual del perfil sin usarlo.
+
+    - **`read-assessments`**: `artifacts list quiz|test`, `artifacts show`, cómo se lee una prueba,
+      el vocabulario de la interfaz (Control y Examen, no `quiz` y `test`) y la barrera de "no creo ni
+      corrijo, eso es la pestaña Pruebas".
+    - **`review-progress`**: `profile show`, `artifacts attempts`, las tres señales por separado, y
+      que un blanco no es un fallo ni lo es un "no evaluable". Es la skill del smoke test que ya
+      existe (`docs/ai-agent.md:131`: _"¿qué llevo peor de este material?"_).
+
+    **La regla que se aplica, y no es "una skill = un comando":** una skill es **una pregunta del
+    alumno**. Esa es la unidad que hace que una consulta cargue exactamente una skill; partir por
+    debajo de eso obliga a cargar dos y cuesta un paso del bucle, que es más caro que cualquier cuerpo
+    de skill. Por eso se parten estas dos (dos preguntas distintas) y **no** se parte
+    `use-uploaded-materials` en `read` y `view` (una sola pregunta, "léeme esto", con dos caminos de
+    coste que hay que comparar en el mismo texto).
+
+    **Y por eso no entra ninguna skill de método** ("explica citando", "sé socrático"): eso debe
+    cumplirse **siempre**, y lo que debe cumplirse siempre va en el system prompt canónico, donde no
+    depende de que el modelo acierte a cargarla. Una skill es para lo que solo aplica a veces.
+
+    Estado final: **cinco skills**, catálogo de ~190 tokens (hoy 155), y ninguna capacidad nueva. Se
+    reparte lo que ya había.
 
 ### Asunciones marcadas (no preguntadas, revisables)
 
@@ -631,8 +698,15 @@ de errores como mapa.
 
 **Tramo 4D · La subida y su cadena.** 11. `pdf-sniff.ts` con sus tests. 12. Ruta de subida, con la copia dentro del scope y el orden de validación de la sección 4.2. 13. Gracia de alta en el limitador. 14. `UploadDropzone` y la cadena de progreso por fichero.
 
-**Tramo 4E · El agente que se ve.** 15. System prompt canónico, `skill-dedup.ts` conectado al bucle y los cuerpos de las tres skills
-recortados y desduplicados entre sí (palanca 3, a y b). 16. `follow-up.ts` conectado, y los tres botones. 17. Chips de contexto de pantalla, lista de conversaciones y coste del turno.
+**Tramo 4E · El agente que se ve.**
+
+15. System prompt canónico, `skill-dedup.ts` conectado al bucle (palanca 3a) y la reorganización de
+    las skills (decisiones 16 y 17): **`use-study-notes`** extraída de `use-uploaded-materials`, y
+    **`use-study-assessments` partida** en `read-assessments` y `review-progress`. Las cinco quedan
+    sin solapamiento. Comprobación: la suma de los **cinco** cuerpos baja de los 12.849 bytes de hoy,
+    y el smoke test de `docs/ai-agent.md:131` sigue acabando en `profile show` y nombrando la señal.
+16. `follow-up.ts` conectado, y los tres botones.
+17. Chips de contexto de pantalla, lista de conversaciones y coste del turno.
 
 **Tramo 4F · Las dos evals nuevas.**
 
@@ -667,7 +741,16 @@ empatan también en la eval, gana `low`**: mismo resultado con menos varianza. -
 sin él, no la cifra absoluta. - Apuntes: `note-generation.eval.ts`, mirando sobre todo las cifras inventadas y los términos
 traducidos. - **Si un camino no mejora de forma visible, se queda sin thinking**: el que paga la duda es el
 coste. Y si la traducción empeora un prompt, **se revierte ese prompt** y se anota. 22. Correr la batería completa, con `STRICT=1`. 23. Barrido de límites: la tabla de la sección 3 revisada entera, cada valor con veredicto, más los
-techos de salida por camino de la sección 4.2. 24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
+techos de salida por camino de la sección 4.2. **Incluye los tres listados de comando que hoy no
+tienen techo ninguno** (invariante 11, sin límites implícitos), frente a `materials read`, que sí lo
+tiene con `maxIndexTextCharactersPerTurn`:
+    - **`artifacts show` de un `quiz` o un `test`** devuelve `JSON.stringify(artifact)` entero
+      (`artifact-commands.ts:108-109`). Un Examen de 30 preguntas con enunciados, opciones,
+      explicaciones y citas entra de golpe en el historial: del orden de 6.000 a 8.000 tokens en una
+      sola llamada, y ahí se queda el resto de la conversación.
+    - **`artifacts attempts` sin argumento** devuelve todos los intentos de todas las pruebas
+      (`:255-271`).
+    - **`artifacts list` sin filtro** devuelve todos los artefactos (`:201-217`). 24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
 `docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
 `CHANGELOG.md` y `NOTES.md`. 25. **Corregir el apartado "Tutor agent" de [`docs/architecture.md:218-225`](../../docs/architecture.md).**
 Hoy dice "el modelo debe cargarlas mediante `load_skill`" sin decir que el modelo **ya ve** el
@@ -755,6 +838,20 @@ Cada cosa con su motivo, para que nadie la reabra ni la dé por olvidada:
   ya está diseñada** para cuando entre: la imagen la lee el tutor y propone un bloque con
   `artifacts note propose`, que el alumno acepta (ADR-014). Va a `NOTES.md` como próximo paso.
 - **El `@` manual de contexto.** El contexto de pantalla cubre el caso común.
+- **`materials topics <materialId>`, el décimo comando.** Es la mejor candidata a comando nuevo que
+  sale del repaso de los 9 actuales: hoy, para saber de qué trata un material, hay que llamar a
+  `materials read` con un rango de páginas **elegido a ciegas**, que es la llamada cara. El índice ya
+  existe en `.data/materials/index` con sus `topics` y sus rangos de página, así que el comando sería
+  barato de escribir y ahorraría lecturas. **No entra por tiempo** (decisión 1), y porque el contexto
+  de pantalla de esta fase tapa parcialmente el hueco: si el alumno tiene el material abierto, el
+  agente ya recibe su referencia. Queda en `NOTES.md` como el primer candidato de la fase siguiente.
+- **La clave de respuestas en `artifacts show`.** Un `quiz` o un `test` vuelven como JSON entero, con
+  `correctOptionId` y compañía (`shared/src/schemas/artifact.ts:50,65,76`), y la skill lo nombra como
+  algo normal (`use-study-assessments.ts:30-31`). Durante un Examen real **no hay fuga**: la
+  aplicación entra en modo examen sin chat y el servidor responde 409 (`App.tsx:39-42`). Pero nada
+  impide que el alumno pida las respuestas **antes** de empezar. No se cierra aquí porque exige
+  decidir producto (¿el tutor debe poder ver la clave?), y eso es una pregunta para Iván, no una
+  decisión de ejecución. **Va a `@guardarrailes` como hallazgo** y a `NOTES.md`.
 - **`artifacts create` anclado.** [`docs/ai-agent.md:16`](../../docs/ai-agent.md) promete que vuelve en
   esta fase; **no vuelve, y el documento se corrige**, en vez de dejar la promesa colgando.
 - **Reorganizar `.data`.** Fontanería que no se ve en la demo. Propuesta anotada en `NOTES.md`:

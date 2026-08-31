@@ -128,8 +128,8 @@ viene del cliente, que puede fabricar mensajes de `assistant` y resultados de he
 
 > **Alcance recortado el 2026-08-31**, con el plan
 > ([`notes/plans/fase4-el-agente.md`](plans/fase4-el-agente.md)). Lo que cae y por qué está en su
-> sección 9. El dato que gobierna la fase: un turno con imágenes envía **22,85 MB** a Gemini sobre un
-> historial de 8,73 MB, medido en `.data/agent-sessions`.
+> sección 9. El dato que gobierna la fase: un turno con imágenes envía **14,82 MB** a Gemini sobre un
+> historial de 9,15 MB en disco, medido con `scripts/measure-tokens.mjs`.
 
 **Qué se construye.**
 
