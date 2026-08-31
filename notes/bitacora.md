@@ -714,3 +714,7 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     registra en el log del servidor como diagnóstico (`generateForTopic`). F3-08/F3-09 reescritos en
     `especificacion.md` para que digan "al log", no "al resultado", y "guardadas = pedidas o falla
     entero" en vez de pedir un desglose por pregunta que el diseño no da.
+  - **El bloqueo de campos al agotarse el tiempo tenía un hueco, arreglado.** `ExamRun.tsx`: `locked`
+    solo miraba `phase === "graded"` (ya corregido), no `"grading"` (corrigiendo): entre que la
+    entrega automática se dispara al llegar a 0 (decisión 20) y que vuelve la corrección, los campos
+    seguían editables aunque los botones ya estuvieran deshabilitados. Ahora `locked` cubre las dos.

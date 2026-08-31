@@ -295,7 +295,10 @@ function ExamBody({
   }
 
   const unanswered = countUnanswered(assessment.questions, answers);
-  const locked = phase === "graded";
+  // Se bloquea al entregar, no solo al terminar de corregir: agotado el tiempo la entrega es
+  // automática (decisión 20) y desde ese instante no se puede seguir rellenando ni modificar nada,
+  // solo esperar la corrección.
+  const locked = phase === "grading" || phase === "graded";
 
   return (
     <>
