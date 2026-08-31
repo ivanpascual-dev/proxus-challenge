@@ -1,7 +1,8 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useState } from "react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
-import { materialsQuery } from "../domain/materials/atoms.ts";
+import { deleteMaterialAction, materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import { UploadDropzone } from "./UploadDropzone.tsx";
 import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
@@ -13,6 +14,31 @@ interface SidebarProps {
 
 export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
+  const deleteMaterial = useAtomSet(deleteMaterialAction, { mode: "promise" });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{ readonly materialId: string; readonly message: string } | null>(null);
+
+  const onDelete = async (materialId: string, title: string) => {
+    if (deletingId !== null) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `¿Borrar "${title}"? Se pierden también su apunte, sus controles y sus exámenes con sus intentos. No se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(materialId);
+    setDeleteError(null);
+    try {
+      await deleteMaterial(materialId);
+    } catch (cause) {
+      setDeleteError({ materialId, message: messageOf(cause) });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <aside className="h-screen overflow-y-auto border-border border-r bg-canvas p-5 max-md:h-auto max-md:max-h-[45vh] max-md:border-r-0 max-md:border-b">
@@ -48,11 +74,11 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
                   </summary>
                   <ul className="grid gap-2 border-border border-t p-3">
                     {value.materials.map((material) => (
-                      <li key={material.id}>
+                      <li key={material.id} className="relative">
                         <button
                           type="button"
                           onClick={() => onSelectMaterial(material.id)}
-                          className={`w-full rounded-xl p-3 text-left transition hover:border-brand hover:bg-canvas ${
+                          className={`w-full rounded-xl p-3 pr-10 text-left transition hover:border-brand hover:bg-canvas ${
                             selectedMaterialId === material.id
                               ? "border border-brand bg-brand-soft"
                               : "border border-transparent bg-canvas/70"
@@ -70,6 +96,21 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
                             </span>
                           </span>
                         </button>
+                        <button
+                          type="button"
+                          title={`Borrar "${material.title}"`}
+                          aria-label={`Borrar "${material.title}"`}
+                          onClick={() => void onDelete(material.id, material.title)}
+                          disabled={deletingId !== null}
+                          className="absolute top-3 right-3 rounded-full p-1 text-muted transition hover:bg-danger/10 hover:text-danger-ink disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {deletingId === material.id ? "…" : "✕"}
+                        </button>
+                        {deleteError !== null && deleteError.materialId === material.id && (
+                          <p className="mt-1 rounded-lg border border-danger/40 bg-danger/10 p-2 text-danger-ink text-xs">
+                            No se pudo borrar: {deleteError.message}
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ul>

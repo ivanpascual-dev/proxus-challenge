@@ -279,7 +279,8 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
     });
   },
   reindex: (id) => Effect.fail(new MaterialIndexingFailed({ materialId: id, reason: "el eval no indexa materiales" })),
-  upload: () => Effect.die("stub: upload no debería llamarse en este eval")
+  upload: () => Effect.die("stub: upload no debería llamarse en este eval"),
+  remove: () => Effect.die("stub: remove no debería llamarse en este eval")
 });
 
 const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({

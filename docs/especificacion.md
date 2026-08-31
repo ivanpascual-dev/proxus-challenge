@@ -478,6 +478,9 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
   materiales de la misma subida.
 - **F4-10.** CUANDO el indexado y la generación de apuntes se disparen por una subida, EL sistema NO
   DEBERÁ descontarlos del cubo de frecuencia de artefactos.
+- **F4-10b.** CUANDO la persona borre un material, EL sistema DEBERÁ borrar también su apunte, sus
+  controles y sus exámenes con sus intentos, y NO DEBERÁ dejar ningún artefacto apuntando a un material
+  que ya no existe.
 
 #### Sesión y conversaciones
 

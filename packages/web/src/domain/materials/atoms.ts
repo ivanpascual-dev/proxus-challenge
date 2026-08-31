@@ -53,3 +53,14 @@ export const uploadMaterialsAction = apiRuntime.fn(
   },
   { reactivityKeys: ["materials"] }
 );
+
+// Borra el PDF y, en cascada, su apunte, controles y exámenes (ADR-011: el materialId sale del
+// nombre del fichero, así que un huérfano choca al resubir el mismo PDF). Invalida ambas etiquetas:
+// la lista de materiales y la de artefactos.
+export const deleteMaterialAction = apiRuntime.fn(
+  (materialId: string) =>
+    ApiClient.use((client) =>
+      client.materials.remove({ params: { id: materialId } })
+    ).pipe(Effect.withSpan("materials.remove", { kind: "client" })),
+  { reactivityKeys: ["materials", "artifacts"] }
+);

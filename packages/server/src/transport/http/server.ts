@@ -32,6 +32,7 @@ import { FileMaterialIndexRepository } from "../../infra/materials/file-material
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { IndexingServiceLive } from "../../domain/materials/indexing-service.ts";
 import { NoteGenerationService, NoteGenerationServiceLive } from "../../domain/artifacts/note-generation-service.ts";
+import { MaterialDeletionServiceLive } from "../../domain/materials/material-deletion-service.ts";
 import {
   AssessmentGenerationService,
   AssessmentGenerationServiceLive,
@@ -404,6 +405,7 @@ const DomainLive = Layer.mergeAll(
   GeminiModel,
   NoteServiceLive,
   NoteGenerationServiceLive,
+  MaterialDeletionServiceLive,
   AssessmentGenerationServiceLive,
   AttemptServiceLive.pipe(Layer.provide(OpenAnswerJudgeLive))
 ).pipe(

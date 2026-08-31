@@ -118,6 +118,10 @@ export interface MaterialRepository {
   readonly upload: (
     candidates: readonly UploadCandidate[]
   ) => Effect.Effect<readonly MaterialUploadOutcome[], TooManyMaterials | MaterialRepositoryError>;
+  // Borra el PDF. Solo el fichero: el índice cacheado por huella de contenido se queda (es una
+  // optimización compartida, no algo del usuario) y los artefactos del material los borra
+  // `MaterialDeletionService`, que orquesta las dos cosas.
+  readonly remove: (id: string) => Effect.Effect<void, MaterialNotFound | MaterialRepositoryError>;
 }
 
 export class MaterialIndexingFailed extends Data.TaggedError("MaterialIndexingFailed")<{

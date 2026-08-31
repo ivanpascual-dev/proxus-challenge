@@ -49,6 +49,7 @@ const fakeMaterials = (overrides?: Partial<MaterialRepository>) => Layer.succeed
     getIndex: (id) => id === material.id ? Effect.succeed(index) : Effect.fail(new MaterialNotFound({ materialId: id })),
     reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
     upload: () => Effect.die("stub: upload no debería llamarse en este test"),
+    remove: () => Effect.die("stub: remove no debería llamarse en este test"),
     ...overrides
   })
 );

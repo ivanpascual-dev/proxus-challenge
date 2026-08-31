@@ -28,6 +28,7 @@ import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
 import { MaterialRepository, type MaterialUploadOutcome } from "../../domain/materials/material.ts";
+import { MaterialDeletionService } from "../../domain/materials/material-deletion-service.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
 
@@ -124,6 +125,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
     const artifacts = yield* ArtifactRepository;
     const profile = yield* StudyProfileService;
     const rateLimiter = yield* RateLimiter;
+    const deletion = yield* MaterialDeletionService;
 
     return handlers
       .handle("list", () => materials.list().pipe(
@@ -198,6 +200,17 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
       .handle("get", ({ params }) => materials.get(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", Effect.die),
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id)))
+      ))
+      // Borra el PDF y sus artefactos (apunte, controles, exámenes). Mismo cubo `artifacts` que
+      // `deleteArtifact`: es la única otra operación destructiva por HTTP, y el mismo margen sobra.
+      .handle("remove", ({ params }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.check(key, "artifacts");
+        return yield* deletion.remove(params.id);
+      }).pipe(
+        Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
+        Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
+        Effect.catch((error) => logAndFailStorage(params.id, error))
       ))
       .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),

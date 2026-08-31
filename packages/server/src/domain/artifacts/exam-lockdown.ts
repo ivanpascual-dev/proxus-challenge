@@ -49,6 +49,9 @@ export const CLOSED_ROUTES: readonly string[] = [
   // Subir un material nuevo (fase 4) da acceso a material que no estaba en el examen: se cierra igual
   // que el resto de rutas que tocan materiales.
   "POST /api/materials",
+  // Borrar un material se lleva sus artefactos (fase 4): tanto acceso a material como el propio
+  // borrado de artefactos, así que se cierra por las dos razones a la vez.
+  "DELETE /api/materials/:id",
   "GET /api/materials/:id",
   "GET /api/materials/:id/index",
   "GET /api/materials/:id/assessments",

@@ -286,7 +286,12 @@ export const FileMaterialRepository = {
       return results;
     });
 
-    return { list, get, renderPage, getIndex, reindex, upload };
+    const remove = (id: string): Effect.Effect<void, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
+      const file = yield* getFile(id);
+      yield* fs.remove(file.path).pipe(Effect.mapError(mapError));
+    });
+
+    return { list, get, renderPage, getIndex, reindex, upload, remove };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };

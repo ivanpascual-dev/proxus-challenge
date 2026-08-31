@@ -111,6 +111,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   su propio progreso (subiendo, indexando página N de M, generando apuntes tema N de M). Un fichero
   que no es un PDF de verdad, o que repite el nombre de un material ya subido, se rechaza nombrando el
   motivo, sin tumbar a los demás de la misma tanda.
+- **Borrar un material.** Cada material de la barra lateral tiene un botón para borrarlo. Antes de
+  hacerlo se avisa de que también se pierden su apunte, sus controles y sus exámenes con sus intentos,
+  y de que no se puede deshacer.
 
 ### Cambiado
 

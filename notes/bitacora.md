@@ -822,3 +822,14 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   `inputTokens` del último turno guardado en el fichero de sesión (sin gastar una llamada real de
   80.000 tokens contra Gemini). Se desbloquea, si algún día hace falta, con un guion que genere ese
   historial largo de verdad.
+
+## 2026-08-31 · Fase 4 · borrar un material
+
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión, no estaba en el plan escrito: borrar
+  un material se lleva sus artefactos en cascada, con aviso previo en la interfaz y sin confirmación
+  doble en el servidor.** Surgió al hablar de qué pasa, ahora que subir un PDF es una acción normal
+  desde la web, cuando alguien borra uno. ADR-011 ya se había topado con el problema y lo había dejado
+  abierto a propósito ("eso es independiente de esta decisión"): en fase 1 no había forma de borrar un
+  material, así que el huérfano era teórico. La bitácora guarda el contexto (por qué ahora sí hacía
+  falta resolverlo, y por qué se descartaron la papelera y la confirmación en servidor); el ADR-024
+  guarda la decisión en sí, y corrige el párrafo de ADR-011 que ya no era cierto.

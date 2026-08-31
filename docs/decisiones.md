@@ -520,8 +520,10 @@ que exige la invariante 3 llevada a la interfaz: un material sin indexar se dice
   primero. La identidad se resuelve al leer, contra el fichero que hoy tiene esa huella.
 - **Borrar un PDF no borra su índice.** Se queda huérfano a propósito: borrar es el caso en que más
   probable es que el fichero vuelva, y si vuelve el mismo contenido vuelve su huella y el índice sirve
-  intacto. Lo que sí queda roto son las citas de artefactos que apunten a un material borrado, y eso es
-  independiente de esta decisión: viene de que el `materialId` sale del nombre del fichero.
+  intacto. (Lo que sí quedaba roto eran las citas de artefactos que apuntaran a un material borrado;
+  esta ADR lo dejó como algo independiente, pendiente de resolver. La fase 4 lo resuelve: ADR-024
+  decide que borrar un material se lleva sus artefactos en cascada, así que ya no hay cita huérfana que
+  pueda quedar.)
 - **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** El día que haya
   subida de ficheros con id generado (fase 4), la primera mitad de este registro se revisa; la segunda,
   la del archivado por huella, no cambia.
@@ -1095,3 +1097,51 @@ fabricar un límite superado donde no hay dato).
   no una cuota de uso.
 - Si el techo resulta corto o largo en uso real, se ajusta la cifra en `limits.ts`; no hace falta
   tocar el mecanismo.
+
+---
+
+## ADR-024 · Borrar un material se lleva sus artefactos, en cascada y sin preguntar dos veces
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-31
+
+**Contexto.** El plan de la fase 4 no traía borrado de materiales; surgió al hablar con Iván de qué
+pasaba, ahora que subir un PDF es una acción normal desde la interfaz, cuando alguien se equivoca de
+fichero o quiere quitar uno. ADR-011 ya se había topado con el problema y lo había dejado explícitamente
+abierto: "lo que sí queda roto son las citas de artefactos que apunten a un material borrado, y eso es
+independiente de esta decisión". En fase 1 ese hueco era teórico, no había forma de borrar un material
+desde la aplicación. Con un botón real, deja de serlo: cada borrado dejaría un apunte, unos controles y
+unos exámenes citando un `materialId` que ya no abre nada, exactamente el fallo silencioso que el
+sistema evita en cualquier otro sitio (invariante 3).
+
+**Decisión.** Borrar un material borra también, en cascada, todo lo que cuelga de él: su apunte, sus
+controles y sus exámenes con sus intentos. La interfaz avisa del alcance de la pérdida antes de llamar
+(confirmación con la lista de lo que se pierde); el servidor no vuelve a preguntar, igual que en el
+resto de acciones destructivas del sistema (borrar una conversación, borrar un bloque). La orquesta
+`MaterialDeletionService` (`domain/materials/`): lista los artefactos, filtra los que pertenecen a ese
+`materialId`, los borra uno a uno con `ArtifactRepository.deleteArtifact` y solo entonces borra el PDF
+con `MaterialRepository.remove`. El índice cacheado por huella de contenido (ADR-011) no se toca: sigue
+siendo una optimización compartida entre ficheros, no algo del usuario.
+
+**Opciones consideradas.**
+
+- **Dejar los artefactos huérfanos**, como contemplaba ADR-011 cuando el borrado no existía. Descartada
+  por la razón de arriba: con un botón real el huérfano deja de ser un caso raro y pasa a ser lo normal
+  cada vez que alguien borra algo.
+- **Borrado suave (papelera, deshacer).** Descartada por alcance: ninguna otra acción destructiva del
+  sistema es reversible (conversación, bloque), y añadir una papelera solo para materiales rompe esa
+  coherencia sin que el reto la pida.
+- **Confirmar también en el servidor**, con un segundo golpe además del de la interfaz. Descartada: es
+  el mismo patrón que ya usan borrar una conversación y borrar un bloque, la interfaz es quien avisa y
+  el servidor ejecuta.
+
+**Consecuencias.**
+
+- El párrafo de ADR-011 que dejaba el problema abierto queda corregido para apuntar aquí.
+- Borrar y resubir el mismo PDF (mismo nombre, `materialId` de ADR-011) ya no puede reencarnar
+  artefactos huérfanos con datos desincronizados: al borrar, sus artefactos desaparecen con él, así que
+  resubir empieza limpio.
+- Un fallo a mitad de la cascada (por ejemplo, un artefacto que no se deja borrar) deja el material sin
+  borrar y algunos artefactos ya borrados: no hay transacción entre dos repositorios de ficheros
+  distintos. Se acepta porque el caso es raro (el mismo fallo que impediría borrar el artefacto desde su
+  propia pantalla) y el estado resultante es visible, no silencioso.

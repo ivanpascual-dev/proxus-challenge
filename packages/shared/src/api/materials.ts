@@ -57,6 +57,20 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
       success: PdfMaterial,
       error: [MaterialNotFound.pipe(HttpApiSchema.status(404))]
     }),
+    // Borrar el PDF se lleva sus artefactos (apunte, controles, exámenes con sus intentos): dejarlos
+    // huérfanos es lo que producía el choque al resubir el mismo PDF (materialId se deriva del
+    // nombre, ADR-011). El frontend avisa de la pérdida antes de llamar; el servidor no pregunta.
+    HttpApiEndpoint.delete("remove", "/:id", {
+      params: {
+        id: Schema.String
+      },
+      success: HttpApiSchema.NoContent,
+      error: [
+        MaterialNotFound.pipe(HttpApiSchema.status(404)),
+        RateLimited.pipe(HttpApiSchema.status(429)),
+        MaterialStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
     // El índice sin imágenes: temas, procedencia y texto de cada página.
     HttpApiEndpoint.get("index", "/:id/index", {
       params: {
