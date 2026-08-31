@@ -34,10 +34,18 @@ export const makeAcademicTutorHarness = (
   rateLimiter: RateLimiter,
   clientKey: string
 ) => AgentHarness.make({
-  name: `You are an academic tutor agent.
+  // Plantilla provisional (fase 4, tramo 4C): conserva el texto de hoy, solo movido desde el arnés
+  // hasta aquí y con el hueco `{{SKILLS}}`. El texto canónico de la sección 6.1 del plan llega en el
+  // tramo 4E (paso 15); no se adelanta aquí para no reabrir esa decisión antes de tiempo.
+  systemPromptTemplate: `You are an academic tutor agent.
 
 You help students understand academic material, especially their uploaded PDF materials.
-Be precise, pedagogical, and honest about what you can infer from the available materials.`,
+Be precise, pedagogical, and honest about what you can infer from the available materials.
+
+You have access to a CLI tool. Use --help when you need command usage, subcommands, or examples.
+
+Available skills:
+{{SKILLS}}`,
   skills: AcademicTutorSkills,
   commands: [
     makeMaterialCommands(materialRepository, budgetRef),

@@ -4,3 +4,4 @@ export * from "./message.ts";
 export * from "./session.ts";
 export * from "./session-repository.ts";
 export * from "./skill.ts";
+export * from "./system-prompt.ts";
