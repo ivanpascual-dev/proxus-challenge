@@ -209,23 +209,27 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
       .handle("solvable", ({ params }) => attempts.solvable(params.id))
       // Empezar un intento. El modo lo deriva el servicio del artefacto. El techo
       // (`maxPracticeAttemptsPerAssessment` / `maxExamAttemptsPerAssessment`) cuenta también los
-      // cancelados y caducados (decisión 22).
-      .handle("startAttempt", ({ params }) => Effect.gen(function* () {
-        const key = yield* clientKey;
-        yield* rateLimiter.check(key, "artifacts");
-        return yield* attempts.start(params.id);
-      }))
+      // cancelados y caducados (decisión 22). No gasta el cubo `artifacts`: no hay llamada a la IA
+      // hasta que se entrega (`submitAttempt`), y solo si hay desarrollo corto que corregir.
+      .handle("startAttempt", ({ params }) => attempts.start(params.id))
       // Registrar que se abrió una pista y devolver su texto (solo en práctica, decisión 10).
       .handle("revealHint", ({ params, payload }) => attempts.revealHint(params.id, params.attemptId, payload.questionId))
-      // Entregar y corregir. Gasta llamadas al juez: cuenta contra el cubo `artifacts` y toma un
-      // permiso de concurrencia. La capa JSON del adaptador se provee solo aquí.
+      // Entregar y corregir. Solo gasta el cubo `artifacts` y un permiso de concurrencia cuando de
+      // verdad va a llamar al juez, es decir, si hay algún desarrollo corto no vacío que corregir: una
+      // prueba de solo opción múltiple/verdadero-falso no usa IA y no debe contar contra el cupo. La
+      // capa JSON del adaptador se provee siempre, la use o no.
       .handle("submitAttempt", ({ params, payload }) => Effect.gen(function* () {
+        const needsJudge = payload.answers.some(
+          (answer) => answer.questionType === "short-answer" && answer.answer.trim().length > 0
+        );
         const key = yield* clientKey;
-        yield* rateLimiter.check(key, "artifacts");
-        yield* rateLimiter.acquire(key);
+        if (needsJudge) {
+          yield* rateLimiter.check(key, "artifacts");
+          yield* rateLimiter.acquire(key);
+        }
         return yield* attempts.submit(params.id, params.attemptId, payload.answers).pipe(
           Effect.provide(GeminiJsonLanguageModelLive),
-          Effect.ensuring(rateLimiter.release(key))
+          Effect.ensuring(needsJudge ? rateLimiter.release(key) : Effect.void)
         );
       }))
       // Cancelar el intento y abrir la puerta (decisión 19).

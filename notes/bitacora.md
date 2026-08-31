@@ -718,3 +718,8 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     solo miraba `phase === "graded"` (ya corregido), no `"grading"` (corrigiendo): entre que la
     entrega automática se dispara al llegar a 0 (decisión 20) y que vuelve la corrección, los campos
     seguían editables aunque los botones ya estuvieran deshabilitados. Ahora `locked` cubre las dos.
+  - **El cubo `artifacts` (5 cada 10 min, para llamadas a IA) cargaba operaciones sin IA, arreglado.**
+    `startAttempt` lo gastaba sin llamar nunca al modelo (`handlers.ts`); ya no lo toca. `submitAttempt`
+    lo gastaba siempre, aunque un examen 100% opción múltiple no llama al juez; ahora solo lo gasta
+    (`check`+`acquire`) si `payload.answers` trae de verdad una respuesta de desarrollo corto no vacía
+    (decisión de Iván: cargar solo si hay algo que corregir).
