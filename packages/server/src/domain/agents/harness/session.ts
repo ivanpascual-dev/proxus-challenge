@@ -3,6 +3,8 @@ import { LanguageModel, Prompt, Tool } from "effect/unstable/ai";
 import type { AgentHarness, AgentToolkit } from "./harness.ts";
 import { isMaterialPageImages } from "../../materials/material.ts";
 import { degradeHistory } from "./message-degrade.ts";
+import { dedupeSkillLoads } from "./skill-dedup.ts";
+import { extractFollowUp } from "./follow-up.ts";
 import { AgentMessage, type AgentMessage as AgentMessageType } from "./message.ts";
 
 export interface AgentSessionRunOptions {
@@ -45,6 +47,8 @@ export interface AgentSessionRunResult {
   readonly newMessages: readonly AgentMessageType[];
   readonly messages: readonly AgentMessageType[];
   readonly steps: readonly AgentSessionStep[];
+  // Decisión 8: recortadas del texto del modelo por `extractFollowUp`, nunca completadas.
+  readonly followUpQuestions: readonly string[];
 }
 
 export interface AgentSession {
@@ -109,13 +113,14 @@ function execute(
       newMessages.push(message);
       yield* emit(message);
     });
-    const close = (output: string): AgentSessionRunResult => {
+    const close = (output: string, followUpQuestions: readonly string[] = []): AgentSessionRunResult => {
       const degradedNewMessages = degradeHistory(newMessages);
       return {
         output,
         newMessages: degradedNewMessages,
         messages: [...previousMessages, ...degradedNewMessages],
-        steps
+        steps,
+        followUpQuestions
       };
     };
 
@@ -125,7 +130,7 @@ function execute(
     const maxSteps = input.maxSteps;
 
     for (let step = 0; step < maxSteps; step++) {
-      const prompt = renderPrompt(harness.systemPrompt, allMessages());
+      const prompt = renderPrompt(harness.systemPrompt, dedupeSkillLoads(allMessages()));
       const outcome = yield* LanguageModel.generateText({
         prompt,
         toolkit,
@@ -171,20 +176,22 @@ function execute(
       }
 
       if (response.toolResults.length === 0) {
-        const output = response.text.length > 0 ? response.text : lastToolResult;
+        const rawOutput = response.text.length > 0 ? response.text : lastToolResult;
+        const { text: output, questions } = extractFollowUp(rawOutput);
         yield* appendMessage(AgentMessage.assistant(output));
-        return close(output);
+        return close(output, questions);
       }
 
       lastToolResult = String(response.toolResults.at(-1)?.result ?? lastToolResult);
     }
 
-    const output = lastToolResult.length > 0
+    const rawOutput = lastToolResult.length > 0
       ? lastToolResult
       : "Agent stopped after reaching the maximum number of steps.";
+    const { text: output, questions } = extractFollowUp(rawOutput);
     yield* appendMessage(AgentMessage.assistant(output));
 
-    return close(output);
+    return close(output, questions);
   });
 }
 
