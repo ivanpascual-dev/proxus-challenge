@@ -57,6 +57,7 @@ interface TopicGeneration {
   readonly questions: readonly GeneratedQuestion[];
   readonly note: string; // "" salvo problema
   readonly reasoningTokens: number | undefined;
+  readonly finishReason: string | undefined;
 }
 
 // El mensaje de usuario replica el del servicio (assessment-generation-service.ts:309-330), recortado:
@@ -83,21 +84,26 @@ const generateTopic = (topic: TopicFixture, mode: ThinkingMode): Effect.Effect<T
         { role: "user", content: generationUserMessage(topic) }
       ]
     }).pipe(
-      Effect.map((res) => ({ text: res.text, reasoning: res.usage.outputTokens.reasoning })),
+      Effect.map((res) => ({ text: res.text, reasoning: res.usage.outputTokens.reasoning, finishReason: res.finishReason as string })),
       Effect.provide(geminiAssessmentGenerationLayer(mode)),
-      Effect.catch(() => Effect.succeed({ text: "", reasoning: undefined as number | undefined }))
+      Effect.catch(() => Effect.succeed({ text: "", reasoning: undefined as number | undefined, finishReason: undefined as string | undefined }))
     );
 
+    // Riesgo 10 (fase 4): una salida cortada por el techo es un JSON inválido que el parseo
+    // defensivo descarta, y sin mirar `finishReason` se cuenta como "el tema no daba para tantas
+    // preguntas" en vez de como lo que es.
+    const lengthNote = response.finishReason === "length" ? " (finishReason: length, cortado por el techo de salida)" : "";
+
     if (response.text.length === 0) {
-      return { questions: [], note: "el modelo no respondió a la generación", reasoningTokens: response.reasoning };
+      return { questions: [], note: `el modelo no respondió a la generación${lengthNote}`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
     }
 
     const parsed = parseGeneratedQuestions(response.text);
     if (parsed.kind === "insufficient") {
-      return { questions: [], note: `el modelo dijo "insufficientContent" (maxPossible ${parsed.maxPossible})`, reasoningTokens: response.reasoning };
+      return { questions: [], note: `el modelo dijo "insufficientContent" (maxPossible ${parsed.maxPossible})`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
     }
     if (parsed.kind === "unparseable") {
-      return { questions: [], note: `no se pudo parsear la respuesta (${parsed.reason})`, reasoningTokens: response.reasoning };
+      return { questions: [], note: `no se pudo parsear la respuesta (${parsed.reason})${lengthNote}`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
     }
 
     const questions = parsed.questions.flatMap((question) =>
@@ -105,8 +111,8 @@ const generateTopic = (topic: TopicFixture, mode: ThinkingMode): Effect.Effect<T
         ? [{ prompt: question.prompt, options: question.options, correctOptionId: question.correctOptionId }]
         : []
     );
-    const note = parsed.dropped.length > 0 ? `${parsed.dropped.length} pregunta(s) descartada(s) al parsear` : "";
-    return { questions, note, reasoningTokens: response.reasoning };
+    const note = parsed.dropped.length > 0 ? `${parsed.dropped.length} pregunta(s) descartada(s) al parsear${lengthNote}` : lengthNote.trim();
+    return { questions, note, reasoningTokens: response.reasoning, finishReason: response.finishReason };
   });
 
 // --- contestar una pregunta --------------------------------------------------------------

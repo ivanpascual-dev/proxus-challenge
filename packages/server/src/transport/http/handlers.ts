@@ -16,7 +16,7 @@ import {
   type MaterialUploadResult
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
-import { GeminiJsonLanguageModelLive } from "../../domain/agents/gemini.ts";
+import { GeminiJudgeLanguageModelLive } from "../../domain/agents/gemini.ts";
 import {
   ArtifactRepository,
   type Artifact,
@@ -299,7 +299,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
       // Entregar y corregir. Solo gasta el cubo `artifacts` y un permiso de concurrencia cuando de
       // verdad va a llamar al juez, es decir, si hay algún desarrollo corto no vacío que corregir: una
       // prueba de solo opción múltiple/verdadero-falso no usa IA y no debe contar contra el cupo. La
-      // capa JSON del adaptador se provee siempre, la use o no.
+      // capa del juez (`GeminiJudgeLanguageModelLive`, §4.2, tramo 4G) se provee siempre, la use o no.
       .handle("submitAttempt", ({ params, payload }) => Effect.gen(function* () {
         const needsJudge = payload.answers.some(
           (answer) => answer.questionType === "short-answer" && answer.answer.trim().length > 0
@@ -310,7 +310,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
           yield* rateLimiter.acquire(key);
         }
         return yield* attempts.submit(params.id, params.attemptId, payload.answers).pipe(
-          Effect.provide(GeminiJsonLanguageModelLive),
+          Effect.provide(GeminiJudgeLanguageModelLive),
           Effect.ensuring(needsJudge ? rateLimiter.release(key) : Effect.void)
         );
       }))

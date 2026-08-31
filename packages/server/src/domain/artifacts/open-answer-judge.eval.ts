@@ -2,16 +2,16 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Console, Effect, Layer, Schema } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
-import { GeminiJsonLanguageModelLive, GeminiLanguageModelLive } from "../agents/gemini.ts";
+import { GeminiJudgeLanguageModelLive, GeminiLanguageModelLive, geminiJudgeLayer, type ThinkingMode } from "../agents/gemini.ts";
 import { OPEN_ANSWER_JUDGE_PROMPT } from "./assessment-prompts.ts";
 import { interpretJudgeResponse, judgeUserMessage, type JudgeQuestion } from "./open-answer-judge.ts";
 import type { ShortAnswerCorrection } from "./artifact.ts";
 
 // Eval del juez de desarrollo corto (§6.7.2). Hace llamadas reales al modelo. Dos objetivos:
 //
-// 1. Medir la TASA DE CAÍDAS AL PARSEAR con la capa JSON (`GeminiJsonLanguageModelLive`,
-//    `responseMimeType: application/json`) y sin ella (`GeminiLanguageModelLive`). Las dos cifras van a
-//    `notes/bitacora.md` (riesgo 2) y a `NOTES.md`.
+// 1. Medir la TASA DE CAÍDAS AL PARSEAR con la capa JSON (`GeminiJudgeLanguageModelLive`, la que corre
+//    en producción, `responseMimeType: application/json`) y sin ella (`GeminiLanguageModelLive`). Las
+//    dos cifras van a `notes/bitacora.md` (riesgo 2) y a `NOTES.md`.
 // 2. Ver si el juez acierta el veredicto en los seis casos por pregunta del fixture, con la paráfrasis
 //    como caso central (la defensa 2 contra el falso negativo).
 //
@@ -186,13 +186,20 @@ const formatLayer = (report: LayerReport): string => [
 
 const main = Effect.gen(function* () {
   const which = process.argv.find((arg) => arg.startsWith("--layer="))?.split("=")[1] ?? "both";
+  const thinking = process.argv.find((arg) => arg.startsWith("--thinking="))?.split("=")[1] as ThinkingMode | undefined;
 
   const reports: LayerReport[] = [];
-  if (which === "both" || which === "json") {
-    reports.push(yield* runLayer("con capa JSON (responseMimeType)", GeminiJsonLanguageModelLive));
-  }
-  if (which === "both" || which === "plain") {
-    reports.push(yield* runLayer("sin capa JSON (temperatura 0.2)", GeminiLanguageModelLive));
+  // Fase 4, tramo 4G, paso 21 (decisión 14): con `--thinking=`, corre solo la capa JSON (la que se
+  // envía en producción) en ese nivel de pensamiento, para decidir low/high/off por resultado.
+  if (thinking !== undefined) {
+    reports.push(yield* runLayer(`con capa JSON, thinking ${thinking}`, geminiJudgeLayer(thinking)));
+  } else {
+    if (which === "both" || which === "json") {
+      reports.push(yield* runLayer("con capa JSON (responseMimeType)", GeminiJudgeLanguageModelLive));
+    }
+    if (which === "both" || which === "plain") {
+      reports.push(yield* runLayer("sin capa JSON (temperatura 0.2)", GeminiLanguageModelLive));
+    }
   }
 
   yield* Console.log(`\neval del juez · fixture v${fixture.version} · ${fixture.questions.length} preguntas × 6 casos\n`);

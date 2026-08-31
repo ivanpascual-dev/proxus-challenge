@@ -241,17 +241,15 @@ export interface GeminiGenerationConfig {
   readonly thinkingConfig?: { readonly thinkingLevel: "low" | "high" };
 }
 
-// Las dos capas que existen hoy en producción (tutor e indexación, y la JSON de preguntas y juez)
-// mantienen el techo del tutor: el mapa por camino de `modelOutputTokens` ya está en `packages/shared`
-// (tramo 4B), pero conectar cada camino a su techo es trabajo del tramo 4G, cuando la eval diga qué
-// nivel de pensamiento lleva cada uno.
+// Cada capa de producción con su techo por camino (§4.2, cableado en el tramo 4G): el tutor con el
+// suyo, y `JSON_GENERATION` (la capa "Control") con el de `quiz`, no ya con el del tutor.
 const DEFAULT_GENERATION: GeminiGenerationConfig = {
   temperature: LIMITS.modelTemperature,
   maxOutputTokens: LIMITS.modelOutputTokens.tutor
 };
 const JSON_GENERATION: GeminiGenerationConfig = {
   temperature: LIMITS.jsonModelTemperature,
-  maxOutputTokens: LIMITS.modelOutputTokens.tutor,
+  maxOutputTokens: LIMITS.modelOutputTokens.quiz,
   responseMimeType: "application/json"
 };
 
@@ -403,21 +401,21 @@ const makeGeminiLanguageModel = (generation: GeminiGenerationConfig) => Layer.ef
 
 export const GeminiLanguageModelLive = makeGeminiLanguageModel(DEFAULT_GENERATION);
 
-// El mismo adaptador con `responseMimeType: "application/json"` y temperatura 0 (§6.7.1). Se provee
-// con `Effect.provide` en el punto de llamada de la generación de preguntas y del juez; el arnés del
-// tutor sigue con `GeminiLanguageModelLive`, porque ahí hay llamadas a herramientas y forzar JSON las
-// rompería. `responseSchema` se deja para después de medir: con el mime type ya se acaban las vallas
-// de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se queda: el
-// modo JSON forzado reduce los fallos, no los elimina.
+// El mismo adaptador con `responseMimeType: "application/json"` y temperatura 0 (§6.7.1); el arnés
+// del tutor sigue con `GeminiLanguageModelLive`, porque ahí hay llamadas a herramientas y forzar JSON
+// las rompería. `responseSchema` se deja para después de medir: con el mime type ya se acaban las
+// vallas de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se
+// queda: el modo JSON forzado reduce los fallos, no los elimina.
+//
+// Camino "Control" (`quiz`): temperatura JSON, formato JSON forzado, sin pensamiento (decisión 14: es
+// el camino de más volumen, `maxQuizzesPerTopic: 2` por tema, y es práctica), techo de quiz (§4.2).
 export const GeminiJsonLanguageModelLive = makeGeminiLanguageModel(JSON_GENERATION);
 
-// --- capas de las evals de generación (tramo 4F) ------------------------------------------------
+// --- fábricas parametrizadas por nivel de pensamiento -------------------------------------------
 //
-// `assessment-generation.eval.ts` y `note-generation.eval.ts` prueban su camino con el pensamiento
-// apagado, `low` y `high`, que es lo que decide su nivel en el tramo 4G (decisión 14, paso 21).
-// Hasta esa decisión NADIE MÁS las usa: la generación en producción sigue con las capas de arriba.
-// El techo de salida sale del mapa por camino de `packages/shared` (`modelOutputTokens.test` y
-// `.note`), que ya cuenta el pensamiento sumado a la salida (sección 4.2 del plan).
+// Las usan `assessment-generation.eval.ts`, `note-generation.eval.ts` y `open-answer-judge.eval.ts`
+// (con `--thinking=`) para medir off/low/high antes de decidir. El techo de salida sale del mapa por
+// camino de `packages/shared`, que ya cuenta el pensamiento sumado a la salida (§4.2 del plan).
 
 export type ThinkingMode = "off" | "low" | "high";
 
@@ -440,6 +438,57 @@ export const geminiNoteGenerationLayer = (mode: ThinkingMode) =>
     maxOutputTokens: LIMITS.modelOutputTokens.note,
     ...thinkingConfigFor(mode)
   });
+
+// Camino "Juez" (respuesta abierta): temperatura JSON, formato JSON forzado, techo del juez (§4.2).
+export const geminiJudgeLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.jsonModelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.judge,
+    responseMimeType: "application/json",
+    ...thinkingConfigFor(mode)
+  });
+
+// --- capas de producción por camino (tramo 4G, decisión 14 + paso 21) ---------------------------
+//
+// El nivel de pensamiento de cada camino se decidió corriendo `eval:assessments`, `eval:notes` y
+// `eval:judge --thinking=` dos veces cada una (antes y después de traducir los prompts a inglés,
+// paso 20). Resultado medido, con el detalle completo en notes/bitacora.md:
+//
+//   - Apuntes (`note`): "high" baja los términos traducidos de forma consistente en las DOS pasadas
+//     (2/3→1/3 en español, 1/3→0/3 en inglés) sin acercarse al techo de salida (pensamiento medido
+//     ~1.000-1.200 tok de 4.096 disponibles). Mejora visible y repetida: se queda con "high".
+//   - Examen (`test`): "high" mejora la diferencia con/sin material cuando no falla, pero revienta el
+//     techo de salida (`finishReason: "length"`) en 1 de 3 temas en LAS DOS pasadas, con un
+//     pensamiento que osciló entre 1,7k y 15,7k tokens en el mismo fixture: inestable e
+//     impredecible. "low" iguala o mejora a "sin pensamiento" en las dos pasadas (Δ 8% vs Δ 0-8%) con
+//     un pensamiento estable (~100-130 tok). Se queda con "low": el riesgo 10 (una salida cortada se
+//     lee como "el tema no daba" en vez de como lo que es) pesa más que un punto de diferencia que
+//     además no se sostiene entre pasadas.
+//   - Juez (respuesta abierta): ningún nivel mejora el acierto de forma visible sobre "sin
+//     pensamiento" (18/18 apagado en español; 17/18 en los tres modos tras traducir, con una caída
+//     REAL de parseo en "high" que "off" no tuvo). Paso 21: "si un camino no mejora de forma visible,
+//     se queda sin thinking: el que paga la duda es el coste". Desviación de la decisión 14 original
+//     ("Sí" para el juez), prevista por el propio paso 21: el resultado de la eval puede revertirla.
+const NOTE_THINKING: ThinkingMode = "high";
+const TEST_THINKING: ThinkingMode = "low";
+const JUDGE_THINKING: ThinkingMode = "off";
+
+// Camino "Indexación": temperatura JSON, formato JSON forzado, sin pensamiento (decisión 14: 261
+// páginas de una tirada, transcribir no se beneficia de razonar), techo de indexación (§4.2).
+export const GeminiIndexLanguageModelLive = makeGeminiLanguageModel({
+  temperature: LIMITS.jsonModelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.indexing,
+  responseMimeType: "application/json"
+});
+
+// Camino "Examen" (`test`), fijado al nivel decidido arriba.
+export const GeminiJsonThinkingLanguageModelLive = geminiAssessmentGenerationLayer(TEST_THINKING);
+
+// Camino "Juez", fijado al nivel decidido arriba (hoy "off": ver la nota de más arriba).
+export const GeminiJudgeLanguageModelLive = geminiJudgeLayer(JUDGE_THINKING);
+
+// Camino "Apuntes" (`note`), fijado al nivel decidido arriba.
+export const GeminiProseThinkingLanguageModelLive = geminiNoteGenerationLayer(NOTE_THINKING);
 
 export const GeminiModel = AiModel.make(
   "google",

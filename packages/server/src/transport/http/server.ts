@@ -23,7 +23,13 @@ import {
   type MaterialNotFound,
   type MaterialRepositoryError
 } from "../../domain/materials/material.ts";
-import { GeminiJsonLanguageModelLive, GeminiModel } from "../../domain/agents/gemini.ts";
+import {
+  GeminiIndexLanguageModelLive,
+  GeminiJsonLanguageModelLive,
+  GeminiJsonThinkingLanguageModelLive,
+  GeminiModel,
+  GeminiProseThinkingLanguageModelLive
+} from "../../domain/agents/gemini.ts";
 import { TutorChatService, TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { NoteServiceLive } from "../../domain/artifacts/note-service.ts";
@@ -196,7 +202,7 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
         "x-accel-buffering": "no"
       }
     });
-  })
+  }).pipe(Effect.provide(GeminiIndexLanguageModelLive))
 );
 
 const encodeNoteAlreadyExists = Schema.encodeSync(NoteAlreadyExists);
@@ -295,7 +301,7 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
         "x-accel-buffering": "no"
       }
     });
-  })
+  }).pipe(Effect.provide(GeminiProseThinkingLanguageModelLive))
 );
 
 const encodeAssessmentGenEvent = Schema.encodeSync(AssessmentGenerationStreamEvent);
@@ -350,7 +356,10 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
       return yield* HttpServerResponse.json({ message: rejection.value.message }, { status: rejection.value.status });
     }
 
-    const languageModel = yield* LanguageModel.LanguageModel;
+    // La capa elegida según `request.kind` (§4.2): Examen lleva el pensamiento decidido en el tramo
+    // 4G (paso 21); Control se queda sin pensar (decisión 14, es el camino de más volumen).
+    const generationLayer = request.kind === "test" ? GeminiJsonThinkingLanguageModelLive : GeminiJsonLanguageModelLive;
+    const languageModel = yield* LanguageModel.LanguageModel.pipe(Effect.provide(generationLayer));
 
     const events = Stream.callback<AssessmentGenerationStreamEvent, never, LanguageModel.LanguageModel>((queue) =>
       assessmentGen.forMaterial(id, request, (progress) => Queue.offer(queue, {
@@ -388,7 +397,7 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
         "x-accel-buffering": "no"
       }
     });
-  }).pipe(Effect.provide(GeminiJsonLanguageModelLive))
+  })
 );
 
 const Routes = Layer.mergeAll(
