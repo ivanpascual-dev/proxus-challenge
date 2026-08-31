@@ -1,16 +1,50 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
-import { MaterialListResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
+import { Multipart } from "effect/unstable/http";
+import { LIMITS } from "../limits.ts";
+import { MaterialListResponse, MaterialUploadResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
 import { MaterialIndex } from "../schemas/material-index.ts";
 import { MaterialAssessmentsResponse } from "../schemas/attempt-api.ts";
 import { StudyProfile } from "../schemas/study-profile.ts";
-import { MaterialNotFound, MaterialNotIndexed, MaterialStorageError, PageOutOfRange } from "../errors/material-errors.ts";
+import {
+  MaterialNotFound,
+  MaterialNotIndexed,
+  MaterialStorageError,
+  PageOutOfRange,
+  TooManyMaterials
+} from "../errors/material-errors.ts";
+import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
+
+// Multipart en buffer (no en stream): el fichero entero tiene que estar en disco antes de que
+// `pdfinfo` lo compruebe (sección 4.2 del plan de fase 4). `maxFileSize` es el techo por fichero
+// (`maxUploadBytes`); `maxTotalSize` es el caso peor de un lote al límite (`maxFilesPerUpload`
+// ficheros, cada uno al techo).
+const UploadPayload = Schema.Struct({
+  files: Multipart.FilesSchema
+}).pipe(HttpApiSchema.asMultipart({
+  maxParts: LIMITS.maxFilesPerUpload,
+  maxFileSize: LIMITS.maxUploadBytes,
+  maxTotalSize: LIMITS.maxFilesPerUpload * LIMITS.maxUploadBytes
+}));
 
 export class MaterialsApi extends HttpApiGroup.make("materials")
   .add(
     HttpApiEndpoint.get("list", "/", {
       success: MaterialListResponse
+    }),
+    // Al subir, se indexa y se generan los apuntes en cadena, sin pulsar nada (decisión 3). Solo PDF
+    // (decisión 2). Fallo por fichero (tipo, nombre duplicado) va dentro de la respuesta, uno por
+    // fichero (F4-02); solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
+    // abortan la petición entera, antes de escribir nada (F4-03, F4-04).
+    HttpApiEndpoint.post("upload", "/", {
+      payload: UploadPayload,
+      success: MaterialUploadResponse,
+      error: [
+        TooManyMaterials.pipe(HttpApiSchema.status(400)),
+        LimitExceeded.pipe(HttpApiSchema.status(400)),
+        RateLimited.pipe(HttpApiSchema.status(429))
+      ]
     }),
     HttpApiEndpoint.get("get", "/:id", {
       params: {

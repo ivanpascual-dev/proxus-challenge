@@ -41,3 +41,32 @@ export class MaterialStorageError extends Schema.ErrorClass<MaterialStorageError
   materialId: Schema.String,
   message: Schema.String
 }) {}
+
+// Errores de la subida (fase 4). Fallo por fichero: no aborta el resto del lote, viaja dentro del
+// resultado de ESE fichero en la respuesta 200 de `POST /materials` (F4-02, "el PDF bueno sigue su
+// cadena"). El contentType que manda el navegador no se cree (asunción A1): esto es lo que sale
+// cuando los bytes mágicos `%PDF-` o `pdfinfo` rechazan el fichero.
+export class UnsupportedFileType extends Schema.ErrorClass<UnsupportedFileType>("UnsupportedFileType")({
+  _tag: Schema.tag("UnsupportedFileType"),
+  fileName: Schema.String,
+  message: Schema.String
+}) {}
+
+// Nombre de fichero repetido. Fallo por fichero, no sobreescribe (ADR-011: el materialId sale del
+// nombre del fichero, y sobreescribir cambiaría el material al que apuntan citas ya escritas).
+export class MaterialAlreadyExists extends Schema.ErrorClass<MaterialAlreadyExists>("MaterialAlreadyExists")({
+  _tag: Schema.tag("MaterialAlreadyExists"),
+  fileName: Schema.String,
+  materialId: Schema.String,
+  message: Schema.String
+}) {}
+
+// La petición entera se rechaza antes de escribir nada (F4-03, F4-04): los materiales que ya existen
+// más los que trae la subida pasan de `maxMaterials`. Nombra cuántos caben y cuántos hay.
+export class TooManyMaterials extends Schema.ErrorClass<TooManyMaterials>("TooManyMaterials")({
+  _tag: Schema.tag("TooManyMaterials"),
+  limit: Schema.Number,
+  existing: Schema.Number,
+  requested: Schema.Number,
+  message: Schema.String
+}) {}

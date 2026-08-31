@@ -7,6 +7,7 @@ export const LIMITS = {
   maxBlockCharacters: 5_000,
   maxUploadBytes: 25 * 1024 * 1024,
   maxMaterials: 5,
+  maxFilesPerUpload: 5,
 
   // Coste por turno
   maxPagesPerTurn: 20,
@@ -18,7 +19,14 @@ export const LIMITS = {
   messagesPerDay: { limit: 200, windowMs: 24 * 60 * 60 * 1000 },
   artifactsPerWindow: { limit: 5, windowMs: 10 * 60 * 1000 },
   artifactsPerDay: { limit: 40, windowMs: 24 * 60 * 60 * 1000 },
+  // Documentos por día (fase 4, decisión 4). No es lo mismo que `maxMaterials`: este frena la
+  // FRECUENCIA de subidas (el bucle subir-borrar-subir para explotar la gracia de alta), no cuántos
+  // materiales hay vivos a la vez.
+  uploadsPerWindow: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
+  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` en su primer indexado y su
+  // primera generación de apuntes, porque subir ya se cobró contra `uploadsPerWindow` (fase 4, decisión 4).
+  uploadGraceMs: 10 * 60 * 1000,
 
   // Pruebas (fase 3)
   // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.
