@@ -304,7 +304,7 @@ Comprobado leyendo el repo, no los documentos.
 | Prompts en español    | `assessment-prompts.ts`, `note-generation-prompts.ts`, `rewrite-block-prompts.ts`, `url-source-prompts.ts`, `indexing-prompts.ts` | 6.581 caracteres de prompt en español                                                                                                                                                                       |
 | Skills del tutor      | `skills/*.ts`                                                                                                                     | **Ya en inglés**, 9.697 caracteres                                                                                                                                                                          |
 | Eval del juez         | `open-answer-judge.eval.ts`                                                                                                       | Existe y sirve para decidir el nivel de thinking                                                                                                                                                            |
-| Eval de autoría       | `evals/artifact-authoring.eval.ts`                                                                                                | **Obsoleta**: prueba `artifacts create`, que el tutor perdió en la fase 3 (ADR-022)                                                                                                                         |
+| Eval de conversación  | `evals/artifact-authoring.eval.ts`                                                                                                | **Viva, con el nombre caducado.** La fase 3 la reconvirtió (`:37-40`): comprueba que el tutor NO autora, que remite a la pestaña y que nombra tema y señal. Única eval que corre el bucle del agente entero |
 
 ### Límites declarados y nunca aplicados
 
@@ -756,8 +756,23 @@ bitácora y a `NOTES.md`.
 
 **Tramo 4G · Idioma y medición final.**
 
+19b. **Renombrar `artifact-authoring.eval.ts` a `tutor-behaviour.eval.ts`** y ampliarla. El nombre
+    miente desde la fase 3 y el script de `docs/testing.md:23` va con él. **Los cuatro criterios de hoy
+    se conservan tal cual**, que siguen siendo válidos y son la única red del bucle del agente. Se
+    añaden los cuatro comportamientos que estrena esta fase y que ninguna otra eval toca, todos
+    comprobables por código y sin juez:
+    - **Idioma (decisión 9, el riesgo mayor de la traducción):** el prompt pasa a inglés y la respuesta
+      tiene que seguir en español. Se comprueba sobre el texto de salida.
+    - **Preguntas de seguimiento (decisión 8, F4-28 y F4-29):** que salgan tres, en español, y que
+      cuando el bloque no venga o venga mal formado **no se pinte ninguna**. La mitad que importa es la
+      segunda: que no se inventen.
+    - **Elección de skill (decisión 17):** ahora son cinco y el riesgo es que cargue la que no toca.
+      Se mira la traza de `tool-call`, no el texto: "¿qué llevo peor?" carga `review-progress`,
+      "enséñame el Examen 3" carga `read-assessments`.
+    - **Contexto de pantalla (decisión 5):** con un material en el contexto, que no vuelva a pedir por
+      comando lo que ya tiene delante.
 20. Traducir los cinco prompts.
-21. Correr las tres evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
+21. Correr las evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
     Decidir con el resultado, no con la impresión, y anotarlo: - Juez: `open-answer-judge.eval.ts`.
     **`low` y `high` empatan en coste (decisión 14), así que si empatan también en la eval, gana `low`**:
     mismo resultado con menos varianza. - Examen: `assessment-generation.eval.ts`, mirando la **diferencia**
@@ -926,9 +941,15 @@ Cada cosa con su motivo, para que nadie la reabra ni la dé por olvidada:
    renderizar desde el PDF, y el caché de `.data/materials/pages` sigue ahí.
 8. **`maxPastedCharactersPerTurn` se queda sin aplicar.** Su razón de ser era el `@` manual, que sale
    del alcance. Queda documentado como no aplicable, en vez de fingir que se cumple.
-9. **La eval `artifact-authoring.eval.ts` está obsoleta** desde el ADR-022: prueba una capacidad que el
-   tutor ya no tiene. Si no se borra o se reescribe en esta fase, es una trampa para el siguiente que
-   la corra y la vea fallar.
+9. **La eval `artifact-authoring.eval.ts` tiene el nombre obsoleto, no el contenido.** Corrección de
+   este plan: la fase 3 ya la reconvirtió (ver su comentario en `:37-40`) y hoy comprueba **lo
+   contrario** de lo que dice el nombre, que el tutor **no** autora, que remite a la pestaña "Pruebas"
+   y que al recomendar repaso nombra el tema y la señal (invariante 5). Y lo comprueba en serio: mira
+   el estado del repositorio, no solo el texto de la respuesta. **Es la única eval que ejercita el
+   bucle del agente entero**, con su harness, sus comandos y sus skills reales. Ni las dos nuevas ni
+   el juez la cubren: las tres miden generación de artefactos o corrección, no conversación. Se
+   renombra y se amplía en el tramo 4G. **Borrarla sería quedarse sin la única red del agente
+   justo en la fase que le reescribe el prompt, las skills y el bucle.**
 10. **El pensamiento consume presupuesto de salida, y el Examen ya estaba al filo.** Calculado: el caso
     peor (un material de un solo tema, 30 preguntas en una llamada) son ~6.000 tokens de JSON, más los
     ~1.600 de pensamiento que medí, contra un techo que era de 8.192. Por eso el techo pasa a ser por
