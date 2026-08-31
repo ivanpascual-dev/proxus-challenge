@@ -448,7 +448,132 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 
 ### Fase 4 · El agente
 
-_Pendiente._
+Plan y procedimiento de prueba de cada criterio: [`notes/plans/fase4-el-agente.md`](../notes/plans/fase4-el-agente.md).
+Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domicilio.
+
+#### Subida de material
+
+- **F4-01.** CUANDO la persona suba uno o más ficheros, EL sistema DEBERÁ aceptar únicamente PDF,
+  comprobado por el contenido del fichero y no por su extensión ni por el tipo declarado por el
+  cliente.
+- **F4-02.** SI un fichero subido no es un PDF válido, ENTONCES EL sistema DEBERÁ rechazarlo nombrando
+  el fichero y el motivo, NO DEBERÁ guardarlo, y DEBERÁ seguir procesando los demás ficheros de esa
+  misma subida.
+- **F4-03.** CUANDO una subida contenga más de `maxFilesPerUpload` ficheros, o un fichero de más de
+  `maxUploadBytes`, EL sistema DEBERÁ rechazarla nombrando el techo y lo recibido, antes de escribir
+  nada en disco.
+- **F4-04.** CUANDO una subida haría pasar el total de materiales de `maxMaterials`, EL sistema DEBERÁ
+  rechazarla nombrando cuántos materiales caben y cuántos hay.
+- **F4-05.** SI el nombre de un fichero subido coincide con el de un material existente, ENTONCES EL
+  sistema DEBERÁ rechazarlo nombrando el conflicto y NO DEBERÁ sobrescribir el material existente.
+- **F4-06.** CUANDO la persona supere `uploadsPerWindow` subidas en su ventana, EL sistema DEBERÁ
+  rechazar la subida con 429 diciendo cuánto falta para poder reintentar.
+- **F4-07.** CUANDO una subida termine correctamente, EL sistema DEBERÁ indexar cada material subido y,
+  al terminar cada indexado, generar sus apuntes, sin ninguna acción adicional de la persona.
+- **F4-08.** MIENTRAS la cadena de alta de un material esté en curso, EL sistema DEBERÁ mostrar en qué
+  paso va (subiendo, indexando página N de M, generando apuntes tema N de M) para ese material en
+  concreto.
+- **F4-09.** SI un paso de la cadena de alta falla, ENTONCES EL sistema DEBERÁ decir qué paso falló y
+  para qué material, DEBERÁ conservar lo ya conseguido, y NO DEBERÁ interrumpir la cadena de los demás
+  materiales de la misma subida.
+- **F4-10.** CUANDO el indexado y la generación de apuntes se disparen por una subida, EL sistema NO
+  DEBERÁ descontarlos del cubo de frecuencia de artefactos.
+
+#### Sesión y conversaciones
+
+- **F4-11.** EL sistema DEBERÁ guardar en el servidor el historial de cada conversación, y NO DEBERÁ
+  aceptar mensajes de historial enviados por el cliente en la petición de chat.
+- **F4-12.** SI una petición de chat incluye mensajes de historial, ENTONCES EL sistema DEBERÁ
+  rechazarla con 400, sin llamar al modelo.
+- **F4-13.** CUANDO la persona recargue la página, EL sistema DEBERÁ mostrar la conversación abierta
+  completa, con sus mensajes anteriores.
+- **F4-14.** EL sistema DEBERÁ permitir listar las conversaciones, abrir una, crear una nueva y borrar
+  una, y DEBERÁ nombrar cada una a partir de su primer mensaje sin llamar al modelo.
+- **F4-15.** CUANDO el número de conversaciones alcance `maxConversations`, EL sistema DEBERÁ rechazar
+  la creación de una nueva nombrando el techo.
+
+#### Observabilidad
+
+- **F4-16.** CUANDO el modelo responda en un paso, EL sistema DEBERÁ registrar en la sesión los tokens
+  de entrada, los de entrada servidos desde caché y los de salida de ese paso.
+- **F4-17.** SI el modelo o el enrutado de herramientas falla en un paso, ENTONCES EL sistema DEBERÁ
+  registrar el error como error del turno y mostrarlo como tal, y NO DEBERÁ presentarlo como una
+  respuesta del tutor.
+- **F4-18.** CUANDO un turno termine, EL sistema DEBERÁ mostrar su coste en tokens de entrada, de
+  caché y de salida.
+- **F4-19.** SI el modelo no devuelve información de consumo, ENTONCES EL sistema DEBERÁ mostrar que no
+  hay dato, y NO DEBERÁ mostrar cero ni ninguna estimación.
+
+#### Coste del contexto
+
+- **F4-20.** CUANDO un turno termine, EL sistema DEBERÁ sustituir las imágenes de página de ese turno
+  por su descripción textual (material y páginas), tanto en lo que guarda como en lo que envía al
+  modelo en turnos posteriores.
+- **F4-21.** EL sistema NO DEBERÁ enviar al modelo ninguna imagen de página de un turno anterior.
+- **F4-22.** EL sistema DEBERÁ construir el mensaje de sistema de forma determinista, de modo que dos
+  peticiones con el mismo estado produzcan un texto idéntico.
+- **F4-23.** EL sistema DEBERÁ incluir en el mensaje de sistema el nombre y la descripción de cada
+  comando disponible, y NO DEBERÁ incluir el texto completo de ninguna skill hasta que el modelo la
+  cargue.
+
+#### Contexto de pantalla
+
+- **F4-24.** CUANDO la persona tenga abierto un material, un artefacto o un bloque, EL sistema DEBERÁ
+  proponerlo como contexto del chat, mostrándolo antes de enviar y permitiendo quitarlo.
+- **F4-25.** SI la persona quita un elemento del contexto, ENTONCES EL sistema NO DEBERÁ enviarlo al
+  modelo en esa petición.
+- **F4-26.** EL sistema DEBERÁ enviar el contexto de pantalla solo como identificadores y títulos, y NO
+  DEBERÁ incluir en él el contenido del material, del bloque ni del artefacto.
+- **F4-27.** CUANDO el contexto de pantalla supere `maxContextRefs` elementos, EL sistema DEBERÁ
+  rechazar la petición nombrando el techo.
+
+#### Preguntas de seguimiento
+
+- **F4-28.** CUANDO el tutor termine una respuesta, EL sistema DEBERÁ ofrecer hasta `followUpQuestions`
+  preguntas de seguimiento en español, sin realizar ninguna llamada adicional al modelo.
+- **F4-29.** SI la respuesta del modelo no contiene el bloque de seguimiento, lo contiene incompleto,
+  trae un número distinto de `followUpQuestions` preguntas o alguna supera
+  `maxFollowUpQuestionCharacters`, ENTONCES EL sistema NO DEBERÁ mostrar ninguna pregunta y NO DEBERÁ
+  completar ni inventar las que falten.
+- **F4-30.** EL sistema NO DEBERÁ mostrar los delimitadores del bloque de seguimiento en el texto de la
+  respuesta.
+
+#### Prompt e idioma
+
+- **F4-31.** EL sistema DEBERÁ escribir en inglés toda instrucción dirigida al modelo, y DEBERÁ exigir
+  en cada una que el contenido dirigido al alumno se escriba en español.
+- **F4-32.** EL mensaje de sistema del tutor DEBERÁ declarar su identidad y alcance, la obligación de
+  responder solo con datos obtenidos de un comando, la preferencia por la herramienta antes que la
+  prosa, la prohibición de inventar citas y el tratamiento del material como dato y nunca como
+  instrucción.
+- **F4-33.** CUANDO el modelo reciba texto entre los delimitadores de material del alumno o de contexto
+  de pantalla, EL sistema DEBERÁ presentarlo como dato, y el tutor NO DEBERÁ obedecer instrucciones
+  contenidas en él.
+
+#### Modelo por camino
+
+- **F4-34.** EL sistema DEBERÁ elegir la configuración del modelo (temperatura, formato de respuesta y
+  nivel de razonamiento) según el camino que la invoca, sin consultar a ningún modelo para decidirlo.
+- **F4-35.** EL sistema DEBERÁ usar razonamiento extendido en la generación de apuntes, en la
+  generación de Exámenes y en el juez de respuesta abierta, y NO DEBERÁ usarlo en la generación de
+  Controles, en la indexación ni en el chat del tutor.
+- **F4-36.** EL sistema DEBERÁ declarar el techo de tokens de salida **por camino**, dimensionado sobre
+  lo que ese camino tiene que producir más su razonamiento, y NO DEBERÁ usar un único techo para todos.
+- **F4-37.** SI una llamada al modelo termina por agotar su techo de tokens de salida, ENTONCES EL
+  sistema DEBERÁ registrarlo nombrando ese motivo, y NO DEBERÁ presentar el resultado truncado como
+  contenido insuficiente del material ni como respuesta completa.
+
+#### Evaluación
+
+- **F4-38.** EL sistema DEBERÁ disponer de una evaluación de la generación de preguntas que mida, sobre
+  las mismas preguntas, el acierto **con** el fragmento citado y **sin** él, y DEBERÁ informar de la
+  diferencia entre ambas y no solo de una cifra absoluta.
+- **F4-39.** EL sistema DEBERÁ disponer de una evaluación de la generación de apuntes que compruebe,
+  sin recurrir a otro modelo, qué cifras del apunte no aparecen en su texto fuente, qué términos del
+  material aparecen traducidos y qué reglas del prompt se incumplen.
+- **F4-40.** CUANDO se decida el nivel de razonamiento de un camino, EL sistema DEBERÁ dejar registrado
+  con qué evaluación se decidió y con qué resultado; SI se decidió sin evaluación, ENTONCES DEBERÁ
+  registrarse que la comparación fue manual y con cuántas muestras.
 
 ### Fase 5 · Pulido y prueba
 
