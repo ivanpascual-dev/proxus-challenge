@@ -245,7 +245,10 @@ const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiG
   toolConfig: toolConfig(options),
   generationConfig: {
     temperature: generation.temperature,
-    maxOutputTokens: LIMITS.maxModelOutputTokens,
+    // Fix mínimo de referencia (fase 4, tramo 4B dejó `modelOutputTokens` como mapa por camino): las
+    // seis capas con techo propio y `thinkingConfig` (sección 4.2 del plan) son trabajo de un tramo
+    // posterior, no de este. Hasta entonces, las dos capas que existen hoy usan el techo del tutor.
+    maxOutputTokens: LIMITS.modelOutputTokens.tutor,
     ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType })
   }
 });
