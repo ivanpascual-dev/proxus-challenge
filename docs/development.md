@@ -58,13 +58,18 @@ pnpm --filter @proxus/server run eval:tutor:artifact-authoring
 
 ```bash
 pnpm --filter @proxus/server run agent:tutor "list my uploaded materials"
-pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta sobre variables cualitativas"
+pnpm --filter @proxus/server run agent:tutor "¿qué me conviene repasar de álgebra?"
 ```
+
+El tutor no crea ni corrige artefactos: los apuntes salen de la pestaña Apuntes y las pruebas de la
+pestaña Pruebas (F2-39, F3-34). Sus comandos de artefactos son de lectura (`artifacts list`,
+`artifacts show`, `artifacts attempts`, `profile show`) más `artifacts note propose` para sugerir
+cambios en un apunte.
 
 Si pasas JSON al CLI y contiene espacios, envuélvelo en comillas simples:
 
 ```bash
-artifacts create '{"kind":"quiz","title":"Demo","questions":[]}'
+artifacts note propose abc123 '{"rationale":"Falta el caso vacío","operation":{"type":"insert","afterBlockId":null,"markdown":"## El conjunto vacío\n..."}}'
 ```
 
 ## Troubleshooting
@@ -90,9 +95,9 @@ Comprueba:
 - `GOOGLE_GENERATIVE_AI_API_KEY` es válida,
 - `GEMINI_MODEL` apunta a un modelo disponible.
 
-### La web no refresca artifacts tras crear uno
+### La web no refresca los artefactos tras una acción del tutor
 
-El chat invalida queries al recibir tool results. Si estás debuggeando, refresca la página o revisa `packages/web/src/domain/tutor/invalidation.ts`.
+El chat invalida queries al recibir tool results (p. ej. `artifacts note propose`). Si estás debuggeando, refresca la página o revisa `packages/web/src/domain/tutor/invalidation.ts`.
 
 ### Cambié schemas y rompió todo
 

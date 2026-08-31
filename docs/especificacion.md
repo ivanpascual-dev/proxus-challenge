@@ -228,7 +228,9 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   pestaña DEBERÁ mostrar el motivo real del fallo, nunca darlo por hecho.
 - **F2-38.** CUANDO el alumno borre un apunte, EL sistema DEBERÁ eliminarlo y la vista del material
   DEBERÁ volver a ofrecer la creación de apuntes.
-- **F2-39.** EL tutor NO DEBERÁ crear apuntes: `artifacts create` solo acepta quiz y test.
+- **F2-39.** EL tutor NO DEBERÁ crear apuntes: la generación de apuntes es un servicio con su ruta, que
+  se dispara desde la pestaña Apuntes (F2-36), no una capacidad del tutor. (Desde la fase 3 el tutor
+  tampoco crea Controles ni Exámenes, F3-34: no crea ningún artefacto.)
 
 #### El editor de bloque (tramo 2E)
 
@@ -415,9 +417,11 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   rango DEBERÁ rechazarlo nombrando el rango y el valor recibido.
 - **F3-41.** EL reparto por tipo de pregunta DEBERÁ mantener sus porcentajes sea cual sea el total
   pedido, y con el mínimo del rango DEBERÁ producir al menos una pregunta de cada tipo del reparto.
-- **F3-42.** SI un material alcanza `maxQuizzesPerMaterial` o `maxTestsPerMaterial`, o una prueba alcanza
-  `maxPracticeAttemptsPerAssessment` o `maxExamAttemptsPerAssessment`, ENTONCES EL sistema DEBERÁ
-  rechazar la siguiente con 400 nombrando el techo, cuántos hay y cómo bajar de él.
+- **F3-42.** SI un tema alcanza `maxQuizzesPerTopic` (el techo del Control va por tema, donde va su
+  alcance), o un material alcanza `maxTestsPerMaterial` en un modo (prueba o examen se cuentan por
+  separado), o una prueba alcanza `maxPracticeAttemptsPerAssessment` o `maxExamAttemptsPerAssessment`,
+  ENTONCES EL sistema DEBERÁ rechazar la siguiente con 400 nombrando el techo, cuántos hay y cómo bajar
+  de él.
 
 #### Discrepar de la corrección
 

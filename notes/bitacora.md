@@ -673,3 +673,25 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   ataques y la nota del juez inflable por inyección del alumno como riesgo residual esperado ("reduce,
   no elimina"; la nota la calcula el código, un fallo de parseo cae a `unevaluated`, y hay el backstop
   de `dispute`).
+
+### Pasada de `@fiel-al-plan` y alineación
+
+- **Veredicto: ⚠️ DERIVA**, solo de documentación y un campo de contrato. Ninguna decisión cerrada
+  reabierta en silencio, texto canónico de los prompts fiel palabra por palabra.
+- **`ArtifactSummary.materialId` pasa de opcional a obligatorio** (`schemas/artifact.ts:195`). §5.4 lo
+  pedía obligatorio para quiz y test; se había dejado opcional "por si un artefacto antiguo no lo
+  trae". Iván: ese caso ya no puede ocurrir. Los tres sitios que construyen el summary
+  (`handlers.ts:157`, `assessment-generation-service.ts:633`, `server.ts:266`) ya lo poblaban siempre,
+  así que el cambio es solo del esquema. 279 tests en verde.
+- **Docs alineados con la fase 3:** `especificacion.md` F2-39 (ya no habla de `artifacts create`, que
+  se retiró entero) y F3-42 (`maxQuizzesPerMaterial` no existe: el techo del Control va por tema,
+  `maxQuizzesPerTopic`; el del Examen por material y por modo, `maxTestsPerMaterial`).
+  `development.md` (ejemplos de `artifacts create` sustituidos por comandos de lectura). ADR-016
+  (marca que la fase 3 revierte "el tutor autora quiz y test" y renombra la skill a
+  `use-study-assessments`).
+- **Desviaciones menores aceptadas (no se tocan):** el módulo `domain/artifacts/exam-lockdown.ts`
+  quedó **puro** y la parte impura se separó a `transport/http/exam-lockdown-guard.ts`; §6.9.1 lo
+  describía como una sola pieza impura. Respeta mejor la separación puro/impuro de §6. Y el contador
+  de preguntas en blanco del perfil se llama `blank`, no `asked` como decía §6.5: evita un total que
+  sería suma de señales (lo que §6.5 justo prohíbe).
+

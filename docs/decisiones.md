@@ -714,7 +714,9 @@ solo `text/html` y `text/plain`; y extracción de texto con una función pura y 
 
 ## ADR-016 · El tutor autora lo abierto; transformar un material es un servicio con ruta
 
-- **Estado:** aceptada
+- **Estado:** aceptada; el límite "el tutor autora quiz y test" lo revierte la fase 3 (ADR-019, ADR-022,
+  decisión 4): el tutor ya no crea ningún artefacto, las pruebas salen de la pestaña Pruebas con su
+  ruta. La skill se renombró de `create-study-artifacts` a `use-study-assessments`.
 - **Fecha:** 2026-08-29
 
 **Contexto.** La fase 2 añade la generación de apuntes. La primera versión la hacía el tutor: un
@@ -739,7 +741,7 @@ dispara.
   falló y motivó sacar la generación del agente.
 
 **Decisión.** Generar apuntes es un **servicio del dominio con su ruta** (`POST /api/materials/:id/notes`,
-progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `create-study-artifacts` le
+progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `use-study-assessments` le
 dice que se generan desde la pestaña "Apuntes" del material y que remita ahí a quien se lo pida.
 
 El límite general: **el tutor autora lo que tiene forma abierta y se pide conversando** (quiz y test;
