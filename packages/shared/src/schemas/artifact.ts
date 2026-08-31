@@ -190,9 +190,9 @@ export const ArtifactSummary = Schema.Struct({
     Schema.Literal("test")
   ]),
   title: Schema.String,
-  // Presente en los apuntes desde la fase 2; los Controles y Exámenes también viven dentro de su
-  // material (decisión 15). `null` solo si un artefacto antiguo no lo trae.
-  materialId: Schema.optional(Schema.String),
+  // Todo artefacto vive dentro de su material: el apunte lo lleva desde la fase 2, los Controles y
+  // Exámenes desde su alcance (decisión 15, §5.4). Obligatorio: no hay artefacto sin material.
+  materialId: Schema.String,
   // Solo Controles y Exámenes: lo que la pestaña "Pruebas" necesita para pintar la lista sin
   // descargar cada prueba entera (§5.4). Ausente en los apuntes.
   createdAt: Schema.optional(Schema.String),
