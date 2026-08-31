@@ -203,14 +203,27 @@ const toolConfig = (options: LanguageModel.ProviderOptions) => {
     : { functionCallingConfig };
 };
 
-const requestBody = (options: LanguageModel.ProviderOptions) => ({
+// La configuración de generación que cada capa fija. La capa viva del tutor usa la temperatura baja
+// de siempre y no fuerza formato; la capa JSON (§6.7.1) la usan solo la generación de preguntas y el
+// juez, con `responseMimeType` y temperatura 0 para que la misma respuesta se corrija igual dos
+// veces. No es composición exótica: es el mismo adaptador con otra configuración.
+export interface GeminiGenerationConfig {
+  readonly temperature: number;
+  readonly responseMimeType?: string;
+}
+
+const DEFAULT_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.modelTemperature };
+const JSON_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.jsonModelTemperature, responseMimeType: "application/json" };
+
+const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiGenerationConfig) => ({
   systemInstruction: promptSystemInstruction(options.prompt),
   contents: promptContents(options.prompt),
   tools: geminiTools(options.tools),
   toolConfig: toolConfig(options),
   generationConfig: {
-    temperature: LIMITS.modelTemperature,
-    maxOutputTokens: LIMITS.maxModelOutputTokens
+    temperature: generation.temperature,
+    maxOutputTokens: LIMITS.maxModelOutputTokens,
+    ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType })
   }
 });
 
@@ -262,7 +275,7 @@ const toResponseParts = (
   ];
 };
 
-export const GeminiLanguageModelLive = Layer.effect(
+const makeGeminiLanguageModel = (generation: GeminiGenerationConfig) => Layer.effect(
   LanguageModel.LanguageModel,
   Effect.gen(function* () {
     const config = yield* GeminiConfig;
@@ -277,7 +290,7 @@ export const GeminiLanguageModelLive = Layer.effect(
             const response = await fetch(geminiUrl(config.model, config.apiKey), {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify(requestBody(options)),
+              body: JSON.stringify(requestBody(options, generation)),
               signal: AbortSignal.any([signal, AbortSignal.timeout(LIMITS.modelCallTimeoutMs)])
             });
 
@@ -297,6 +310,16 @@ export const GeminiLanguageModelLive = Layer.effect(
     });
   })
 ).pipe(Layer.orDie);
+
+export const GeminiLanguageModelLive = makeGeminiLanguageModel(DEFAULT_GENERATION);
+
+// El mismo adaptador con `responseMimeType: "application/json"` y temperatura 0 (§6.7.1). Se provee
+// con `Effect.provide` en el punto de llamada de la generación de preguntas y del juez; el arnés del
+// tutor sigue con `GeminiLanguageModelLive`, porque ahí hay llamadas a herramientas y forzar JSON las
+// rompería. `responseSchema` se deja para después de medir: con el mime type ya se acaban las vallas
+// de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se queda: el
+// modo JSON forzado reduce los fallos, no los elimina.
+export const GeminiJsonLanguageModelLive = makeGeminiLanguageModel(JSON_GENERATION);
 
 export const GeminiModel = AiModel.make(
   "google",

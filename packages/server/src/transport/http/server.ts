@@ -5,6 +5,9 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
 import {
+  AssessmentGenerationStreamEvent,
+  ExamInProgress,
+  GenerateAssessmentInput,
   LimitExceeded,
   MaterialIndexStreamEvent,
   NoteAlreadyExists,
@@ -20,7 +23,7 @@ import {
   type MaterialNotFound,
   type MaterialRepositoryError
 } from "../../domain/materials/material.ts";
-import { GeminiModel } from "../../domain/agents/gemini.ts";
+import { GeminiJsonLanguageModelLive, GeminiModel } from "../../domain/agents/gemini.ts";
 import { TutorChatService, TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { NoteServiceLive } from "../../domain/artifacts/note-service.ts";
@@ -29,14 +32,25 @@ import { FileMaterialIndexRepository } from "../../infra/materials/file-material
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { IndexingServiceLive } from "../../domain/materials/indexing-service.ts";
 import { NoteGenerationService, NoteGenerationServiceLive } from "../../domain/artifacts/note-generation-service.ts";
+import {
+  AssessmentGenerationService,
+  AssessmentGenerationServiceLive,
+  summarizeAssessment
+} from "../../domain/artifacts/assessment-generation-service.ts";
+import { AttemptServiceLive } from "../../domain/artifacts/attempt-service.ts";
+import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts";
+import { StudyProfileServiceLive } from "../../domain/profile/study-profile.ts";
+import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
+import { ExamLockdownGuardLive, rawRouteLockdownRejection } from "./exam-lockdown-guard.ts";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
 }).pipe(
-  Layer.provide(HttpHandlersLive)
+  Layer.provide(HttpHandlersLive),
+  Layer.provide(ExamLockdownGuardLive)
 );
 
 const DocsRoute = HttpApiScalar.layer(ProxusApi, {
@@ -50,9 +64,23 @@ const encodeNdjson = (event: TutorChatStreamEvent) =>
 
 const encodeLimitExceeded = Schema.encodeSync(LimitExceeded);
 const encodeRateLimited = Schema.encodeSync(RateLimited);
+const encodeExamInProgress = Schema.encodeSync(ExamInProgress);
+
+// La puerta cerrada del examen (decisión 18) para las rutas NDJSON sueltas: no pasan por `HttpApi`,
+// así que el middleware `ExamLockdownGuard` no las cubre y comprueban a mano. Sale como JSON con
+// `message` antes de abrir el stream, igual que `RateLimited`.
+const examLockdownCheck = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  return yield* rawRouteLockdownRejection(request.method, request.url);
+});
 
 const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
   Effect.gen(function* () {
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
+
     const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest);
 
     const limitExceeded = checkChatRequestLimits(input);
@@ -103,7 +131,8 @@ const reindexErrorMessage = (
     case "MaterialIndexingFailed":
       return error.reason;
     case "MaterialRepositoryError":
-      return `Error al leer el material: ${String(error.reason)}`;
+      // El motivo crudo (ruta, error de disco) no le sirve al usuario y es detalle interno.
+      return "No se pudo cargar el material. Vuelve a intentarlo en un momento.";
   }
 };
 
@@ -113,6 +142,11 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
@@ -177,6 +211,11 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
@@ -251,14 +290,119 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
   })
 );
 
-const Routes = Layer.mergeAll(ApiRoutes, DocsRoute, TutorStreamRoute, MaterialIndexStreamRoute, NoteGenerationRoute);
+const encodeAssessmentGenEvent = Schema.encodeSync(AssessmentGenerationStreamEvent);
+const encodeAssessmentGenNdjson = (event: AssessmentGenerationStreamEvent) =>
+  encoder.encode(`${JSON.stringify(encodeAssessmentGenEvent(event))}\n`);
+
+// Bajo demanda: la persona pulsa "Control de este tema" o "Examen del material" en la pestaña
+// Pruebas. El código pone la forma (cuántas preguntas de cada tipo, sobre qué tema, con qué cita), el
+// modelo redacta, y `question-parse` filtra sin rellenar. Emite el progreso tema a tema como NDJSON y
+// termina con done (el resumen de la prueba) o failed (el motivo). Mismo patrón que la generación de
+// apuntes; usa la capa del adaptador en modo JSON (§6.7.1), proveída solo aquí.
+const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/assessments", () =>
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params.id ?? "";
+
+    const locked = yield* examLockdownCheck;
+    if (Option.isSome(locked)) {
+      return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
+    }
+
+    const request = yield* HttpServerRequest.schemaBodyJson(GenerateAssessmentInput).pipe(
+      Effect.catch(() => Effect.succeed(null))
+    );
+    if (request === null) {
+      return yield* HttpServerResponse.json(
+        { message: "El cuerpo de la petición no tiene el formato esperado (kind, topicId, origin, questionCount)." },
+        { status: 400 }
+      );
+    }
+
+    const rateLimiter = yield* RateLimiter;
+    const key = yield* clientKey;
+    // Genera un artefacto y una llamada al modelo por tema: cuenta contra el cubo `artifacts` y toma
+    // un permiso de concurrencia, como el chat y los apuntes.
+    const rejected = yield* rateLimiter.check(key, "artifacts").pipe(
+      Effect.andThen(() => rateLimiter.acquire(key)),
+      Effect.as(Option.none<RateLimited>()),
+      Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
+    );
+    if (Option.isSome(rejected)) {
+      return yield* HttpServerResponse.json(encodeRateLimited(rejected.value), { status: 429 });
+    }
+
+    const assessmentGen = yield* AssessmentGenerationService;
+
+    // Precondiciones comprobadas ANTES de abrir el stream (§6.9): material inexistente, sin indexar,
+    // techo de pruebas. Salen como JSON con `message`, no como un `failed` a mitad.
+    const rejection = yield* assessmentGen.precheck(id, request);
+    if (Option.isSome(rejection)) {
+      yield* rateLimiter.release(key);
+      return yield* HttpServerResponse.json({ message: rejection.value.message }, { status: rejection.value.status });
+    }
+
+    const languageModel = yield* LanguageModel.LanguageModel;
+
+    const events = Stream.callback<AssessmentGenerationStreamEvent, never, LanguageModel.LanguageModel>((queue) =>
+      assessmentGen.forMaterial(id, request, (progress) => Queue.offer(queue, {
+        type: "progress" as const,
+        topic: progress.topic,
+        topicCount: progress.topicCount,
+        message: progress.message
+      }).pipe(Effect.asVoid)).pipe(
+        Effect.matchEffect({
+          onSuccess: (result) => Queue.offer(queue, {
+            type: "done" as const,
+            assessment: summarizeAssessment(result.artifact),
+            questionCount: result.questionCount,
+            retries: result.retries
+          }).pipe(Effect.asVoid),
+          onFailure: (error) => Queue.offer(queue, {
+            type: "failed" as const,
+            message: error.reason
+          }).pipe(Effect.asVoid)
+        }),
+        Effect.andThen(Queue.end(queue))
+      )
+    );
+
+    const body = events.pipe(
+      Stream.provideService(LanguageModel.LanguageModel, languageModel),
+      Stream.map(encodeAssessmentGenNdjson),
+      Stream.ensuring(rateLimiter.release(key))
+    );
+
+    return HttpServerResponse.stream(body, {
+      contentType: "application/x-ndjson",
+      headers: {
+        "cache-control": "no-cache",
+        "x-accel-buffering": "no"
+      }
+    });
+  }).pipe(Effect.provide(GeminiJsonLanguageModelLive))
+);
+
+const Routes = Layer.mergeAll(
+  ApiRoutes,
+  DocsRoute,
+  TutorStreamRoute,
+  MaterialIndexStreamRoute,
+  NoteGenerationRoute,
+  AssessmentGenerationRoute
+);
 
 const DomainLive = Layer.mergeAll(
   TutorChatServiceLive,
   GeminiModel,
   NoteServiceLive,
-  NoteGenerationServiceLive
+  NoteGenerationServiceLive,
+  AssessmentGenerationServiceLive,
+  AttemptServiceLive.pipe(Layer.provide(OpenAnswerJudgeLive))
 ).pipe(
+  // El perfil de estudio lo usan el `AttemptService` (al entregar y al discrepar) y el handler de
+  // `GET /materials/:id/profile`: se provee a los dos con `provideMerge` y queda en la salida.
+  Layer.provideMerge(StudyProfileServiceLive),
   Layer.provideMerge(RateLimiterLive())
 );
 
@@ -268,7 +412,8 @@ const InfraLive = Layer.mergeAll(
     Layer.provide(FileMaterialIndexRepository.layer(".data/materials/index")),
     Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer)))
   ),
-  FileArtifactRepository.layer(".data/artifacts")
+  FileArtifactRepository.layer(".data/artifacts"),
+  FileStudyProfileRepository.layer(".data/profile")
 );
 
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(

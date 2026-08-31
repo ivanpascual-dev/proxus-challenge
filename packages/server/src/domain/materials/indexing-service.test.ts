@@ -118,5 +118,5 @@ test("si la transcripción no se puede parsear, la página va a failedPages y no
   assert.equal(index.pages.some((page) => page.page === 1), false);
   const failed = index.failedPages.find((page) => page.page === 1);
   assert.ok(failed, "la página 1 debe estar en failedPages");
-  assert.match(failed!.reason, /parse/i);
+  assert.match(failed!.reason, /no se pudo interpretar/i);
 });

@@ -357,7 +357,7 @@ export const renderError = (error: CliError) => {
     case "InvalidArgument":
       return `Invalid argument ${error.argument}: expected ${error.expected}, got ${error.value}`;
     case "UnexpectedArgument":
-      return `Unexpected argument: ${error.value}\n\nIf the command contains JSON or spaces, wrap that whole argument in single quotes. Example: artifacts create '{"kind":"note","title":"Title","markdown":"Text"}'\n\nUse --help on the command for the exact syntax.`;
+      return `Unexpected argument: ${error.value}\n\nIf the command contains JSON or spaces, wrap that whole argument in single quotes. Example: artifacts note propose id1 '{"rationale":"...","operation":{"type":"remove","blockId":"b1"}}'\n\nUse --help on the command for the exact syntax.`;
   }
 };
 

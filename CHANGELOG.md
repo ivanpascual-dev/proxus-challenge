@@ -64,22 +64,66 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   interna, redirigen, pesan de más, tardan de más o no son texto), guarda un fragmento de la página
   como fuente y redacta un borrador del bloque. Antes de añadirlo se ven el borrador y el fragmento
   extraído; si no se pudo redactar el borrador, el bloque se añade vacío con el fragmento como fuente.
+- **Pruebas dentro del material.** Un material indexado tiene una pestaña "Pruebas": se genera un
+  Examen del material entero desde su cabecera, o un Control de un tema pulsando el "＋" de ese tema en
+  el mapa mental. Se elige el número de preguntas dentro del rango y la generación enseña el progreso
+  tema a tema. Cada prueba de la lista dice su alcance, su número de preguntas y su último intento. El
+  orden en que la prueba presenta sus preguntas se fija al generarla y no las agrupa por tipo. Pedir
+  una prueba que saldría con exactamente las mismas preguntas que otra del mismo alcance se rechaza en
+  vez de duplicarla.
+- **Practicar una prueba.** Desde la lista, "Practicar" abre la prueba en modo práctica: sin reloj ni
+  penalización, con las pistas a mano, el material consultable en las otras pestañas y la corrección al
+  entregar (nota sobre 10, puntuación bruta y corrección pregunta a pregunta con su cita). Cada
+  pregunta de desarrollo tiene "Esto sí lo dije" para retirar su corrección del perfil.
+- **Hacer un Examen real.** Al generar un Examen se elige el modo: "De prueba" (a libro abierto, como
+  un Control) o "Real". Un Examen real se lanza con "Empezar el examen" y ocupa la aplicación entera:
+  no hay barra lateral, ni pestañas del material, ni chat, solo las preguntas (sin su cita de tema y
+  páginas), el reloj y los botones de entregar y cancelar. Antes de empezar hay un aviso de cómo
+  funciona: cuántas preguntas y minutos, que el reloj solo corre mientras el examen esté abierto, que
+  cada rato fuera queda registrado como una interrupción y que el resto de la aplicación queda cerrado
+  mientras dure. El reloj se para al cerrar la pestaña y se retoma donde se dejó; al agotarse, el
+  examen se entrega solo. Recargar o cerrar la página con un examen abierto pide confirmación, y al
+  volver a abrir la aplicación un diálogo ofrece volver al examen a medias o cancelarlo.
+- **Historial de intentos de una prueba.** Cada prueba con al menos un intento tiene "Ver intentos":
+  la lista de todos ellos por fecha, con su modo y su resultado. Un intento corregido se reabre entero
+  con las preguntas, lo que respondió el alumno, la corrección de cada una con su cita, y el "Esto sí
+  lo dije" de las de desarrollo. Un intento cancelado o caducado no se corrige: enseña por qué se
+  cerró y, si el examen se interrumpió, cuántas veces y en qué franjas.
+- **Pruebas de repaso.** Al generar un Control o un Examen, si el perfil del material tiene algo que
+  repasar (un tema fallado, uno consultado con pista o uno marcado como importante) se puede elegir
+  "De repaso" en vez de "Nuevas": las preguntas se concentran en esos temas y cada una dice por qué
+  entró ("porque fallaste este tema", "porque abriste una pista", "porque lo marcaste como
+  importante"). Si no hay nada que repasar, el interruptor no se ofrece y en su lugar se explica
+  cuándo se activará. En el Examen real el motivo de cada pregunta no se muestra.
+- **Tu progreso en el material.** La pestaña "Pruebas" tiene un bloque desplegable, plegado por
+  defecto, que muestra tema a tema lo que llevas de este material: aciertos, fallos, respuestas sin
+  evaluar o en blanco, pistas abiertas y la marca de "importante", cada señal por separado y sin
+  sumarlas. Es solo lectura y se pone al día al entregar o discrepar un intento.
+- **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
+  del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
+  "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
+  navegador, no a la pantalla.
 
 ### Cambiado
 
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
 - **Toda la interfaz habla español.** El chat (cabecera, sugerencias de inicio, botones, mensajes), la
-  barra lateral y el solucionador de quizzes y tests (enunciados, tipos de pregunta, correcciones,
-  botones) pasan de inglés a español, además de la zona de apuntes que ya lo estaba.
+  barra lateral y las pruebas (enunciados, tipos de pregunta, correcciones, botones) pasan de inglés a
+  español, además de la zona de apuntes que ya lo estaba.
 - **El tutor ya no crea apuntes.** Los apuntes se generan desde la pestaña "Apuntes" de cada material,
-  no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña. El tutor sigue creando
-  quizzes y tests.
+  no pidiéndoselos al tutor en el chat. Si se le piden, remite a esa pestaña.
+- **El tutor ya no crea, entrega ni corrige pruebas por el chat.** Pedirle "hazme un test" o
+  "corrígeme esto" lleva a la pestaña "Pruebas" del material: solo el alumno, desde ahí, genera
+  pruebas y hace intentos que muevan su perfil. El tutor sí las lee para hablar de ellas, y ahora
+  también lee el perfil de estudio del material: al recomendar qué repasar nombra la señal concreta
+  que trae cada tema ("fallaste este tema", "abriste una pista aquí", "lo marcaste como importante")
+  en vez de una nota resumen.
 - **El aviso de fichero de artefacto ilegible da un motivo en lenguaje humano** ("no tiene el formato
   de un artefacto válido; puede ser de una versión anterior") en vez del error de esquema crudo. El
   detalle técnico va al log del servidor.
 - **Los apuntes viven en su material, no en la barra lateral.** La barra lateral deja de listar los
-  apuntes y separa lo que queda en dos secciones, "Quizzes" y "Tests", cada una con su propio contador.
+  apuntes.
 - **El tutor entiende "bloque" como bloque del apunte.** Al preguntarle por los bloques, el mapa
   mental o el apunte de un material, el tutor lee el apunte en vez de contar las secciones del PDF, y
   puede leer un bloque concreto para hablar de él.
@@ -89,10 +133,29 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   abre un menú con esos formatos. Las tablas traen su propia barra para añadir y quitar filas y
   columnas. Se van el botón "Editar/Hecho" y el recuadro de markdown; lo que se guarda sigue siendo el
   mismo markdown limpio.
+- **Ningún error en pantalla enseña detalle técnico.** Los mensajes de error de la aplicación dicen
+  qué ha fallado y qué se puede hacer, sin nombres de fichero, errores de esquema, `_tag` ni "revisa
+  el log". El detalle técnico va al log del servidor o a la consola del navegador.
+- **Los avisos de límite de frecuencia se leen en lenguaje humano.** Al agotar la ventana corta el
+  aviso nombra los minutos que dura; al agotar el tope diario dice que se descanse y se vuelva
+  mañana, en vez de hablar en segundos.
 
 ### Corregido
 
 - **Las insignias de estado se leen en el tema claro.** "Sin indexar", "transcrito por el modelo" y
   las marcas de acierto usaban un color que sobre su fondo claro no llegaba al mínimo de contraste.
+- **La pestaña "Pruebas" ya no se cae por un intento antiguo en disco.** Si un fichero de intento
+  guardado tiene un formato de una versión anterior, se ignora y se registra en el log del servidor;
+  la lista de pruebas y sus últimos intentos se carga igual, en vez de romperse entera.
+- **Escribir en una respuesta corta o renombrar unos apuntes ya no deja la página en blanco.** El
+  campo leía su valor demasiado tarde y la excepción tumbaba toda la vista.
+- **Los temas marcados como importantes reciben más preguntas al generar una prueba.** El reparto ya
+  pesaba el énfasis, pero la generación no le pasaba qué temas estaban marcados, así que la marca no
+  cambiaba nada. Ahora un tema marcado pesa el doble en el reparto.
 
 ### Eliminado
+
+- **La barra lateral ya no resuelve quizzes ni tests.** Se van las secciones "Quizzes" y "Tests" y el
+  espacio de trabajo donde se respondían. La barra lateral se queda con los materiales y el aviso de
+  ficheros de artefacto ilegibles; las pruebas se generan y se resuelven en la pestaña "Pruebas" de
+  cada material.

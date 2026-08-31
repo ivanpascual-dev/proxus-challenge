@@ -388,3 +388,347 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   `window.DOMParser` y una vista de ProseMirror montada). MIT, solo test, fuera del runtime. De paso,
   el subrayado sale del esquema (`underline: false`): solo se representa con `<u>` y `tiptap-markdown`
   lo perdía en silencio al guardar.
+
+## 2026-08-30 · Fase 3 · tramo 3A · contratos y cimiento
+
+- **Desviación (frontera 3A/3B renegociada con Iván):** el plan §8 mete en 3A "endpoints del §5.6
+  declarados" (paso 6) y `question-parse` (parte del 9). Se quedan para 3B. En 3A entran solo: los
+  esquemas §5.1‑5.5 y su mirror, `limits.ts` §5.7, las clases de error nuevas
+  (`assessment-errors.ts`, **sin rutas todavía**), y los módulos puros `grading.ts` y
+  `exam-scoring.ts` con sus tests. Motivo: el cambio del ciclo de vida del intento (§5.5) rompe a la
+  vez repositorio, comando del tutor, eval y web; se cierra con shims mínimos y se dejan los endpoints
+  para cuando exista la generación de verdad, así cada commit deja el repo compilando.
+- **Desviación (la extracción de `grading.ts` no se pudo aislar en su propio commit):** el reparto
+  pedía "contrato" y "extracción" separados. La corrección vieja vivía en `artifact.ts` referida a
+  los esquemas de intento que el §5.5 elimina, así que reescribir el esquema obliga a reescribir la
+  corrección en el mismo commit. El bug del `maxScore` (recorría `attempt.answers`, así que 2 de 10
+  respondidas daban 2/2; ahora recorre `artifact.questions` y las no respondidas son `blank`) viaja
+  con esa reescritura.
+- **Deuda (shims que sustituyen 3B y 3D):**
+  - `makeArtifact` rellena `scope`/`origin`/`examTimeLimitSeconds` con marcadores. Lo desbloquea la
+    retirada de `artifacts create` (paso 27, tramo 3D).
+  - `makeInProgressAttempt` sintetiza un intento de práctica en el camino de `artifacts submit`. Lo
+    desbloquea el endpoint de crear intento (paso 14, tramo 3B).
+  - `ArtifactWorkspace.tsx` sigue con el solucionador viejo (respuesta múltiple como lista separada
+    por comas, sin pistas, sin modos). Lo sustituye `AssessmentSolver` (paso 15, tramo 3B).
+  - `artifact-authoring.eval.ts` con shim para pasar el typecheck; se reescribe entera (paso 27,
+    tramo 3D).
+
+## 2026-08-30 · Fase 3 · tramo 3B · generar y practicar
+
+- **Desviación de secuencia (pasos 9-10):** el plan pedía que `question-parse.ts` absorbiera la
+  normalización de opciones de `artifact-commands.ts:170-212`. El parseo nuevo ya deja los ids de
+  opción (`a`/`b`/`c`/`d`) y de criterio (`c1..`) fuera del contrato con el modelo (decisiones
+  20b/20c), pero la normalización vieja sigue viva: la usa el comando `artifacts create`, que no se
+  retira hasta el tramo 3D (paso 27). Hasta entonces conviven las dos rutas de parseo. Los pasos 8
+  (`assessment-shape.ts`) y 11 (capa JSON del adaptador de Gemini) salieron como el plan decía.
+- **No hizo falta parar en §6.7.1:** el plan avisaba de que, si la capa JSON de Gemini no se podía
+  proveer limpia en el punto de llamada, había que detenerse y replantear. Sí se pudo:
+  `AssessmentGenerationRoute` hace `Effect.provide(GeminiJsonLanguageModelLive)` solo en ese handler y
+  el `Stream.callback` recibe el `LanguageModel` por `Stream.provideService` desde el mismo scope. Sin
+  enhebrado manual por los constructores del arnés (el problema que sí tuvo la generación de apuntes,
+  ADR-016) y sin tocar la capa del tutor.
+- **Deuda (`origin: "review"` es stub hasta 3D):** `assessment-generation-service.ts` resuelve el
+  alcance y genera para `origin: "practice"` y `"exam"`; con `"review"` falla a propósito porque
+  necesita el perfil de estudio (temas flojos del alumno) que llega en el tramo 3D. La pestaña Pruebas
+  que consume la ruta es el paso 15, todavía no cablea "review".
+- **Deuda (`POST /artifacts/:id/submit` sigue vivo):** el plan §5.6 lo da por retirado. No se ha
+  quitado porque lo usa el solucionador viejo de `ArtifactWorkspace.tsx`. Hasta el paso 15 conviven
+  el endpoint viejo (`/:id/submit`, con `makeInProgressAttempt` sintético) y el nuevo del ciclo de
+  intento (`/:id/attempts/:attemptId/submit`); el paso 15 trae el `AssessmentSolver` nuevo y retira
+  el resto viejo. **Saldada en el paso 15:** se retira la ruta HTTP `submit` y su handler, y con ellos
+  `submitArtifactAttemptAction` en la web. El esquema `SubmitAttemptInput` y `repository.submitAttempt`
+  siguen vivos porque los usa el comando `artifacts submit` del tutor; se retiran en el paso 27 (3D).
+
+### Paso 15 · pestaña Pruebas y solucionador de práctica
+
+- **Desviación (F3-11 reescrito por decisión de Iván en esta sesión):** la práctica ya no corrige
+  pregunta a pregunta ni da "refuerzo inmediato al acertar". Corrige al entregar, igual que el examen;
+  lo que la distingue es quitar el reloj y la penalización y dar pistas + el material a la vista + el
+  chat del tutor abierto. Toca `docs/especificacion.md` (F3-11), el plan (tabla de términos §4, pasos
+  15, "Resolver" §6.11, fila QA "Modo práctica") y el `AssessmentSolver`. Recoger en el ADR de los
+  modos práctica/examen cuando se escriban los ADR de la fase 3 (plan §9).
+- **Deuda (`artifactsByKindQuery` queda sin usar):** la barra lateral pasa a `artifactsQuery` (ya no
+  lista quiz/test). El atom sigue exportado en `packages/web/src/domain/artifacts/atoms.ts`; lo usa (o
+  lo retira) el paso 29 del tramo 3D, cuando se decide qué queda de artefactos en la barra lateral.
+- **Decisión sobre la marcha (el botón de generar en el mapa mental es un "＋" en la esquina del
+  nodo):** `mindmap-layout.ts` calcula el tamaño de cada nodo para que quepa solo su etiqueta y sus
+  páginas (layout puro, sin medir botones). Un botón con texto obliga a reservar sitio en ese layout;
+  un círculo "＋" de radio fijo en la esquina superior derecha del `rect` no lo toca. El `onClick` de
+  abrir página baja del `<g>` al `<rect>` y los `<text>` llevan `pointerEvents="none"` para que el
+  "＋" quede encima y clicable.
+
+### Paso 15 · la pestaña Pruebas se caía al abrirla
+
+- **Causa raíz:** `GET /materials/:id/assessments` devolvía `SchemaError(Missing key at ["mode"])`
+  crudo en pantalla. `listAttempts` (`file-artifact-repository.ts`) leía todos los ficheros de intento
+  con `Effect.all`: un solo fichero con el esquema viejo (sin `mode`, anterior a la fase 3) tumbaba el
+  listado entero. Ahora usa `Effect.partition` + `Effect.logWarning` y salta el fichero ilegible,
+  igual que `listArtifacts`. Hay 3 ficheros de intento pre-fase-3 en `.data` que se pueden borrar.
+- **Decisión sobre la marcha (higiene de errores de cara al usuario):** ningún error en pantalla
+  enseña detalle técnico (`SchemaError`, ruta de fichero, `_tag`, `ECONNREFUSED`, "revisa el log"):
+  solo qué falló y qué hacer. El motivo crudo va a `Effect.logWarning` en el punto donde se produce.
+  Barrido en servidor (handlers, `server.ts`, streams de indexación / generación de prueba y apuntes /
+  reescritura, `url-source`) y en web (nuevos `lib/error-message.ts` y `lib/stream-error.ts` como
+  único camino del error a la interfaz; un `defect` siempre como texto genérico). Queda como enmienda
+  a ADR-005 (2026-08-30); generaliza el comentario "fase 2, decisión 28" de
+  `file-artifact-repository.ts`.
+
+### Retoques tras probar el tramo 3B
+
+Iván probó el tramo y pidió tres arreglos. Lo que no se ve en el diff:
+
+- **Causa raíz (no se podía responder en práctica):** en `AssessmentSolver` el bloqueo de los campos
+  era `attempt !== null`, heredado de cuando la práctica corregía pregunta a pregunta. Tras reescribir
+  F3-11 en el paso 15 (la práctica corrige al entregar), "hay intento" dejó de significar "ya
+  corregido", así que al empezar la práctica todos los inputs nacían deshabilitados y no se podía
+  marcar ninguna respuesta, de ningún tipo. Pasa a `graded !== null`.
+- **Decisión sobre la marcha (contexto para la futura ADR-018):** el determinismo que defiende ADR-018
+  (plan §9) es el del REPARTO por tipo, no el de la secuencia. Las preguntas montadas salían agrupadas
+  por tipo porque el bucle las pide tipo por tipo. Ahora se barajan con una permutación de
+  Fisher-Yates sembrada por el id de la prueba (`question-order.ts`); es reproducible sin
+  `Math.random()` porque el id vive en el JSON guardado. F3-06c nuevo. No se crea ADR: el plan reserva
+  ADR-018..021 para el paso 30, esto es contexto para cuando se escriba ADR-018.
+- **Decisión sobre la marcha (F3-06b, de una conversación de diseño con Iván):** primero rechazó atar
+  el orden a algo que hiciera dos controles iguales; luego aclaró que 6 pedidas siguen siendo 6
+  entregadas, que repetir preguntas sueltas (iguales o reformuladas) vale, y que lo único a evitar es
+  un control o examen entero idéntico a uno anterior. Implementado: al generar una prueba de un alcance
+  que ya tiene otras se le pasan al modelo los enunciados previos de ese tema para empujarlo a variar,
+  y si la huella del conjunto (enunciados normalizados, sin orden) coincide con la de una prueba
+  existente del mismo alcance, la generación falla sin guardar nada. `priorAssessments` es tolerante:
+  si el listado falla, se genera sin comprobar. El repaso (3D) no pasará por esta salvaguarda.
+
+### Paso 16 · la eval del juez y la medición del riesgo 2
+
+`open-answer-judge.eval.ts` + `open-answer-judge.fixture.json`: 3 preguntas de desarrollo corto
+(estadística, psicología social, lógica), cada una con su fragmento de material embebido para que la
+eval sea autónoma, y los 6 casos de §6.7.2. Corre con llamadas reales al modelo, con la capa JSON
+(`GeminiJsonLanguageModelLive`, `responseMimeType`) y sin ella (`GeminiLanguageModelLive`, temp 0.2).
+Script `eval:judge`. `judgeUserMessage` se exporta de `open-answer-judge.ts` junto a
+`interpretJudgeResponse`: son las dos piezas que la eval mide.
+
+**Riesgo 2 · tasa de caídas al parsear la respuesta del juez (18 respuestas por capa):**
+
+| | Caídas al parsear | Criterios que no casan |
+| --- | --- | --- |
+| Con capa JSON | **0 % (0/18)** | 0 % (0/18) |
+| Sin capa JSON (temp 0.2) | **0 % (0/18)** | 0 % (0/18) |
+
+El parser defensivo (`parseModelJson`: quita vallas de markdown, recorta al primer y último `{}`) ya
+absorbe lo que el modo JSON evitaría. En este fixture forzar `responseMimeType` **no reduce** las
+caídas porque no hay ninguna. **No se añade `responseSchema`** (§6.7.1 lo condicionaba a que la tasa
+siguiera siendo mala; es 0).
+
+Donde sí se nota la capa JSON es en la **consistencia del veredicto**, no en el parseo: con capa JSON
+(temp 0) el juez acertó 17-18/18 entre dos ejecuciones; sin ella (temp 0.2), 15-17/18, con los fallos
+saltando de una respuesta a otra entre ejecuciones. La capa JSON no hace al juez más listo, lo hace
+reproducible (§6.7 defensa 4). Los fallos sin capa JSON eran todos de criterio en el filo (dar por
+cumplido "las dos miden dispersión" cuando la respuesta solo lo dice explícito de una), nunca
+paráfrasis buenas marcadas como fallo.
+
+**Riesgo 1 · el caso central (paráfrasis válida):** 3/3 correctas con y sin capa JSON, en las dos
+ejecuciones. "Correcta al revés" (orden invertido), también 3/3. El único desajuste recurrente entre
+fixture y juez fue un "sobre otra cosa" demasiado cercano al tema (una respuesta sobre refuerzo
+positivo frente a una pregunta de disonancia cognitiva): el juez lo daba por `gradable` con criterios
+sin cumplir en vez de `gradable: false`. Es defendible (misma disciplina); se cambió el caso del
+fixture por uno inequívocamente ajeno (tectónica de placas) y pasó. La cifra y la redacción del
+riesgo 1 van a `NOTES.md` en el cierre de fase.
+
+### Escribir en una respuesta corta dejaba la página en blanco
+
+- **Causa raíz:** el `onChange` del textarea de respuesta corta (`AssessmentSolver`, `QuestionInput`)
+  leía `event.currentTarget.value` dentro del updater de `setAnswers`. React pone `currentTarget` a
+  `null` en cuanto el handler retorna, y el updater corre después, en el render siguiente: leía
+  `null`, lanzaba, y como no hay ErrorBoundary la interfaz entera se quedaba en blanco. Se arregla
+  leyendo el valor antes de `setAnswers`. El título de los apuntes (`NoteWorkspace`) tenía el patrón
+  exacto, latente: renombrar unos apuntes lo habría disparado. Mismo arreglo en los dos sitios.
+- **Deuda saldada (ErrorBoundary):** `packages/web/src/components/ErrorBoundary.tsx` es ahora la red
+  de render. Envuelve `<App/>` en `main.tsx` y, por separado, `Sidebar`, `MaterialPanel` y `Chat` en
+  `App.tsx`, para que un panel que se caiga no se lleve a los otros dos. El `key={material.id}` del
+  `MaterialPanel` se mueve al boundary que lo envuelve: sigue forzando el remonte al cambiar de
+  material y de paso resetea el boundary. El detalle técnico va a `console.error` con el
+  `componentStack`, nunca a pantalla.
+
+## 2026-08-30 · Fase 3 · tramo 3C · el examen (lado servidor)
+
+- **Decisión sobre la marcha (dos constantes que el plan no fijaba):** `examInterruptionThresholdMs`
+  (45 s, tres latidos perdidos) es la raya entre "sigue conectado" y "hubo un hueco": un silencio del
+  latido más corto cuenta entero como tiempo conectado, uno más largo no cuenta y se guarda en
+  `interruptions`. `examSubmitGraceSeconds` (15 s) es el margen de red y desfase de reloj dentro del
+  cual `submit()` todavía acepta una entrega pasada del límite; más allá, `TimeLimitExceeded` 409. El
+  plan §5.6 solo declaraba el error: cómo distingue el servidor la entrega automática del cliente (cabe
+  en la holgura) de un `curl` tardío (no cabe) se decidió aquí. Contexto para ADR-020/022 (paso 30).
+- **Decisión sobre la marcha (el guard no cachea y falla abierto):** `ExamLockdownGuard` mira si hay
+  examen en curso leyendo todos los intentos de disco, en cada petición que cae en la lista cerrada.
+  No hay caché: un examen recién empezado tiene que cerrar la puerta al instante, y una caché con
+  invalidación repartida entre el middleware y las cuatro rutas NDJSON sueltas era más complejidad de
+  la que el ahorro justifica a esta escala (ficheros de intento acotados por los techos de §5.7). Si
+  el listado falla, la puerta se **abre** (fail-open) y el motivo va al log: encerrar al alumno por un
+  fallo de disco es peor que dejar pasar una petición. Contexto para ADR-021 (paso 30).
+- **Regla nueva pedida a mitad (un solo intento a medias a la vez):** Iván la pidió durante la sesión,
+  no estaba en el plan. `start()` ya no solo mira el techo: si hay otro intento `in-progress` (de otra
+  prueba o de otro modo) lo rechaza con `AttemptInProgress` 409 nombrando cuál; si el que hay abierto
+  es de la misma prueba y el mismo modo, lo retoma en vez de crear otro. El techo de intentos por modo
+  se mantiene y ahora se cuenta sobre todos los intentos del artefacto (`listAttempts()` sin filtro,
+  luego `filter`), no sobre `listAttempts(artifactId)`. Contexto para un ADR nuevo (paso 30).
+- **Desviación (decisión 6 reabierta, con el OK de Iván):** el plan la cerró como «el modo es del
+  intento, no del artefacto» (el mismo Control se practica hoy y se examina mañana). Al montar el
+  examen se vio que no se sostiene: el Examen real se genera **sin pistas**, y eso es una propiedad
+  del artefacto, no de quien lo abre. Modelo nuevo ([ADR-018](../docs/decisiones.md)): el Control es
+  siempre de práctica; el Examen se genera «de prueba» (`mode: "practice"`) o «real» (`mode: "exam"`);
+  el intento hereda el modo del artefacto y empezar ya no lleva cuerpo (`StartAttemptInput` fuera). El
+  techo de Exámenes por material pasa a contarse por modo: `maxTestsPerMaterial` de 4 a 2, o sea 2 de
+  prueba + 2 reales. Los ADR reservados del plan §11 corren un número (018 lo toma esta inversión). El
+  selector al generar y el panel del Examen real llegan en commits posteriores del mismo tramo; este
+  solo mueve contrato y servidor y adapta la web para que compile.
+
+## 2026-08-30 · Fase 3 · tramo 3C · el examen (lado cliente)
+
+- **Desviación (la cita no se pinta en el Examen real):** el plan daba por hecho que la cita de tema y
+  páginas se ve al resolver cualquier prueba (§6, «toda pregunta enseña su cita»; tabla §9, fila
+  Anclaje). Iván la retira del Examen real: «solo las preguntas». Un examen de verdad no te entrega
+  las páginas donde está la respuesta. `QuestionCard` gana `showSource` (default `true`, así práctica
+  y Control no cambian) y `ExamRun` lo pasa a `false`, también sobre el intento ya entregado. El dato
+  sigue en la pregunta (F3-01 intacto); criterio nuevo F3-19b. No mueve ningún registro de decisiones:
+  es presentación, no contrato.
+
+## 2026-08-30 · Fase 3 · tramo 3D · el bucle
+
+### Paso 25 · el perfil de estudio
+
+- **Desviación (el perfil se recalcula entero, no se aplica incremental):** el plan §6.5 describe
+  `applyAttempt(profile, artifact, gradedAttempt)` como la operación central. La implementación la
+  deja como función pura pero la envuelve en `StudyProfileService.sync`, que **reconstruye el perfil
+  desde cero** (`rebuildProfile`) a partir de todos los intentos `graded` del material en cada
+  escritura. Motivo: "esto sí lo dije" (§6.7 defensa 1) reescribe un intento ya aplicado, y un rebuild
+  desde cero lo refleja sin un camino de reversión aparte, manteniendo el determinismo y la
+  idempotencia que pide §6.5/ADR-002. `appliedAttemptIds` se guarda igual: hace idempotente el propio
+  rebuild y deja traza de qué intentos entraron.
+- **Decisión sobre la marcha (un fallo al recalcular el perfil no tumba la entrega):** `submit` y
+  `dispute` guardan el intento y **luego** llaman a `sync`; si `sync` falla se registra con
+  `logWarning` y la operación devuelve bien. El perfil es una proyección y se rehace desde cero en el
+  siguiente `sync` o `read`; dejar sin corregir un intento ya corregido por un fallo de disco del
+  perfil sería peor. Mismo criterio fail-open que el guard del examen (tramo 3C). Contexto para
+  ADR-022 (paso 30).
+
+### Paso 26 · el repaso
+
+- **Deuda saldada (la decisión 2 no estaba cableada):** `assessment-shape.plan()` acepta
+  `emphasizedTopicIds` y pesa un tema marcado el doble desde el paso 8, pero
+  `assessment-generation-service` nunca le pasaba ese dato, así que marcar un tema como importante no
+  cambiaba el reparto de una prueba de material. Se cablea aquí, no en el paso 8, porque el servicio
+  solo empieza a leer el perfil de estudio en este paso (antes no tenía de dónde sacar `emphasis`).
+- **Decisión sobre la marcha (campo `reviewReason` en la cita, no estaba en el plan §5):** §6.11 y
+  F3-32 dan por hecho que cada pregunta de un repaso dice qué señal la trajo, pero el plan §5 no
+  añadió el campo al contrato. Se añade mínimo: `QuestionSource.reviewReason: "fallada" | "pista" |
+  "marcada" | null`, `null` fuera del repaso. Es por tema (todos los huecos de un tema comparten la
+  señal que más pesó, la que ya calcula `assessment-shape`), no por pregunta individual.
+- **Decisión sobre la marcha (el repaso no es fail-open):** una generación de material sigue si el
+  perfil no se puede leer (solo pierde la ponderación por énfasis); una de repaso falla en voz alta,
+  porque sin perfil no hay nada con qué concentrar las preguntas. Distinto del fail-open del guard del
+  examen y del recálculo del perfil (paso 25): allí la alternativa era encerrar o descorregir; aquí es
+  generar un repaso sin foco, que es un repaso inventado (invariante 3).
+
+### Paso 27 · el tutor deja de autorar pruebas
+
+- **Desviación (se retiró más de lo que decía el plan):** el plan hablaba de "retirada de los comandos
+  `create`/`submit`/`grade`". Además de los comandos, se retiró el código muerto que solo ellos
+  usaban: los métodos `createArtifact`/`submitAttempt`/`gradeAttempt` del puerto `ArtifactRepository`,
+  los esquemas `Create*Input`/`Submit*Input` (en el mirror del servidor y en `@proxus/shared`), y
+  `makeArtifact`/`makeInProgressAttempt`/`placeholderScope`. Quedaron sin referencias al irse los
+  comandos; el comentario del mirror ya anticipaba la retirada ("que se retira en el tramo 3D").
+- **Decisión sobre la marcha (`profile show`, el eval y la retirada viajan en un commit):** el eval
+  `artifact-authoring` se reescribe entero (comprueba lo contrario que antes) y no compila hasta que
+  aterrizan las dos mitades del cambio, porque el `tsconfig` de `@proxus/server` incluye los
+  `.eval.ts` y la firma de `makeAcademicTutorHarness` la tocan las dos. La skill sí va en un commit
+  aparte (es texto, no ata el typecheck).
+
+### Paso 28 · la vista del perfil
+
+- **Desviación (el perfil se ve dentro de la pestaña Pruebas, no como pestaña propia):** el plan
+  (paso 28) solo pide "vista del perfil por material" sin decir dónde vive. Se coloca como bloque
+  desplegable ("Tu progreso en este material"), plegado por defecto, bajo la cabecera de la pestaña
+  Pruebas. Motivo: §6.11 y la decisión 15 fijan Pruebas como la cuarta pestaña junto a PDF, Mapa
+  mental y Apuntes, y ninguna menciona una quinta. Pendiente de que Iván lo pruebe y decida si quiere
+  otro sitio.
+
+### Paso 29 · pasada de guardarraíles
+
+- **Veredicto: ⚠️ REVISAR, no bloquea el cierre de fase 3.** Toda la superficie nueva del tramo (la
+  retirada de `create`/`submit`/`grade`, `profile show` de solo lectura, la skill nueva, la cita
+  copiada por el código, el juez que nunca degrada a nota inventada) está bien cerrada en código.
+- **Tres arreglos aplicados:**
+  - `chat-limits.ts`: `maxSteps` se valida como entero entre 1 y el techo. `maxSteps: 12.9` pasaba el
+    `> 12` y el bucle de `session.ts` corría 13 iteraciones, una llamada al modelo de más.
+  - `assessment-generation-service.ts`: `topic.label` y los enunciados de pruebas previas (todos
+    redactados por el modelo) entraban en el prompt a nivel de instrucción; ahora van dentro de
+    `STUDENT_MATERIAL_OPEN/CLOSE` como dato. Inyección de segundo orden desde un PDF hostil.
+  - `limits.ts` + `gemini.ts`: la temperatura del camino JSON pasa de literal `0` a
+    `LIMITS.jsonModelTemperature` (coherencia con ADR-007/008).
+- **Deuda confirmada para fase 4** (ya en `notes/hoja-de-ruta.md` §Fase 4): el historial de chat
+  fabricable (el cliente manda `messages` con `assistant`/`tool-result` inventados) lo cierra "Sesión
+  en el servidor"; que el tutor enumere sus herramientas y skills si se lo piden directo lo cierra
+  "System prompt canónico". Las dos son barreras del ADR-008 asignadas a fase 4.
+- **Pendiente para el cierre de fase (paso 30 / `NOTES.md`):** documentar el conteo de la batería de
+  ataques y la nota del juez inflable por inyección del alumno como riesgo residual esperado ("reduce,
+  no elimina"; la nota la calcula el código, un fallo de parseo cae a `unevaluated`, y hay el backstop
+  de `dispute`).
+
+### Pasada de `@fiel-al-plan` y alineación
+
+- **Veredicto: ⚠️ DERIVA**, solo de documentación y un campo de contrato. Ninguna decisión cerrada
+  reabierta en silencio, texto canónico de los prompts fiel palabra por palabra.
+- **`ArtifactSummary.materialId` pasa de opcional a obligatorio** (`schemas/artifact.ts:195`). §5.4 lo
+  pedía obligatorio para quiz y test; se había dejado opcional "por si un artefacto antiguo no lo
+  trae". Iván: ese caso ya no puede ocurrir. Los tres sitios que construyen el summary
+  (`handlers.ts:157`, `assessment-generation-service.ts:633`, `server.ts:266`) ya lo poblaban siempre,
+  así que el cambio es solo del esquema. 279 tests en verde.
+- **Docs alineados con la fase 3:** `especificacion.md` F2-39 (ya no habla de `artifacts create`, que
+  se retiró entero) y F3-42 (`maxQuizzesPerMaterial` no existe: el techo del Control va por tema,
+  `maxQuizzesPerTopic`; el del Examen por material y por modo, `maxTestsPerMaterial`).
+  `development.md` (ejemplos de `artifacts create` sustituidos por comandos de lectura). ADR-016
+  (marca que la fase 3 revierte "el tutor autora quiz y test" y renombra la skill a
+  `use-study-assessments`).
+- **Desviaciones menores aceptadas (no se tocan):** el módulo `domain/artifacts/exam-lockdown.ts`
+  quedó **puro** y la parte impura se separó a `transport/http/exam-lockdown-guard.ts`; §6.9.1 lo
+  describía como una sola pieza impura. Respeta mejor la separación puro/impuro de §6. Y el contador
+  de preguntas en blanco del perfil se llama `blank`, no `asked` como decía §6.5: evita un total que
+  sería suma de señales (lo que §6.5 justo prohíbe).
+
+## 2026-08-31 · Fase 3 · pasada de `/proxus-verifier` y sus arreglos
+
+- **Veredicto de la primera pasada: 🚨 NO CIERRA.** Servidor aislado en `PORT=3100` con copia
+  desechable de `.data`, para no chocar con el de la sesión hermana ni tocar datos reales. 279/279
+  tests, los tres checks en verde, tabla de invariantes e criterios F3 recorrida entera. Un hallazgo
+  🚨 (rompía la invariante 11) y dos ⚠️, más dos observaciones de diseño. Cerrado con Iván uno a uno:
+  - **`maxOpenAnswerCharacters` sin validar en el servidor (invariante 11), arreglado.**
+    `attempt-service.ts:submit` rechaza con `LimitExceeded` (400) antes de gastar ninguna llamada al
+    juez si una respuesta de desarrollo corto supera 1500 caracteres. El `maxLength` del `<textarea>`
+    era la única barrera; un cliente que no fuera la web se la saltaba entera. Test de regresión en
+    `attempt-service.test.ts`.
+  - **F3-08/F3-09 (el motivo de cada pregunta descartada), reescritos, no el código.** El reparto ya
+    era todo o nada (si el tema no da para las N pedidas tras los reintentos, la generación entera
+    falla nombrando el motivo, `assessment-generation-service.ts:490-494`); lo que faltaba era el
+    motivo de cada descarte individual (`parsed.dropped`), que se calculaba y se tiraba. Decisión de
+    Iván: no exponerlo al alumno (el todo-o-nada ya lo protege), pero tampoco perderlo: ahora se
+    registra en el log del servidor como diagnóstico (`generateForTopic`). F3-08/F3-09 reescritos en
+    `especificacion.md` para que digan "al log", no "al resultado", y "guardadas = pedidas o falla
+    entero" en vez de pedir un desglose por pregunta que el diseño no da.
+  - **El bloqueo de campos al agotarse el tiempo tenía un hueco, arreglado.** `ExamRun.tsx`: `locked`
+    solo miraba `phase === "graded"` (ya corregido), no `"grading"` (corrigiendo): entre que la
+    entrega automática se dispara al llegar a 0 (decisión 20) y que vuelve la corrección, los campos
+    seguían editables aunque los botones ya estuvieran deshabilitados. Ahora `locked` cubre las dos.
+  - **El cubo `artifacts` (5 cada 10 min, para llamadas a IA) cargaba operaciones sin IA, arreglado.**
+    `startAttempt` lo gastaba sin llamar nunca al modelo (`handlers.ts`); ya no lo toca. `submitAttempt`
+    lo gastaba siempre, aunque un examen 100% opción múltiple no llama al juez; ahora solo lo gasta
+    (`check`+`acquire`) si `payload.answers` trae de verdad una respuesta de desarrollo corto no vacía
+    (decisión de Iván: cargar solo si hay algo que corregir).
+  - **`questionCount` fuera de rango llegaba como HTTP 200, arreglado.** La ruta de generación es un
+    stream: en cuanto se abre, el estado queda fijado en 200 y ya no cambia. La comprobación del rango
+    vivía dentro de `forMaterial` (después de abrir el stream) en vez de en `precheck` (antes). Movida
+    a `precheck`, con test de regresión (antes probaba el `forMaterial`, ahora prueba el `precheck`
+    directamente). **Deuda emparentada, sin tocar:** el alcance sin huecos que generar o repasar
+    (`planned.holes.length === 0`) tiene el mismo problema y sigue dentro de `forMaterial`; no se
+    movió porque necesita el perfil de estudio y `plan()`, que hoy no corren en `precheck`. Documentado
+    en `docs/api.md`.
+- **280 tests en verde, los tres checks limpios**, tras todos los arreglos anteriores.

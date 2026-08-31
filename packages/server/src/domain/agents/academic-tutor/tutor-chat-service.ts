@@ -3,6 +3,7 @@ import { LanguageModel } from "effect/unstable/ai";
 import { LIMITS, type TutorChatRequest, type TutorChatResponse, type TutorChatStreamEvent } from "@proxus/shared";
 import { ArtifactRepository } from "../../artifacts/artifact.ts";
 import { MaterialRepository } from "../../materials/material.ts";
+import { make as makeStudyProfileService, StudyProfileRepository } from "../../profile/study-profile.ts";
 import { AgentSession } from "../harness/index.ts";
 import { makeAcademicTutorHarness } from "../academic-tutor.ts";
 import { initialTurnBudgetState } from "../../limits/turn-budget.ts";
@@ -28,7 +29,9 @@ export const TutorChatServiceLive = Layer.effect(
   Effect.gen(function* () {
     const materialRepository = yield* MaterialRepository;
     const artifactRepository = yield* ArtifactRepository;
+    const studyProfileRepository = yield* StudyProfileRepository;
     const rateLimiter = yield* RateLimiter;
+    const studyProfileService = makeStudyProfileService(studyProfileRepository, artifactRepository, materialRepository);
 
     const sessionInput = (input: TutorChatRequest) => ({
       input: input.input,
@@ -41,7 +44,7 @@ export const TutorChatServiceLive = Layer.effect(
     // comparte entre peticiones (es lo que hace que la ventana deslizante cuente de verdad).
     const makeTurnHarness = (clientKey: string) => Effect.gen(function* () {
       const budgetRef = yield* Ref.make(initialTurnBudgetState);
-      const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, budgetRef, rateLimiter, clientKey);
+      const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, clientKey);
       return { harness, session: AgentSession.make(harness) };
     });
 

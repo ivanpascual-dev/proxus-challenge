@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { TutorChatStreamEvent, type TutorChatRequest, type TutorChatStreamEvent as TutorChatStreamEventType } from "@proxus/shared";
 import { apiClientConfig } from "../../api-client/config.ts";
+import { errorFromResponse } from "../../lib/stream-error.ts";
 
 const TutorChatStreamEventFromJsonString = Schema.fromJsonString(TutorChatStreamEvent);
 const decodeEvent = Schema.decodeUnknownSync(TutorChatStreamEventFromJsonString);
@@ -16,7 +17,7 @@ export async function* streamTutorMessage(input: TutorChatRequest): AsyncGenerat
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw await errorFromResponse(response);
   }
 
   if (response.body === null) {

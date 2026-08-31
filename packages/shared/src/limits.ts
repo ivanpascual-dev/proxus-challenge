@@ -20,6 +20,40 @@ export const LIMITS = {
   artifactsPerDay: { limit: 40, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
 
+  // Pruebas (fase 3)
+  // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.
+  questionsPerQuiz: { min: 4, max: 8, default: 6 },
+  questionsPerTest: { min: 10, max: 30, default: 20 },
+
+  // Cuántas pruebas y cuántos intentos.
+  maxQuizzesPerTopic: 2, // por tema, no por material: el techo va donde va el alcance del Control
+  maxTestsPerMaterial: 2, // por modo: 2 Exámenes de prueba y 2 Exámenes reales por material
+  maxPracticeAttemptsPerAssessment: 3,
+  maxExamAttemptsPerAssessment: 3,
+
+  // Generación: se completa hasta el número pedido o se falla (decisión 21).
+  maxGenerationRetriesPerTopic: 2,
+
+  maxHintCharacters: 300,
+  maxOpenAnswerCharacters: 1_500,
+  maxRubricCriteria: 5,
+  maxJudgeCallsPerAttempt: 8, // el reparto acota el Examen más grande a 6; esto es el fusible
+  examSecondsPerQuestion: {
+    "multiple-choice": 60,
+    "multiple-response": 90,
+    "true-false": 30,
+    "short-answer": 120
+  },
+  examReviewSeconds: 300,
+  examHeartbeatIntervalMs: 15_000, // mide el tiempo conectado; no cancela nada (decisión 19c)
+  // Un silencio del latido más largo que esto es una interrupción: el hueco no cuenta como tiempo
+  // conectado y se guarda en `interruptions` (decisión 19c). Tres latidos perdidos.
+  examInterruptionThresholdMs: 45_000,
+  // Margen sobre el tiempo límite dentro del cual el servidor todavía acepta una entrega: cubre la
+  // latencia de red y el desfase de reloj de la entrega automática del cliente. Pasado esto, 409
+  // `TimeLimitExceeded` (decisión 9: quien decide si llegó tarde es el servidor).
+  examSubmitGraceSeconds: 15,
+
   // Tamaño de salida
   maxQuestionsPerArtifact: 50,
   maxBlocksPerNote: 200,
@@ -34,6 +68,7 @@ export const LIMITS = {
 
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
+  jsonModelTemperature: 0, // camino JSON (generación de preguntas y juez): 0 para corregir igual dos veces (ADR-008, capa 4)
   maxModelOutputTokens: 8_192,
 
   // Tiempo

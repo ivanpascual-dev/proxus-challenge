@@ -1,8 +1,13 @@
-// El adaptador de Gemini (domain/agents/gemini.ts) no manda generationConfig, así que no hay modo
-// JSON forzado: la respuesta puede venir con una valla de markdown o con texto alrededor. Este
-// parseo es defensivo. Si no se puede sacar un objeto, lanza, y quien llama declara el fallo
-// (failedPages para una página, IndexingError para la llamada de temas). Nunca devuelve un valor
-// neutro (invariante 3).
+// La capa viva del adaptador de Gemini (GeminiLanguageModelLive, la del tutor y la indexación) manda
+// `generationConfig` con temperatura y tope de salida, pero NO `responseMimeType` ni `responseSchema`,
+// así que no hay modo JSON forzado: la respuesta puede venir con una valla de markdown o con texto
+// alrededor. Este parseo es defensivo. Si no se puede sacar un objeto, lanza, y quien llama declara
+// el fallo (failedPages para una página, IndexingError para la llamada de temas). Nunca devuelve un
+// valor neutro (invariante 3).
+//
+// La generación de preguntas y el juez (fase 3) usan la otra capa, GeminiJsonLanguageModelLive, que
+// sí fuerza `application/json`. Aun así este parseo se sigue usando ahí: el modo JSON reduce los
+// fallos de formato, no los elimina (§6.7.1).
 
 export const parseModelJson = (raw: string): unknown => {
   const withoutFences = raw.replace(/```(?:json)?/gi, "").trim();

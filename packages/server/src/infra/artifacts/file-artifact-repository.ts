@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { LIMITS } from "@proxus/shared";
 import {
   Artifact,
   ArtifactAttempt,
@@ -6,14 +7,9 @@ import {
   ArtifactRepository,
   ArtifactRepositorySerializationError,
   ArtifactRepositoryStorageError,
-  ArtifactTypeMismatch,
   AttemptNotFound,
-  CreateArtifactInput,
   ListArtifactsInput,
-  SubmitAttemptInput,
-  gradeAttempt,
-  makeArtifact,
-  makeUngradedAttempt,
+  TooManyQuestions,
   type Artifact as ArtifactType,
   type ArtifactAttempt as ArtifactAttemptType,
   type ArtifactRepository as ArtifactRepositoryType,
@@ -70,6 +66,17 @@ export const FileArtifactRepository = {
     });
 
     const writeArtifactFile = (artifact: ArtifactType): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
+      // Techo duro del contrato (invariante 11, §5.7): se rechaza en voz alta al guardar, nunca se
+      // recorta en silencio. `questionsPerQuiz`/`questionsPerTest` son los rangos que ve el alumno;
+      // esto es el fusible de detrás.
+      if (artifact.kind !== "note" && artifact.questions.length > LIMITS.maxQuestionsPerArtifact) {
+        return yield* new TooManyQuestions({
+          artifactId: artifact.id,
+          ceiling: LIMITS.maxQuestionsPerArtifact,
+          received: artifact.questions.length
+        });
+      }
+
       const encoded = yield* Schema.encodeUnknownEffect(Artifact)(artifact).pipe(
         Effect.mapError(mapSerializationError)
       );
@@ -134,14 +141,6 @@ export const FileArtifactRepository = {
       };
     });
 
-    // `createArtifact` ya no crea apuntes (fase 2, decisión 25): solo quiz y test. El apunte lo genera
-    // `NoteGenerationService`, que comprueba el "un apunte por material" (decisión 19) antes de guardar.
-    const createArtifact = (input: CreateArtifactInput) => Effect.gen(function* () {
-      const artifact = makeArtifact(input);
-      yield* writeArtifactFile(artifact);
-      return artifact;
-    });
-
     const deleteArtifact = (id: string): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
       const filePath = artifactPath(id);
       const exists = yield* fs.exists(filePath).pipe(Effect.mapError(mapStorageError));
@@ -151,51 +150,31 @@ export const FileArtifactRepository = {
       yield* fs.remove(filePath).pipe(Effect.mapError(mapStorageError));
     });
 
-    const submitAttempt = (input: SubmitAttemptInput) => Effect.gen(function* () {
-      const artifact = yield* readArtifactFile(input.artifactId);
-      if (artifact.kind !== input.artifactKind) {
-        return yield* new ArtifactTypeMismatch({
-          artifactId: input.artifactId,
-          expected: input.artifactKind,
-          actual: artifact.kind
-        });
-      }
-
-      const attempt = makeUngradedAttempt(input);
-      yield* writeAttemptFile(attempt);
-      return attempt;
-    });
-
+    // Igual que `listArtifacts`: un fichero de intento ilegible (por ejemplo de una versión anterior
+    // del esquema) se salta y se registra con su motivo crudo en el log del servidor, en vez de
+    // tumbar el listado entero (invariante 3). El motivo técnico no viaja al cliente.
     const listAttempts = (artifactId?: string) => Effect.gen(function* () {
-      const files = yield* listFiles(attemptsDirectory);
-      const attempts = yield* Effect.all(
-        files.filter((file) => file.endsWith(".json")).map((file) => {
-          const attemptId = decodeURIComponent(file.replace(/\.json$/, ""));
-          return readAttemptFile(attemptId);
-        })
-      );
+      const files = (yield* listFiles(attemptsDirectory)).filter((file) => file.endsWith(".json"));
+      const [, attempts] = yield* Effect.partition(files, (file) => {
+        const attemptId = decodeURIComponent(file.replace(/\.json$/, ""));
+        return readAttemptFile(attemptId).pipe(
+          Effect.tapError((error) => Effect.logWarning(
+            `intento ilegible ${file}: ${String("reason" in error ? error.reason : error._tag)}`
+          )),
+          Effect.mapError(() => file)
+        );
+      });
       return attempts.filter((attempt) => artifactId === undefined || attempt.artifactId === artifactId);
     });
 
-    const gradeAttemptById = (attemptId: string) => Effect.gen(function* () {
-      const attempt = yield* readAttemptFile(attemptId);
-      const artifact = yield* readArtifactFile(attempt.artifactId);
-      const graded = yield* gradeAttempt(artifact, attempt);
-      yield* writeAttemptFile(graded);
-      return graded;
-    });
-
     return {
-      createArtifact,
       deleteArtifact,
       saveArtifact: writeArtifactFile,
       getArtifact: readArtifactFile,
       listArtifacts,
-      submitAttempt,
       saveAttempt: writeAttemptFile,
       getAttempt: readAttemptFile,
-      listAttempts,
-      gradeAttempt: gradeAttemptById
+      listAttempts
     };
   }),
   layer: (directory: string) => Layer.effect(ArtifactRepository)(FileArtifactRepository.make(directory))

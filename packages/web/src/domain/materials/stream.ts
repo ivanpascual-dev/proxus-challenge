@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { MaterialIndexStreamEvent, type MaterialIndexStreamEvent as MaterialIndexStreamEventType } from "@proxus/shared";
 import { apiClientConfig } from "../../api-client/config.ts";
+import { errorFromResponse } from "../../lib/stream-error.ts";
 
 const decodeEvent = Schema.decodeUnknownSync(Schema.fromJsonString(MaterialIndexStreamEvent));
 
@@ -13,7 +14,7 @@ export async function* streamReindexMaterial(materialId: string): AsyncGenerator
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw await errorFromResponse(response);
   }
   if (response.body === null) {
     throw new Error("La respuesta de indexación no trae cuerpo");

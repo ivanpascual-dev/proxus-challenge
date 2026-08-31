@@ -1,4 +1,4 @@
-import { Context, Data, Effect, Number as EffectNumber, Schema } from "effect";
+import { Context, Data, Effect, Schema } from "effect";
 
 // Los esquemas del apunte por bloques. Mirror palabra por palabra de
 // `packages/shared/src/schemas/note.ts`: el servidor decodifica el fichero de disco con esta copia y
@@ -76,11 +76,48 @@ export const SaveNoteInput = Schema.Struct({
 });
 export type SaveNoteInput = typeof SaveNoteInput.Type;
 
+// --- Pruebas (fase 3) --------------------------------------------------------
+// Mirror palabra por palabra de `packages/shared/src/schemas/artifact.ts`. Ver la nota de arriba.
+
 export const QuestionOption = Schema.Struct({
   id: Schema.String,
   text: Schema.String
 });
 export type QuestionOption = typeof QuestionOption.Type;
+
+// El motivo por el que una pregunta entra en una generación de repaso (§6.11, F3-33): la señal del
+// perfil que más pesó en su tema. `null` = la pregunta es de una generación de material, no de
+// repaso. La interfaz lo enseña por pregunta, nunca un número resumen (invariante 5, ADR-003).
+export const QuestionReviewReason = Schema.Union([
+  Schema.Literal("fallada"),
+  Schema.Literal("pista"),
+  Schema.Literal("marcada")
+]);
+export type QuestionReviewReason = typeof QuestionReviewReason.Type;
+
+// La cita de una pregunta. La COPIA el código del índice del material (decisión 5, F2-09), nunca la
+// propone el modelo. `transcribed` marca que alguna página citada viene de una transcripción del
+// modelo (invariante 8); `unanchoredReason` no nulo significa que la cita no se pudo comprobar y la
+// interfaz lo enseña (invariante 2: ni se descarta ni se publica en silencio).
+export const QuestionSource = Schema.Struct({
+  materialId: Schema.String,
+  topicId: Schema.String,
+  pages: Schema.Array(Schema.Number),
+  transcribed: Schema.Boolean,
+  unanchoredReason: Schema.NullOr(Schema.String),
+  // `null` salvo en una prueba de repaso: entonces dice qué señal del perfil trajo la pregunta.
+  reviewReason: Schema.NullOr(QuestionReviewReason)
+});
+export type QuestionSource = typeof QuestionSource.Type;
+
+// Un criterio de la rúbrica de un desarrollo corto. El `id` (`c1`, `c2`, …) lo pone el código, no el
+// modelo (decisión 20b): así no hay ningún nombre que se pueda desincronizar entre la pregunta y la
+// corrección.
+export const RubricCriterion = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String
+});
+export type RubricCriterion = typeof RubricCriterion.Type;
 
 export const MultipleChoiceQuestion = Schema.Struct({
   type: Schema.Literal("multiple-choice"),
@@ -88,16 +125,34 @@ export const MultipleChoiceQuestion = Schema.Struct({
   prompt: Schema.String,
   options: Schema.Array(QuestionOption),
   correctOptionId: Schema.String,
-  explanation: Schema.String
+  explanation: Schema.String,
+  hint: Schema.NullOr(Schema.String),
+  source: QuestionSource
 });
 export type MultipleChoiceQuestion = typeof MultipleChoiceQuestion.Type;
+
+// Varias opciones, dos o más correctas (decisión 13). Solo entra en un Examen, no en un Control
+// (§6.2). `correctOptionIds` casa contra los ids de `options`, que pone el código por posición.
+export const MultipleResponseQuestion = Schema.Struct({
+  type: Schema.Literal("multiple-response"),
+  id: Schema.String,
+  prompt: Schema.String,
+  options: Schema.Array(QuestionOption),
+  correctOptionIds: Schema.Array(Schema.String),
+  explanation: Schema.String,
+  hint: Schema.NullOr(Schema.String),
+  source: QuestionSource
+});
+export type MultipleResponseQuestion = typeof MultipleResponseQuestion.Type;
 
 export const TrueFalseQuestion = Schema.Struct({
   type: Schema.Literal("true-false"),
   id: Schema.String,
   prompt: Schema.String,
   correctAnswer: Schema.Boolean,
-  explanation: Schema.String
+  explanation: Schema.String,
+  hint: Schema.NullOr(Schema.String),
+  source: QuestionSource
 });
 export type TrueFalseQuestion = typeof TrueFalseQuestion.Type;
 
@@ -106,22 +161,40 @@ export const ShortAnswerQuestion = Schema.Struct({
   id: Schema.String,
   prompt: Schema.String,
   expectedAnswer: Schema.String,
-  maxScore: Schema.Number
+  maxScore: Schema.Number,
+  hint: Schema.NullOr(Schema.String),
+  rubric: Schema.Array(RubricCriterion),
+  source: QuestionSource
 });
 export type ShortAnswerQuestion = typeof ShortAnswerQuestion.Type;
 
 export const QuizQuestion = Schema.Union([
   MultipleChoiceQuestion,
-  TrueFalseQuestion
+  TrueFalseQuestion,
+  ShortAnswerQuestion
 ]);
 export type QuizQuestion = typeof QuizQuestion.Type;
 
 export const TestQuestion = Schema.Union([
   MultipleChoiceQuestion,
+  MultipleResponseQuestion,
   TrueFalseQuestion,
   ShortAnswerQuestion
 ]);
 export type TestQuestion = typeof TestQuestion.Type;
+
+export const AssessmentScope = Schema.Struct({
+  materialId: Schema.String,
+  topicId: Schema.NullOr(Schema.String),
+  topicLabel: Schema.String
+});
+export type AssessmentScope = typeof AssessmentScope.Type;
+
+export const AssessmentOrigin = Schema.Union([
+  Schema.Literal("material"),
+  Schema.Literal("review")
+]);
+export type AssessmentOrigin = typeof AssessmentOrigin.Type;
 
 export const NoteArtifact = Schema.Struct({
   kind: Schema.Literal("note"),
@@ -133,11 +206,24 @@ export const NoteArtifact = Schema.Struct({
 });
 export type NoteArtifact = typeof NoteArtifact.Type;
 
+// El modo de una prueba lo fija su generación y vive en el artefacto (ADR que anula la decisión 6 del
+// plan de fase 3). El intento hereda su `mode` de aquí, no lo elige quien empieza.
+export const AssessmentMode = Schema.Union([
+  Schema.Literal("practice"),
+  Schema.Literal("exam")
+]);
+export type AssessmentMode = typeof AssessmentMode.Type;
+
 export const QuizArtifact = Schema.Struct({
   kind: Schema.Literal("quiz"),
   id: Schema.String,
   title: Schema.String,
-  questions: Schema.Array(QuizQuestion)
+  questions: Schema.Array(QuizQuestion),
+  scope: AssessmentScope,
+  origin: AssessmentOrigin,
+  createdAt: Schema.String,
+  // El Control es siempre de práctica: no lleva `mode`.
+  examTimeLimitSeconds: Schema.Number
 });
 export type QuizArtifact = typeof QuizArtifact.Type;
 
@@ -145,7 +231,13 @@ export const TestArtifact = Schema.Struct({
   kind: Schema.Literal("test"),
   id: Schema.String,
   title: Schema.String,
-  questions: Schema.Array(TestQuestion)
+  questions: Schema.Array(TestQuestion),
+  scope: AssessmentScope,
+  origin: AssessmentOrigin,
+  createdAt: Schema.String,
+  examTimeLimitSeconds: Schema.Number,
+  // "practice" = de prueba (a libro abierto); "exam" = real (puerta cerrada, sin pistas).
+  mode: AssessmentMode
 });
 export type TestArtifact = typeof TestArtifact.Type;
 
@@ -157,28 +249,10 @@ export const Artifact = Schema.Union([
 export type Artifact = typeof Artifact.Type;
 export type ArtifactKind = Artifact["kind"];
 
-// Fase 2, decisión 25: el agente ya no crea apuntes. La generación es un servicio del dominio
-// (`NoteGenerationService`) con su ruta HTTP, no `artifacts create`. Un apunte se edita luego bloque a
-// bloque con `SaveNoteInput`. Por eso `CreateArtifactInput` solo tiene quiz y test.
-export const CreateQuizArtifactInput = Schema.Struct({
-  kind: Schema.Literal("quiz"),
-  title: Schema.String,
-  questions: Schema.Array(QuizQuestion)
-});
-export type CreateQuizArtifactInput = typeof CreateQuizArtifactInput.Type;
-
-export const CreateTestArtifactInput = Schema.Struct({
-  kind: Schema.Literal("test"),
-  title: Schema.String,
-  questions: Schema.Array(TestQuestion)
-});
-export type CreateTestArtifactInput = typeof CreateTestArtifactInput.Type;
-
-export const CreateArtifactInput = Schema.Union([
-  CreateQuizArtifactInput,
-  CreateTestArtifactInput
-]);
-export type CreateArtifactInput = typeof CreateArtifactInput.Type;
+// Fase 2, decisión 25: el agente ya no crea apuntes. Fase 3, decisiones 4 y 7: el agente tampoco crea
+// Controles ni Exámenes, ni entrega, ni corrige intentos. Solo el alumno, desde la interfaz, genera
+// intentos que muevan el perfil (§1.3). Los Controles y Exámenes se generan con
+// `AssessmentGenerationService` y su ruta; los intentos, con `AttemptService`.
 
 export const MultipleChoiceAnswer = Schema.Struct({
   questionType: Schema.Literal("multiple-choice"),
@@ -186,6 +260,13 @@ export const MultipleChoiceAnswer = Schema.Struct({
   selectedOptionId: Schema.String
 });
 export type MultipleChoiceAnswer = typeof MultipleChoiceAnswer.Type;
+
+export const MultipleResponseAnswer = Schema.Struct({
+  questionType: Schema.Literal("multiple-response"),
+  questionId: Schema.String,
+  selectedOptionIds: Schema.Array(Schema.String)
+});
+export type MultipleResponseAnswer = typeof MultipleResponseAnswer.Type;
 
 export const TrueFalseAnswer = Schema.Struct({
   questionType: Schema.Literal("true-false"),
@@ -203,16 +284,26 @@ export type ShortAnswerAnswer = typeof ShortAnswerAnswer.Type;
 
 export const QuizAnswer = Schema.Union([
   MultipleChoiceAnswer,
-  TrueFalseAnswer
+  TrueFalseAnswer,
+  ShortAnswerAnswer
 ]);
 export type QuizAnswer = typeof QuizAnswer.Type;
 
 export const TestAnswer = Schema.Union([
   MultipleChoiceAnswer,
+  MultipleResponseAnswer,
   TrueFalseAnswer,
   ShortAnswerAnswer
 ]);
 export type TestAnswer = typeof TestAnswer.Type;
+
+export const AttemptAnswer = Schema.Union([
+  MultipleChoiceAnswer,
+  MultipleResponseAnswer,
+  TrueFalseAnswer,
+  ShortAnswerAnswer
+]);
+export type AttemptAnswer = typeof AttemptAnswer.Type;
 
 export const MultipleChoiceCorrection = Schema.Struct({
   questionType: Schema.Literal("multiple-choice"),
@@ -224,6 +315,20 @@ export const MultipleChoiceCorrection = Schema.Struct({
 });
 export type MultipleChoiceCorrection = typeof MultipleChoiceCorrection.Type;
 
+// Crédito parcial con suelo en cero en la nota mostrada; `fullyCorrect` (todo o nada) es lo que lee
+// el perfil (decisión 13). Las dos reglas van separadas a propósito.
+export const MultipleResponseCorrection = Schema.Struct({
+  questionType: Schema.Literal("multiple-response"),
+  questionId: Schema.String,
+  selectedOptionIds: Schema.Array(Schema.String),
+  correctOptionIds: Schema.Array(Schema.String),
+  score: Schema.Number,
+  maxScore: Schema.Number,
+  fullyCorrect: Schema.Boolean,
+  explanation: Schema.String
+});
+export type MultipleResponseCorrection = typeof MultipleResponseCorrection.Type;
+
 export const TrueFalseCorrection = Schema.Struct({
   questionType: Schema.Literal("true-false"),
   questionId: Schema.String,
@@ -234,99 +339,118 @@ export const TrueFalseCorrection = Schema.Struct({
 });
 export type TrueFalseCorrection = typeof TrueFalseCorrection.Type;
 
+export const RubricCriterionResult = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  met: Schema.Boolean
+});
+export type RubricCriterionResult = typeof RubricCriterionResult.Type;
+
+// `status: "graded"` = el juez pudo corregir y `score` tiene sentido. `"unevaluated"` = no era
+// corregible (rúbrica vacía, juez caído, sin relación con la pregunta): `score` es `null`, NO 0
+// (invariante 3). `"disputed"` = el alumno pulsó "esto sí lo dije" y la pregunta deja de mover el
+// perfil (§6.7, defensa 1).
 export const ShortAnswerCorrection = Schema.Struct({
   questionType: Schema.Literal("short-answer"),
   questionId: Schema.String,
-  score: Schema.Number,
+  status: Schema.Union([
+    Schema.Literal("graded"),
+    Schema.Literal("unevaluated"),
+    Schema.Literal("disputed")
+  ]),
+  score: Schema.NullOr(Schema.Number),
   maxScore: Schema.Number,
+  criteria: Schema.Array(RubricCriterionResult),
+  unevaluatedReason: Schema.NullOr(Schema.String),
   feedback: Schema.String
 });
 export type ShortAnswerCorrection = typeof ShortAnswerCorrection.Type;
 
+// Una pregunta que el alumno no respondió: cuenta en `maxScore` y no penaliza (§6.1). No responder
+// no es fallar, así que no es una corrección "incorrecta": es su propia clase.
+export const BlankCorrection = Schema.Struct({
+  questionType: Schema.Literal("blank"),
+  questionId: Schema.String,
+  maxScore: Schema.Number,
+  explanation: Schema.String
+});
+export type BlankCorrection = typeof BlankCorrection.Type;
+
 export const AutoQuestionCorrection = Schema.Union([
   MultipleChoiceCorrection,
+  MultipleResponseCorrection,
   TrueFalseCorrection
 ]);
 export type AutoQuestionCorrection = typeof AutoQuestionCorrection.Type;
 
 export const QuestionCorrection = Schema.Union([
   MultipleChoiceCorrection,
+  MultipleResponseCorrection,
   TrueFalseCorrection,
-  ShortAnswerCorrection
+  ShortAnswerCorrection,
+  BlankCorrection
 ]);
 export type QuestionCorrection = typeof QuestionCorrection.Type;
 
-export const UngradedQuizAttempt = Schema.Struct({
-  artifactKind: Schema.Literal("quiz"),
-  status: Schema.Literal("ungraded"),
+// El modo del intento es el de su prueba (`AssessmentMode`, arriba): el intento lo hereda del
+// artefacto.
+export const AttemptMode = AssessmentMode;
+export type AttemptMode = AssessmentMode;
+
+export const AttemptInterruption = Schema.Struct({
+  from: Schema.String,
+  to: Schema.String
+});
+export type AttemptInterruption = typeof AttemptInterruption.Type;
+
+const attemptBaseFields = {
   id: Schema.String,
   artifactId: Schema.String,
-  answers: Schema.Array(QuizAnswer)
-});
-export type UngradedQuizAttempt = typeof UngradedQuizAttempt.Type;
+  artifactKind: Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")]),
+  mode: AttemptMode,
+  startedAt: Schema.String,
+  timeLimitSeconds: Schema.NullOr(Schema.Number),
+  hintsRevealed: Schema.Array(Schema.String),
+  answers: Schema.Array(AttemptAnswer),
+  connectedSeconds: Schema.Number,
+  lastHeartbeatAt: Schema.NullOr(Schema.String),
+  interruptions: Schema.Array(AttemptInterruption)
+} as const;
 
-export const GradedQuizAttempt = Schema.Struct({
-  artifactKind: Schema.Literal("quiz"),
+export const InProgressAttempt = Schema.Struct({
+  ...attemptBaseFields,
+  status: Schema.Literal("in-progress")
+});
+export type InProgressAttempt = typeof InProgressAttempt.Type;
+
+export const GradedAttempt = Schema.Struct({
+  ...attemptBaseFields,
   status: Schema.Literal("graded"),
-  id: Schema.String,
-  artifactId: Schema.String,
-  answers: Schema.Array(QuizAnswer),
-  score: Schema.Number,
+  submittedAt: Schema.String,
+  elapsedSeconds: Schema.Number,
+  corrections: Schema.Array(QuestionCorrection),
+  rawScore: Schema.Number,
   maxScore: Schema.Number,
-  summary: Schema.String,
-  corrections: Schema.Array(AutoQuestionCorrection)
+  penalty: Schema.Number,
+  displayedScore: Schema.Number,
+  summary: Schema.String
 });
-export type GradedQuizAttempt = typeof GradedQuizAttempt.Type;
+export type GradedAttempt = typeof GradedAttempt.Type;
 
-export const UngradedTestAttempt = Schema.Struct({
-  artifactKind: Schema.Literal("test"),
-  status: Schema.Literal("ungraded"),
-  id: Schema.String,
-  artifactId: Schema.String,
-  answers: Schema.Array(TestAnswer)
+export const AbandonedAttempt = Schema.Struct({
+  ...attemptBaseFields,
+  status: Schema.Literal("abandoned"),
+  reason: Schema.Union([Schema.Literal("cancelled"), Schema.Literal("expired")]),
+  abandonedAt: Schema.String
 });
-export type UngradedTestAttempt = typeof UngradedTestAttempt.Type;
-
-export const GradedTestAttempt = Schema.Struct({
-  artifactKind: Schema.Literal("test"),
-  status: Schema.Literal("graded"),
-  id: Schema.String,
-  artifactId: Schema.String,
-  answers: Schema.Array(TestAnswer),
-  score: Schema.Number,
-  maxScore: Schema.Number,
-  summary: Schema.String,
-  corrections: Schema.Array(QuestionCorrection)
-});
-export type GradedTestAttempt = typeof GradedTestAttempt.Type;
+export type AbandonedAttempt = typeof AbandonedAttempt.Type;
 
 export const ArtifactAttempt = Schema.Union([
-  UngradedQuizAttempt,
-  GradedQuizAttempt,
-  UngradedTestAttempt,
-  GradedTestAttempt
+  InProgressAttempt,
+  GradedAttempt,
+  AbandonedAttempt
 ]);
 export type ArtifactAttempt = typeof ArtifactAttempt.Type;
-
-export const SubmitQuizAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("quiz"),
-  artifactId: Schema.String,
-  answers: Schema.Array(QuizAnswer)
-});
-export type SubmitQuizAttemptInput = typeof SubmitQuizAttemptInput.Type;
-
-export const SubmitTestAttemptInput = Schema.Struct({
-  artifactKind: Schema.Literal("test"),
-  artifactId: Schema.String,
-  answers: Schema.Array(TestAnswer)
-});
-export type SubmitTestAttemptInput = typeof SubmitTestAttemptInput.Type;
-
-export const SubmitAttemptInput = Schema.Union([
-  SubmitQuizAttemptInput,
-  SubmitTestAttemptInput
-]);
-export type SubmitAttemptInput = typeof SubmitAttemptInput.Type;
 
 export const ListArtifactsInput = Schema.Struct({
   kind: Schema.optional(Schema.Union([
@@ -385,6 +509,14 @@ export class MaterialAlreadyHasNote extends Data.TaggedError("MaterialAlreadyHas
   readonly noteId: string;
 }> {}
 
+// Se intentó guardar una prueba con más preguntas que `LIMITS.maxQuestionsPerArtifact` (invariante
+// 11). Se rechaza en voz alta al guardar, nunca se recorta en silencio.
+export class TooManyQuestions extends Data.TaggedError("TooManyQuestions")<{
+  readonly artifactId: string;
+  readonly ceiling: number;
+  readonly received: number;
+}> {}
+
 export class ArtifactRepositorySerializationError extends Data.TaggedError("ArtifactRepositorySerializationError")<{
   readonly reason: unknown;
 }> {}
@@ -395,208 +527,23 @@ export type ArtifactRepositoryError =
   | ArtifactTypeMismatch
   | QuestionNotFound
   | AnswerTypeMismatch
+  | TooManyQuestions
   | ArtifactRepositoryStorageError
   | ArtifactRepositorySerializationError;
 
 export interface ArtifactRepository {
-  readonly createArtifact: (input: CreateArtifactInput) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly saveArtifact: (artifact: Artifact) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getArtifact: (id: string) => Effect.Effect<Artifact, ArtifactRepositoryError>;
   readonly deleteArtifact: (id: string) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly listArtifacts: (input?: ListArtifactsInput) => Effect.Effect<ArtifactListing, ArtifactRepositoryError>;
-  readonly submitAttempt: (input: SubmitAttemptInput) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly saveAttempt: (attempt: ArtifactAttempt) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getAttempt: (id: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly listAttempts: (artifactId?: string) => Effect.Effect<readonly ArtifactAttempt[], ArtifactRepositoryError>;
-  readonly gradeAttempt: (attemptId: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
 }
 
 export const ArtifactRepository = Context.Service<ArtifactRepository>(
   "@proxus/server/artifacts/ArtifactRepository"
 );
 
-export const makeArtifact = (input: CreateArtifactInput): Artifact => {
-  const id = crypto.randomUUID();
-  switch (input.kind) {
-    case "quiz":
-      return { ...input, id };
-    case "test":
-      return { ...input, id };
-  }
-};
-
-export const makeUngradedAttempt = (input: SubmitAttemptInput): ArtifactAttempt => {
-  const id = crypto.randomUUID();
-  switch (input.artifactKind) {
-    case "quiz":
-      return { ...input, id, status: "ungraded" };
-    case "test":
-      return { ...input, id, status: "ungraded" };
-  }
-};
-
-export const gradeAttempt = (
-  artifact: Artifact,
-  attempt: ArtifactAttempt
-): Effect.Effect<ArtifactAttempt, ArtifactTypeMismatch | QuestionNotFound | AnswerTypeMismatch> => {
-  if (attempt.status === "graded") {
-    return Effect.succeed(attempt);
-  }
-
-  switch (attempt.artifactKind) {
-    case "quiz":
-      if (artifact.kind !== "quiz") {
-        return Effect.fail(new ArtifactTypeMismatch({ artifactId: artifact.id, expected: "quiz", actual: artifact.kind }));
-      }
-      return gradeQuizAttempt(artifact, attempt);
-    case "test":
-      if (artifact.kind !== "test") {
-        return Effect.fail(new ArtifactTypeMismatch({ artifactId: artifact.id, expected: "test", actual: artifact.kind }));
-      }
-      return gradeTestAttempt(artifact, attempt);
-  }
-};
-
-const gradeQuizAttempt = (
-  artifact: QuizArtifact,
-  attempt: UngradedQuizAttempt
-): Effect.Effect<GradedQuizAttempt, QuestionNotFound | AnswerTypeMismatch> => Effect.gen(function* () {
-  const corrections: AutoQuestionCorrection[] = [];
-
-  for (const answer of attempt.answers) {
-    const question = yield* findQuestion(artifact.questions, answer.questionId);
-    corrections.push(yield* correctAutoQuestion(question, answer));
-  }
-
-  const { score, maxScore } = scoreAutoCorrections(corrections);
-  return {
-    ...attempt,
-    status: "graded" as const,
-    score,
-    maxScore,
-    summary: `${score}/${maxScore} correct`,
-    corrections
-  };
-});
-
-const gradeTestAttempt = (
-  artifact: TestArtifact,
-  attempt: UngradedTestAttempt
-): Effect.Effect<GradedTestAttempt, QuestionNotFound | AnswerTypeMismatch> => Effect.gen(function* () {
-  const corrections: QuestionCorrection[] = [];
-
-  for (const answer of attempt.answers) {
-    const question = yield* findQuestion(artifact.questions, answer.questionId);
-    corrections.push(yield* correctQuestion(question, answer));
-  }
-
-  const { score, maxScore } = scoreQuestionCorrections(corrections);
-  return {
-    ...attempt,
-    status: "graded" as const,
-    score,
-    maxScore,
-    summary: `${score}/${maxScore} points`,
-    corrections
-  };
-});
-
-const findQuestion = <Q extends QuizQuestion | TestQuestion>(
-  questions: readonly Q[],
-  questionId: string
-): Effect.Effect<Q, QuestionNotFound> => {
-  const question = questions.find((candidate) => candidate.id === questionId);
-  return question === undefined
-    ? Effect.fail(new QuestionNotFound({ questionId }))
-    : Effect.succeed(question);
-};
-
-const correctAutoQuestion = (
-  question: QuizQuestion,
-  answer: QuizAnswer
-): Effect.Effect<AutoQuestionCorrection, AnswerTypeMismatch> => {
-  switch (question.type) {
-    case "multiple-choice":
-      if (answer.questionType !== "multiple-choice") {
-        return Effect.fail(new AnswerTypeMismatch({ questionId: question.id, expected: question.type, actual: answer.questionType }));
-      }
-      return Effect.succeed({
-        questionType: "multiple-choice" as const,
-        questionId: question.id,
-        correct: answer.selectedOptionId === question.correctOptionId,
-        selectedOptionId: answer.selectedOptionId,
-        correctOptionId: question.correctOptionId,
-        explanation: question.explanation
-      });
-    case "true-false":
-      if (answer.questionType !== "true-false") {
-        return Effect.fail(new AnswerTypeMismatch({ questionId: question.id, expected: question.type, actual: answer.questionType }));
-      }
-      return Effect.succeed({
-        questionType: "true-false" as const,
-        questionId: question.id,
-        correct: answer.answer === question.correctAnswer,
-        answer: answer.answer,
-        correctAnswer: question.correctAnswer,
-        explanation: question.explanation
-      });
-  }
-};
-
-const correctQuestion = (
-  question: TestQuestion,
-  answer: TestAnswer
-): Effect.Effect<QuestionCorrection, AnswerTypeMismatch> => {
-  if (question.type === "short-answer") {
-    if (answer.questionType !== "short-answer") {
-      return Effect.fail(new AnswerTypeMismatch({ questionId: question.id, expected: question.type, actual: answer.questionType }));
-    }
-
-    const correct = normalizeAnswer(answer.answer) === normalizeAnswer(question.expectedAnswer);
-    return Effect.succeed({
-      questionType: "short-answer" as const,
-      questionId: question.id,
-      score: correct ? question.maxScore : 0,
-      maxScore: question.maxScore,
-      feedback: correct
-        ? "Answer matches the expected answer."
-        : `Expected: ${question.expectedAnswer}`
-    });
-  }
-
-  return correctAutoQuestion(question, answer as QuizAnswer);
-};
-
-const normalizeAnswer = (answer: string) => answer.trim().toLocaleLowerCase();
-
-export const scoreAutoCorrections = (corrections: readonly AutoQuestionCorrection[]) => ({
-  score: EffectNumber.sumAll(corrections.map((correction) => correction.correct ? 1 : 0)),
-  maxScore: corrections.length
-});
-
-export const scoreQuestionCorrections = (corrections: readonly QuestionCorrection[]) => {
-  const score = EffectNumber.sumAll(corrections.map((correction) => {
-    switch (correction.questionType) {
-      case "multiple-choice":
-      case "true-false":
-        return correction.correct ? 1 : 0;
-      case "short-answer":
-        return correction.score;
-    }
-  }));
-
-  const maxScore = EffectNumber.sumAll(corrections.map((correction) => {
-    switch (correction.questionType) {
-      case "multiple-choice":
-      case "true-false":
-        return 1;
-      case "short-answer":
-        return correction.maxScore;
-    }
-  }));
-
-  return {
-    score: EffectNumber.clamp(score, { minimum: 0, maximum: maxScore }),
-    maxScore
-  };
-};
+// El intento se crea en el servidor al empezarlo (decisión 8), con `AttemptService.start`. No hay
+// ningún camino por el que el tutor sintetice un intento (decisión 7).

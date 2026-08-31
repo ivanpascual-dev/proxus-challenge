@@ -12,6 +12,7 @@ import {
   type DraftBlock,
   type NoteDraft
 } from "./draft.ts";
+import { messageOf } from "../../lib/error-message.ts";
 
 type NoteArtifact = Extract<Artifact, { readonly kind: "note" }>;
 
@@ -100,7 +101,7 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
       }
       setDirty(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setIsSaving(false);
     }
@@ -114,7 +115,9 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
           className="w-full rounded-2xl border border-border-strong bg-canvas p-2 font-bold text-2xl text-heading outline-none focus:border-brand"
           value={draft.title}
           onChange={(event) => {
-            setDraft((current) => ({ ...current, title: event.currentTarget.value }));
+            // Se lee ya, no dentro del updater: React anula `currentTarget` al retornar el handler.
+            const title = event.currentTarget.value;
+            setDraft((current) => ({ ...current, title }));
             setDirty(true);
           }}
           aria-label="Título de los apuntes"

@@ -3,6 +3,7 @@ import type { MaterialBlockSource } from "@proxus/shared";
 import { useState, type ReactNode } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialPageKey, materialPageQuery } from "../../domain/materials/atoms.ts";
+import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
 
 interface BlockCitationProps {
   readonly source: MaterialBlockSource;
@@ -76,8 +77,8 @@ function CitedPage({ materialId, page }: { readonly materialId: string; readonly
       <figcaption className="mb-1 text-muted text-xs">Página {page}</figcaption>
       {AsyncResult.matchWithError(image, {
         onInitial: () => <PageBox>Cargando la página {page}…</PageBox>,
-        onError: (error) => <PageBox tone="error">No se pudo cargar la página {page}. {String(error)}</PageBox>,
-        onDefect: (defect) => <PageBox tone="error">No se pudo cargar la página {page}. {String(defect)}</PageBox>,
+        onError: (error) => <PageBox tone="error">No se pudo cargar la página {page}. {messageOf(error)}</PageBox>,
+        onDefect: (defect) => <PageBox tone="error">No se pudo cargar la página {page}. {DEFECT_MESSAGE}</PageBox>,
         onSuccess: ({ value }) => (
           <img src={value.data} alt={`Página ${page}`} className="w-full rounded-lg border border-border" loading="lazy" />
         )

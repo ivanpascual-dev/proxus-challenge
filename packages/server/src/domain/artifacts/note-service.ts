@@ -109,15 +109,17 @@ export interface NoteService {
 
 export const NoteService = Context.Service<NoteService>("@proxus/server/artifacts/NoteService");
 
-const storageError = (reason: unknown) =>
+// El mensaje al usuario dice qué falló, no cómo: el motivo crudo (ruta, SchemaError, `_tag`) es fuga
+// de detalle interno y no le sirve de nada. El detalle técnico va al log del servidor.
+const storageError = () =>
   new ApiArtifactStorageError({
-    message: `No se pudo leer o escribir el apunte en el almacenamiento: ${String(reason)}`
+    message: "No se pudieron guardar o leer los cambios del apunte. Vuelve a intentarlo en un momento."
   });
 
 const repositoryFailure = (id: string) => (error: ArtifactRepositoryError): ApiArtifactNotFound | ApiArtifactStorageError =>
   error._tag === "ArtifactNotFound"
     ? new ApiArtifactNotFound({ artifactId: id, message: `No hay ningún artefacto con id ${id}.` })
-    : storageError("reason" in error ? error.reason : error._tag);
+    : storageError();
 
 type IndexLookup =
   | { readonly ok: true; readonly index: MaterialIndex }
@@ -184,7 +186,7 @@ export const make = (repository: ArtifactRepository, materials: MaterialReposito
   );
 
   const persist = (note: NoteArtifact) => repository.saveArtifact(note).pipe(
-    Effect.mapError((error) => storageError(error._tag)),
+    Effect.mapError(() => storageError()),
     Effect.as(note)
   );
 
@@ -205,7 +207,7 @@ export const make = (repository: ArtifactRepository, materials: MaterialReposito
         source: resolveInputSource(operation.source ?? null)
       };
       const [block] = yield* resolveSources([draft]).pipe(
-        Effect.mapError((error) => storageError(`índice del material: ${String(error.reason)}`))
+        Effect.mapError(() => storageError())
       );
       proposalOperation = { type: "insert", afterBlockId: operation.afterBlockId, block: block! };
     } else {
@@ -264,11 +266,11 @@ export const make = (repository: ArtifactRepository, materials: MaterialReposito
     }
 
     const withSources = yield* resolveSources(blocks.success).pipe(
-      Effect.mapError((error) => storageError(`índice del material: ${String(error.reason)}`))
+      Effect.mapError(() => storageError())
     );
 
     const saved: NoteArtifact = { ...artifact, title: input.title, blocks: withSources };
-    yield* repository.saveArtifact(saved).pipe(Effect.mapError((error) => storageError(error._tag)));
+    yield* repository.saveArtifact(saved).pipe(Effect.mapError(() => storageError()));
     return saved;
   });
 

@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { NoteGenerationStreamEvent, type NoteGenerationStreamEvent as NoteGenerationStreamEventType } from "@proxus/shared";
 import { apiClientConfig } from "../../api-client/config.ts";
+import { errorFromResponse } from "../../lib/stream-error.ts";
 
 const decodeEvent = Schema.decodeUnknownSync(Schema.fromJsonString(NoteGenerationStreamEvent));
 
@@ -15,17 +16,7 @@ export async function* streamGenerateNotes(materialId: string): AsyncGenerator<N
 
   if (!response.ok) {
     // 409 (el material ya tiene apunte) y 429 (frecuencia) llegan como JSON con `message`.
-    const raw = await response.text();
-    let message = raw;
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (parsed !== null && typeof parsed === "object" && "message" in parsed && typeof parsed.message === "string") {
-        message = parsed.message;
-      }
-    } catch {
-      // no era JSON: se usa el texto tal cual
-    }
-    throw new Error(message);
+    throw await errorFromResponse(response);
   }
   if (response.body === null) {
     throw new Error("La respuesta de generación de apuntes no trae cuerpo");

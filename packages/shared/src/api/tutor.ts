@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { AgentMessage } from "../schemas/agent-message.ts";
 import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
+import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 export const TutorChatRequest = Schema.Struct({
   messages: Schema.Array(AgentMessage),
@@ -37,5 +38,6 @@ export class TutorApi extends HttpApiGroup.make("tutor")
       RateLimited.pipe(HttpApiSchema.status(429))
     ]
   }))
+  .middleware(ExamLockdownGuard)
   .prefix("/tutor")
 {}

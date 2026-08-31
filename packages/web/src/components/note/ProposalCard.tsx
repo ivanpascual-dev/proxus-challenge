@@ -3,6 +3,7 @@ import type { NoteBlock, NoteProposal } from "@proxus/shared";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { acceptProposalAction, rejectProposalAction } from "../../domain/artifacts/atoms.ts";
+import { messageOf } from "../../lib/error-message.ts";
 
 interface ProposalCardProps {
   readonly artifactId: string;
@@ -46,7 +47,7 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
         await reject({ id: artifactId, proposalId: proposal.id });
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setBusy(null);
     }

@@ -1,4 +1,4 @@
-import type { ArtifactKind, RewriteMode, SaveNoteInput, SubmitAttemptInput } from "@proxus/shared";
+import type { ArtifactKind, RewriteMode, SaveNoteInput } from "@proxus/shared";
 import { Effect } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { ApiClient } from "../../api-client/client.ts";
@@ -95,20 +95,5 @@ export const rejectProposalAction = apiRuntime.fn(
 // y así el apunte abierto (`artifactQuery(id)`) y las listas se recargan al momento.
 export const invalidateArtifactsAction = apiRuntime.fn(
   (_: void) => Effect.void,
-  { reactivityKeys: ["artifacts"] }
-);
-
-export const submitArtifactAttemptAction = apiRuntime.fn(
-  (input: SubmitAttemptInput) =>
-    ApiClient.use((client) => input.artifactKind === "quiz"
-      ? client.artifacts.submit({
-          params: { id: input.artifactId },
-          payload: input
-        })
-      : client.artifacts.submit({
-          params: { id: input.artifactId },
-          payload: input
-        })
-    ).pipe(Effect.withSpan("artifacts.submit", { kind: "client" })),
   { reactivityKeys: ["artifacts"] }
 );

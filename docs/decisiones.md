@@ -163,6 +163,15 @@ endpoint y los mapea. Los seis heredados se sustituyen en los endpoints que toqu
 está indexado", que es media línea de la evaluación ("manejo de errores"). Los `orDie` que queden fuera
 de nuestro camino se declaran como deuda conocida y no se disimulan.
 
+**Enmienda (2026-08-30).** Declarar el error no basta: el `message` que llega a la pantalla dice qué ha
+fallado y qué hacer, nunca cómo. El motivo crudo (un `SchemaError`, una ruta de fichero, un `_tag`, un
+`ECONNREFUSED`, "revisa el log") es ruido para quien lee y, en un fallo del servidor, fuga de detalle
+interno. Ese detalle se registra con `Effect.logWarning` en el punto donde se produce y no viaja en la
+respuesta. En la web, `messageOf(cause)` y `errorFromResponse(response)` (`packages/web/src/lib/`) son
+el único camino del error a la interfaz, y un `defect` se enseña siempre como texto genérico.
+Generaliza lo que el repo ya hacía en un solo sitio (`file-artifact-repository.ts`, "fase 2,
+decisión 28").
+
 ---
 
 ## ADR-006 · El contexto que recibe el agente es explícito y visible
@@ -705,7 +714,9 @@ solo `text/html` y `text/plain`; y extracción de texto con una función pura y 
 
 ## ADR-016 · El tutor autora lo abierto; transformar un material es un servicio con ruta
 
-- **Estado:** aceptada
+- **Estado:** aceptada; el límite "el tutor autora quiz y test" lo revierte la fase 3 (ADR-019, ADR-022,
+  decisión 4): el tutor ya no crea ningún artefacto, las pruebas salen de la pestaña Pruebas con su
+  ruta. La skill se renombró de `create-study-artifacts` a `use-study-assessments`.
 - **Fecha:** 2026-08-29
 
 **Contexto.** La fase 2 añade la generación de apuntes. La primera versión la hacía el tutor: un
@@ -730,7 +741,7 @@ dispara.
   falló y motivó sacar la generación del agente.
 
 **Decisión.** Generar apuntes es un **servicio del dominio con su ruta** (`POST /api/materials/:id/notes`,
-progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `create-study-artifacts` le
+progreso NDJSON), igual que indexar. El tutor **no** crea apuntes: la skill `use-study-assessments` le
 dice que se generan desde la pestaña "Apuntes" del material y que remita ahí a quien se lo pida.
 
 El límite general: **el tutor autora lo que tiene forma abierta y se pide conversando** (quiz y test;
@@ -799,3 +810,242 @@ valore si compensan tocar el contrato del bloque y el render.
 - La tabla solo se edita dentro de los límites GFM: quitar fila o columna va siempre por el extremo,
   para no borrar la fila de cabecera ni la primera columna (una tabla sin cabecera se serializaría
   como HTML). El menú «/» está deshabilitado dentro de una tabla.
+
+## ADR-018 · El modo de una prueba lo fija su generación y vive en el artefacto
+
+- **Estado:** aceptada (anula la decisión 6 del plan de fase 3)
+- **Fecha:** 2026-08-30
+
+**Contexto.** El plan de la fase 3 cerró en su decisión 6 que «el modo (práctica o examen) es del
+intento, no del artefacto»: el mismo Control se practicaría hoy y se examinaría mañana, y el artefacto
+solo guardaría los parámetros de examen que el código deriva del reparto de preguntas. Al construir el
+tramo 3C (el examen) esa forma se reveló equivocada:
+
+- Un Examen real se genera **sin pistas** (F3-15). La ausencia de pistas es una propiedad del
+  artefacto, no del intento: si el modo lo elige quien empieza, un Examen «real» abierto tendría
+  pistas guardadas que no se sirven, y un Control «examinado» no tendría ninguna que ocultar. Los dos
+  objetos no son el mismo con otro reloj.
+- El techo `maxTestsPerMaterial` no distinguía Examen de prueba de Examen real, cuando son cantidades
+  con intención distinta.
+- La pestaña Pruebas necesita enrutar desde el listado (`AssessmentListEntry`): el Examen real va a un
+  panel a pantalla completa, y eso hay que saberlo antes de abrir ningún intento.
+
+**Opciones consideradas.**
+
+- **Mantener la decisión 6** (modo del intento). Descartada: obliga a generar toda prueba con pistas y
+  a decidir «sin pistas» en tiempo de intento, lo que choca con F3-15 y con que la pista es contenido
+  que el modelo redacta al generar.
+- **Dos `kind` de artefacto distintos** (`test` y `exam`). Descartada: duplica los esquemas espejo y
+  el enrutado, cuando el reparto de preguntas, la cita y la corrección son idénticos.
+
+**Decisión.** El modo lo fija la **generación** y vive en el artefacto.
+
+- `AssessmentMode` = `"practice" | "exam"`, en el contrato compartido (`schemas/artifact.ts`) y su
+  espejo del servidor.
+- El **Control** (`quiz`) es siempre de práctica: no lleva `mode`.
+- El **Examen** (`test`) lleva `mode`: `"practice"` es un Examen **de prueba** (a libro abierto, con
+  pistas); `"exam"` es un Examen **real** (puerta cerrada, reloj, penalización, generado sin pistas).
+- `GenerateAssessmentInput` gana `mode`, que elige quien genera el Examen.
+- El **intento** sigue teniendo su `mode`, pero lo **hereda** del artefacto (`test` → `artifact.mode`;
+  `quiz` → `"practice"`). `AttemptMode` pasa a ser un alias de `AssessmentMode`.
+- Empezar un intento **no lleva cuerpo**: `StartAttemptInput` se elimina y `POST /:id/attempts` se
+  queda sin payload.
+- `maxTestsPerMaterial` baja de 4 a 2 y cuenta **por modo**: 2 Exámenes de prueba y 2 reales por
+  material.
+
+**Consecuencias.**
+
+- El generador sin pistas del Examen real (siguiente commit del tramo) se apoya en `artifact.mode`.
+- `AssessmentListEntry` gana `mode` y la pestaña Pruebas puede enrutar el Examen real a pantalla
+  completa sin abrir el intento.
+- El plan de fase 3 §11 corre sus ADR reservados un número: ADR-018 lo toma esta decisión, y los que
+  eran 018-021 pasan a 019-022.
+- Este commit mueve el contrato y el servidor y adapta la web para que compile. El selector de
+  prueba/real al generar y el panel del Examen real llegan en commits posteriores del tramo.
+
+---
+
+## ADR-019 · El código pone la forma de la prueba; el modelo redacta las preguntas
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-30
+
+**Contexto.** El adaptador de Gemini de este repo no manda `generationConfig` en el camino vivo, así
+que no hay modo JSON forzado garantizado: la respuesta puede venir con vallas de markdown o texto
+alrededor, y el parseo es defensivo ([`model-json.ts`](../packages/server/src/domain/materials/model-json.ts)).
+De ese hecho cuelga cómo se genera una prueba. Recoge las decisiones 3, 4 y 5 del plan de fase 3 y su
+§1.2.
+
+**Opciones consideradas.**
+
+- **El modelo devuelve la prueba entera** (cuántas preguntas, reparto, cita, identificadores).
+  Descartada: abre la puerta a un Control de 6 con 4 preguntas, a una cita de páginas inventada, y al
+  fallo de "las opciones son a, b, d y la correcta es la c" por identificadores desincronizados, sin
+  ningún punto donde el código lo detecte.
+- **Reparto por tipo aleatorio**, una tirada por prueba. Descartada: dos Controles del mismo alcance
+  saldrían con repartos distintos sin motivo, y la penalización del examen (que depende del número de
+  opciones y de preguntas) dejaría de ser estable.
+
+**Decisión.** El servicio (`AssessmentGenerationService`) pone la **forma**: cuántas preguntas (dentro
+del rango que elige el alumno), el reparto por tipo (porcentajes fijos sobre el total, deterministas),
+sobre qué tema, y la **cita**, que copia del índice (`materialId`, páginas, `topicId`), nunca del
+modelo (invariante 8, F3-01). El modelo solo **redacta**: enunciado, las cuatro opciones como lista de
+textos, la correcta como posición, explicación, pista y criterios de rúbrica. Los identificadores
+(`a`..`d`, `c1`..`cn`, `q1`..) los asigna el código por posición (decisión 20b, F3-47). Toda pregunta
+de opciones tiene exactamente cuatro (decisión 20c). Una pregunta que no decodifica se vuelve a pedir,
+solo las que faltan, hasta `maxGenerationRetriesPerTopic` veces; si no sobrevive ninguna, la
+generación **falla en voz alta** nombrando cuántas se pidieron y cuántas se guardaron (F3-08 a F3-10,
+F3-44 a F3-46). O la prueba sale con las N pedidas o no sale (decisión 21).
+
+**Consecuencias.**
+
+- Es la misma división que ya funcionó en `NoteGenerationService` (ADR-016): el código estructura, el
+  modelo pone prosa.
+- El reparto se audita con aritmética (`length === 4`, porcentajes sobre el total), no con criterio.
+- El riesgo se desplaza de "prueba corta" (resuelto) a "coste y latencia de reintentar": se mide en el
+  tramo 3B y las cifras van a la bitácora. Si son malas se añade `responseSchema`; nunca se baja el
+  listón del parseo ni se entrega una prueba corta.
+- La única superficie del modelo es texto. El material y los enunciados de pruebas previas viajan
+  envueltos como datos (`STUDENT_MATERIAL`), y entra en la batería de `@guardarrailes` (ADR-008).
+
+---
+
+## ADR-020 · El juez dice qué criterios se cumplen; la nota la calcula el código
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-30
+
+**Contexto.** El desarrollo corto se corregía con `trim().toLocaleLowerCase()` y comparación exacta: el
+falso negativo que el ADR-003 ya nombraba como motivo para no dejar esa corrección tocar el perfil. La
+fase 3 mete un juez con rúbrica (decisión 12). Un modelo que devuelve un `7` es un número que nadie
+puede auditar.
+
+**Opciones consideradas.**
+
+- **El juez devuelve la nota.** Descartada: no es auditable, y funde el juicio ("¿la respuesta toca
+  este criterio?") con la aritmética ("¿cuánto vale tocarlo?"), que son dos cosas con dueños
+  distintos.
+- **Sin juez, seguir con comparación de cadenas.** Descartada: F3-23 pone la paráfrasis válida como
+  caso central, y una comparación exacta la suspende siempre.
+
+**Decisión.** El juez (`OpenAnswerJudge`) recibe enunciado, criterios de rúbrica (conceptos, no frases
+del material), el fragmento del que salió la pregunta, y la respuesta del alumno (envuelta como
+datos). Devuelve, criterio a criterio, `met: true | false`, y un veredicto `gradable`. **La nota la
+calcula el código:** `metCount / rubric.length * maxScore`. Si el juez no puede corregir
+(`gradable: false`), si su respuesta no decodifica, o si los identificadores de criterio no casan con
+la rúbrica, la pregunta es `unevaluated` con su motivo: no cuenta como acierto ni como fallo, no mueve
+la nota mostrada, y se ve como tal (F3-24, F3-25). Nunca una nota intermedia inventada; `unevaluated`
+no es cero (ADR-003, invariante 3). La múltiple respuesta lleva dos reglas separadas: crédito parcial
+con suelo en cero en la nota mostrada, todo o nada en la señal del perfil (decisión 13, F3-28). El
+techo `maxJudgeCallsPerAttempt` es el fusible (F3-26).
+
+**Consecuencias.**
+
+- Es el ADR-002 aplicado a la corrección: la parte que un modelo puede hacer bien (juzgar un criterio
+  en lenguaje natural) la hace el modelo; la que tiene que ser reproducible (la cuenta) la hace el
+  código.
+- Un juez roto se ve, con `unevaluated` explícito, en vez de disfrazarse de nota mediocre.
+- El alumno puede discrepar de un criterio ("esto sí lo dije"): la pregunta pasa a `unevaluated` por
+  discrepancia, se retira su aportación al perfil y la nota mostrada del intento no cambia (F3-43,
+  ADR-022).
+- Riesgo residual (falso negativo del juez, sobre todo la paráfrasis válida): medido por la eval de
+  §6.7.2, con la paráfrasis como caso central. Va a `NOTES.md` con su cifra y con la palabra "no
+  resuelto".
+
+---
+
+## ADR-021 · La clave no viaja al navegador y el examen cierra la puerta
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-30
+
+**Contexto.** Qué hace de un examen un examen y no una práctica con reloj. Recoge las decisiones 8, 9,
+18, 19 y 20 del plan de fase 3. El modo (práctica o examen) lo cubre el ADR-018.
+
+**Decisión.** Tres barreras, las tres en el servidor:
+
+1. **La clave no viaja mientras se resuelve.** `GET /:id/solvable` sirve una proyección de la prueba
+   sin `correctOptionId`, `correctAnswer`, `expectedAnswer`, rúbrica ni explicación. La corrección
+   sale al entregar, en los dos modos (F3-11, F3-12). Un examen cuyas respuestas están en el código
+   fuente de la página no es un examen (decisión 9).
+2. **El intento se crea en el servidor al empezarlo,** no al entregarlo (decisión 8). Da `startedAt`
+   con autoridad (sin eso el cronómetro es decorativo), el sitio donde registrar las pistas cuando se
+   abren, y un intento a medias que se ve si se abandona. Empezar no lleva cuerpo (ADR-018).
+3. **Un examen en curso cierra la puerta** (decisión 18). Mientras un intento en modo examen siga
+   `in-progress`, las rutas del material, los apuntes, el mapa mental, otras pruebas y el chat del
+   tutor responden **409 `ExamInProgress`**. La barrera está en el código (`ExamLockdownGuard` sobre
+   una única lista `CLOSED_ROUTES` / `OPEN_ROUTES` con test de cobertura de rutas), no en esconder
+   pestañas. De la puerta **siempre se sale y se ve cómo** (decisión 19): el 409 nombra el intento y
+   dice cómo salir; el intento se cancela en cualquier momento y caduca solo al pasar su tiempo. Un
+   examen a medias se retoma aunque pasen horas: perder la red o cerrar la pestaña no lo cancelan
+   (19b). El reloj cuenta el **tiempo conectado**, medido por el latido; los huecos se guardan como
+   `interruptions` y el historial los enseña (19c, invariante 3). Al arrancar la aplicación con un
+   examen a medias, el diálogo "tienes un examen a medias" es también la llave de la puerta (19d).
+   Quien decide si una entrega llegó tarde es el servidor, con `examSubmitGraceSeconds` de margen
+   (decisión 9, F3-21).
+
+La penalización del modo examen sigue la convención española (`aciertos − errores/(opciones−1)`, en
+blanco ni suma ni resta, escalada a 10, suelo en 0) y **solo cambia la nota mostrada**: no toca el
+perfil (decisión 16, F3-22, invariante 5).
+
+**Consecuencias.**
+
+- La salida siempre visible es la invariante 3 llevada al encierro: un candado sin salida es un bug,
+  no una regla de producto.
+- El cronómetro depende del reloj del servidor: si el proceso se reinicia a mitad de examen,
+  `startedAt` sobrevive en disco y el tiempo sigue corriendo. Es lo correcto y la interfaz lo dice
+  (riesgo 4).
+- La fase 4 (subida de ficheros) tendrá que clasificar sus rutas nuevas en una de las dos listas o el
+  test de cobertura falla.
+
+---
+
+## ADR-022 · El perfil se mueve solo con intentos del alumno
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-30
+
+**Contexto.** La fase 3 es la primera que tiene un perfil de estudio que mover, así que las invariantes
+4 (el perfil lo escribe el código, nunca el modelo) y 5 (las señales no se mezclan) dejan de ser
+teoría. Recoge §1.3 del plan y la decisión 7.
+
+**Decisión.** El perfil (`StudyProfileService`) lo mueve solo el código, al corregir un intento
+`graded`, de forma determinista e idempotente por intento (`appliedAttemptIds`). Se **reconstruye
+entero** desde todos los intentos corregidos del material en cada escritura (proyección pura), no se
+aplica incremental: así "esto sí lo dije" reescribe un intento ya aplicado sin necesitar un camino de
+reversión aparte. Tres señales **separadas** por tema, nunca fundidas en un número:
+
+- dificultad observada (`correct` / `incorrect` / `unevaluated` / `blank`); no responder no es fallar,
+  `blank` va aparte,
+- pistas abiertas (`hintsRevealed`); abrir una pista nunca convierte un acierto en fallo (decisión
+  11),
+- énfasis, que se deriva del bloque marcado del apunte al **leer** el perfil, no se guarda.
+
+**El tutor pierde `artifacts submit` y `artifacts grade`** (además de `create`, que ya se fue por la
+decisión 4). Motivo: si los conservara podría mover el perfil **fabricando intentos**, y la invariante
+4 se rompería de forma **indirecta**, sin que ninguna línea de código diga "el agente escribe el
+perfil". No es una simplificación: es la invariante impuesta en el código. El tutor gana `profile
+show`, de solo lectura (ni siquiera dispara el recálculo). No hay ninguna ruta ni comando que escriba
+el perfil: `sync` solo lo llaman `attempt-service.submit` y `attempt-service.dispute`, caminos del
+alumno desde la interfaz (F3-31).
+
+**Opciones consideradas.**
+
+- **Aplicar el intento incremental** (`applyAttempt` sobre el perfil guardado). Descartada: la
+  discrepancia obliga a un camino de reversión que la reconstrucción desde cero no necesita, y el
+  rebuild sigue siendo determinista e idempotente (§6.5).
+- **Dejar al tutor `submit` y `grade` anclados**, como se hizo con los apuntes. Descartada: mover el
+  perfil no es autorar contenido abierto (ADR-016), es escribir la señal que gobierna qué se le
+  pregunta al alumno después.
+
+**Consecuencias.**
+
+- Un fallo al recalcular el perfil no tumba la entrega (fail-open: se registra con `logWarning` y el
+  perfil se rehace en el siguiente `sync` o `read`). Dejar sin corregir un intento por un fallo de
+  disco del perfil sería peor.
+- El repaso (`origin: "review"`) sí falla en voz alta si no hay perfil: sin señal no hay nada que
+  concentrar (F3-33). Distinto del fail-open de la entrega: allí la alternativa era descorregir; aquí
+  es generar un repaso inventado.
+- El perfil es por material; cruzarlos es otra fase.
+- Quitarle tres comandos al tutor puede dejarlo pobre en la demo (riesgo 8): la fase 4 es la que lo
+  compensa.

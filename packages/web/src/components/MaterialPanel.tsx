@@ -5,6 +5,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, artifactsQuery, deleteArtifactAction } from "../domain/artifacts/atoms.ts";
 import { materialIndexQuery, materialPageKey, materialPageQuery, materialsQuery } from "../domain/materials/atoms.ts";
 import { streamGenerateNotes } from "../domain/artifacts/note-generation-stream.ts";
+import { AssessmentsTab, type PendingControl } from "./assessment/AssessmentsTab.tsx";
 import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
 import {
   LABEL_FONT_PX,
@@ -15,27 +16,37 @@ import {
   type MindMapNode
 } from "../domain/materials/mindmap-layout.ts";
 import { streamReindexMaterial } from "../domain/materials/stream.ts";
+import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
 
 interface MaterialPanelProps {
   readonly materialId: string;
   readonly indexState: "indexed" | "not-indexed";
   readonly title: string;
   readonly pageCount: number;
+  // Empezar un Examen real saca de aquí: la aplicación entera pasa a ser el panel del examen
+  // (decisión 18).
+  readonly onStartExam: (artifactId: string, title: string) => void;
 }
 
-type Tab = "pdf" | "mindmap" | "notes";
+type Tab = "pdf" | "mindmap" | "notes" | "assessments";
 
 // Marca de procedencia de una página, tal como la pinta el visor.
 type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
-export function MaterialPanel({ materialId, indexState, title, pageCount }: MaterialPanelProps) {
+export function MaterialPanel({ materialId, indexState, title, pageCount, onStartExam }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
   const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const [pendingControl, setPendingControl] = useState<PendingControl | null>(null);
 
   const openPageInPdf = (page: number) => {
     setTab("pdf");
     setPendingPage(page);
+  };
+
+  const generateControlForTopic = (topicId: string, topicLabel: string) => {
+    setPendingControl({ topicId, topicLabel });
+    setTab("assessments");
   };
 
   return (
@@ -53,6 +64,7 @@ export function MaterialPanel({ materialId, indexState, title, pageCount }: Mate
           <TabButton active={tab === "pdf"} onClick={() => setTab("pdf")}>PDF</TabButton>
           <TabButton active={tab === "mindmap"} onClick={() => setTab("mindmap")}>Mapa mental</TabButton>
           <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Apuntes</TabButton>
+          <TabButton active={tab === "assessments"} onClick={() => setTab("assessments")}>Pruebas</TabButton>
         </div>
       )}
 
@@ -64,13 +76,29 @@ export function MaterialPanel({ materialId, indexState, title, pageCount }: Mate
 
       {indexed && (
         <div className={`min-h-0 flex-1 ${tab === "mindmap" ? "flex flex-col" : "hidden"}`}>
-          <MindMapTab materialId={materialId} title={title} onOpenPage={openPageInPdf} />
+          <MindMapTab
+            materialId={materialId}
+            title={title}
+            onOpenPage={openPageInPdf}
+            onGenerateControl={generateControlForTopic}
+          />
         </div>
       )}
 
       {indexed && (
         <div className={`min-h-0 flex-1 overflow-y-auto ${tab === "notes" ? "block" : "hidden"}`}>
           <NotesTab materialId={materialId} />
+        </div>
+      )}
+
+      {indexed && (
+        <div className={`min-h-0 flex-1 ${tab === "assessments" ? "flex flex-col" : "hidden"}`}>
+          <AssessmentsTab
+            materialId={materialId}
+            pendingControl={pendingControl}
+            onPendingControlConsumed={() => setPendingControl(null)}
+            onStartExam={onStartExam}
+          />
         </div>
       )}
     </main>
@@ -207,8 +235,8 @@ function PdfPageImage({ materialId, page }: { readonly materialId: string; reado
 
   return AsyncResult.matchWithError(image, {
     onInitial: () => <PagePlaceholder>Cargando la página {page}…</PagePlaceholder>,
-    onError: (error) => <PageError page={page} detail={String(error)} />,
-    onDefect: (defect) => <PageError page={page} detail={String(defect)} />,
+    onError: (error) => <PageError page={page} detail={messageOf(error)} />,
+    onDefect: (defect) => <PageError page={page} detail={DEFECT_MESSAGE} />,
     onSuccess: ({ value }) => (
       <img src={value.data} alt={`Página ${page}`} className="w-full rounded-lg border border-border" loading="lazy" />
     )
@@ -232,21 +260,23 @@ function PageError({ page, detail }: { readonly page: number; readonly detail: s
 function MindMapTab({
   materialId,
   title,
-  onOpenPage
+  onOpenPage,
+  onGenerateControl
 }: {
   readonly materialId: string;
   readonly title: string;
   readonly onOpenPage: (page: number) => void;
+  readonly onGenerateControl: (topicId: string, topicLabel: string) => void;
 }) {
   const index = useAtomValue(materialIndexQuery(materialId));
 
   return AsyncResult.matchWithError(index, {
     onInitial: () => <p className="text-muted">Cargando el mapa…</p>,
-    onError: (error) => <p className="text-danger-ink">No se pudo cargar el índice: {String(error)}</p>,
-    onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el índice: {String(defect)}</p>,
+    onError: (error) => <p className="text-danger-ink">No se pudo cargar el índice: {messageOf(error)}</p>,
+    onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar el índice: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => value.topics.length === 0
       ? <p className="text-muted">El modelo no detectó temas en este material.</p>
-      : <MindMap index={value} title={title} onOpenPage={onOpenPage} />
+      : <MindMap index={value} title={title} onOpenPage={onOpenPage} onGenerateControl={onGenerateControl} />
   });
 }
 
@@ -289,11 +319,13 @@ const nodeStroke = (node: MindMapNode, colorByGroup: boolean): string => {
 function MindMap({
   index,
   title,
-  onOpenPage
+  onOpenPage,
+  onGenerateControl
 }: {
   readonly index: MaterialIndex;
   readonly title: string;
   readonly onOpenPage: (page: number) => void;
+  readonly onGenerateControl: (topicId: string, topicLabel: string) => void;
 }) {
   const [colorByGroup, setColorByGroup] = useState(false);
   const model = useMemo(() => layoutMindMap(index.topics, title, measureText), [index.topics, title]);
@@ -301,7 +333,7 @@ function MindMap({
   return (
     <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border bg-canvas p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted text-sm">Pulsa un tema para abrir su primera página en el PDF.</p>
+        <p className="text-muted text-sm">Pulsa un tema para abrir su primera página; el "＋" de la esquina genera un Control de ese tema.</p>
         <button
           type="button"
           onClick={() => setColorByGroup((value) => !value)}
@@ -318,7 +350,13 @@ function MindMap({
           <path key={i} d={edgePath(edge)} fill="none" stroke="var(--color-border-strong)" strokeWidth={1.5} />
         ))}
         {model.nodes.map((node) => (
-          <MindMapNodeView key={node.id} node={node} colorByGroup={colorByGroup} onOpenPage={onOpenPage} />
+          <MindMapNodeView
+            key={node.id}
+            node={node}
+            colorByGroup={colorByGroup}
+            onOpenPage={onOpenPage}
+            onGenerateControl={onGenerateControl}
+          />
         ))}
       </svg>
     </div>
@@ -328,21 +366,20 @@ function MindMap({
 function MindMapNodeView({
   node,
   colorByGroup,
-  onOpenPage
+  onOpenPage,
+  onGenerateControl
 }: {
   readonly node: MindMapNode;
   readonly colorByGroup: boolean;
   readonly onOpenPage: (page: number) => void;
+  readonly onGenerateControl: (topicId: string, topicLabel: string) => void;
 }) {
   const target = node.kind !== "material" && node.pages.length > 0 ? Math.min(...node.pages) : null;
   const firstBaseline = 11 + LABEL_FONT_PX;
+  const canGenerate = node.kind !== "material";
 
   return (
-    <g
-      transform={`translate(${node.x} ${node.y - node.height / 2})`}
-      onClick={target === null ? undefined : () => onOpenPage(target)}
-      style={{ cursor: target === null ? "default" : "pointer" }}
-    >
+    <g transform={`translate(${node.x} ${node.y - node.height / 2})`}>
       <title>{node.label}{node.pagesText === "" ? "" : ` · ${node.pagesText}`}</title>
       <rect
         width={node.width}
@@ -351,16 +388,28 @@ function MindMapNodeView({
         fill={nodeFill(node, colorByGroup)}
         stroke={nodeStroke(node, colorByGroup)}
         strokeWidth={1}
+        onClick={target === null ? undefined : () => onOpenPage(target)}
+        style={{ cursor: target === null ? "default" : "pointer" }}
       />
       {node.lines.map((line, i) => (
-        <text key={i} x={14} y={firstBaseline + i * 17} fill="var(--color-heading)" fontSize={LABEL_FONT_PX} fontWeight={LABEL_FONT_WEIGHT}>
+        <text key={i} x={14} y={firstBaseline + i * 17} fill="var(--color-heading)" fontSize={LABEL_FONT_PX} fontWeight={LABEL_FONT_WEIGHT} pointerEvents="none">
           {line}
         </text>
       ))}
       {node.pagesText !== "" && (
-        <text x={14} y={firstBaseline + (node.lines.length - 1) * 17 + 15} fill="var(--color-muted)" fontSize={11}>
+        <text x={14} y={firstBaseline + (node.lines.length - 1) * 17 + 15} fill="var(--color-muted)" fontSize={11} pointerEvents="none">
           {node.pagesText}
         </text>
+      )}
+      {canGenerate && (
+        <g
+          onClick={() => onGenerateControl(node.id, node.label)}
+          style={{ cursor: "pointer" }}
+        >
+          <title>Generar un Control de "{node.label}"</title>
+          <circle cx={node.width - 13} cy={13} r={9} fill="var(--color-brand-soft)" stroke="var(--color-brand)" strokeWidth={1} />
+          <text x={node.width - 13} y={17} textAnchor="middle" fontSize={13} fontWeight={700} fill="var(--color-brand)" pointerEvents="none">＋</text>
+        </g>
       )}
     </g>
   );
@@ -396,7 +445,7 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
       }
       refreshMaterials();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setRunning(false);
     }
@@ -441,8 +490,8 @@ function NotesTab({ materialId }: { readonly materialId: string }) {
 
   return AsyncResult.matchWithError(artifacts, {
     onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
-    onError: (error) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(error)}</p>,
-    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onError: (error) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {messageOf(error)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => {
       const summary = value.artifacts.find(
         (artifact) => artifact.kind === "note" && artifact.materialId === materialId
@@ -474,7 +523,7 @@ function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
       }
       refreshArtifacts();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
     } finally {
       setRunning(false);
     }
@@ -523,15 +572,15 @@ function ExistingNote({ noteId }: { readonly noteId: string }) {
       await deleteArtifact(noteId);
       refreshArtifacts();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(messageOf(cause));
       setDeleting(false);
     }
   };
 
   return AsyncResult.matchWithError(note, {
     onInitial: () => <p className="p-4 text-muted">Cargando los apuntes…</p>,
-    onError: (cause) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(cause)}</p>,
-    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {String(defect)}</p>,
+    onError: (cause) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {messageOf(cause)}</p>,
+    onDefect: (defect) => <p className="p-4 text-danger-ink">No se pudieron cargar los apuntes: {DEFECT_MESSAGE}</p>,
     onSuccess: ({ value }) => value.kind !== "note"
       ? <p className="p-4 text-danger-ink">El artefacto {noteId} no es un apunte.</p>
       : (

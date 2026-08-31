@@ -33,15 +33,16 @@ pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta
    ```
 
 2. Abre `http://localhost:5173`.
-3. Comprueba que la sidebar lista materiales y artifacts.
-4. Pide al tutor crear un quiz.
-5. Selecciona el artifact creado.
-6. Responde preguntas y envía intento.
-7. Verifica:
-   - score total,
-   - corrección por pregunta,
-   - opción `try again`,
-   - layout sin workspace cuando no hay artifact seleccionado.
+3. Comprueba que la barra lateral lista los materiales.
+4. Abre un material indexado y ve a la pestaña "Pruebas".
+5. Genera un Examen del material, o un Control desde el "＋" de un tema del mapa mental. Mira el
+   progreso tema a tema.
+6. Pulsa "Practicar", empieza el intento, abre alguna pista y responde las preguntas.
+7. Entrega y verifica:
+   - la nota sobre 10 y la puntuación bruta,
+   - la corrección por pregunta con su cita del material,
+   - "Esto sí lo dije" en una pregunta de desarrollo,
+   - en devtools, que la respuesta de `/solvable` no trae la solución.
 
 ## Qué reportar en una entrega
 

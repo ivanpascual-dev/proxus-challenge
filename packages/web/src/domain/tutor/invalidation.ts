@@ -52,10 +52,9 @@ const cliInput = (input: unknown) => {
   return typeof command === "string" ? command.trim() : undefined;
 };
 
+// El tutor solo tiene una mutación de artefacto: proponer un cambio en un apunte (`artifacts note
+// propose`). No crea pruebas ni entrega intentos (fase 3, decisiones 4 y 7).
 const isArtifactMutation = (input: string) =>
-  input.startsWith("artifacts create ") ||
-  input.startsWith("artifacts submit ") ||
-  input.startsWith("artifacts grade ") ||
   input.startsWith("artifacts note ");
 
 const isMaterialMutation = (input: string) =>
