@@ -34,7 +34,7 @@ const fakeModel = (replies: { readonly transcription: string; readonly topics: s
   LanguageModel.make({
     generateText: (options) => {
       const serialized = JSON.stringify(options.prompt);
-      const text = serialized.includes("transcriptor de páginas")
+      const text = serialized.includes("transcriber of academic material pages")
         ? replies.transcription
         : replies.topics;
       return Effect.succeed([Response.makePart("text", { text })]);

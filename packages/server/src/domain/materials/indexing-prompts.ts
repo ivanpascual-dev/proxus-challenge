@@ -1,40 +1,49 @@
 import { LIMITS } from "@proxus/shared";
 
-// Texto canónico. Se copia literal del plan de la fase 1 (sección 6). Cada regla responde a una
+// Texto canónico. Traducido al inglés en la fase 4 (decisión 9, tramo 4G, paso 20): regla por regla,
+// en el mismo orden. Se copia literal del plan de la fase 1 (sección 6). Cada regla responde a una
 // invariante: la de no traducir es la invariante 1; la de [ilegible] es la invariante 3.
 // `topicsPrompt` se amplió sobre la marcha para pedir una jerarquía de dos niveles (ADR-012); el
 // plan §6.2 y la bitácora del 2026-08-28 recogen el porqué.
+//
+// Incidencia de traducción (plan de fase 4, §6.3): estos dos prompts NO llevan la línea canónica
+// "Write the output in Spanish", a diferencia de los otros cuatro. Su propia regla de no-traducción
+// dice lo contrario ("si la página/el material está en inglés, se queda en inglés"): la salida sigue
+// el idioma del material, nunca se fuerza a español. Añadir la línea sería contradecir la regla en el
+// mismo prompt. Anotado, no preguntado todavía a Iván: revisar en el cierre del tramo 4G.
 
-export const TRANSCRIPTION_PROMPT = `Eres un transcriptor de páginas de material académico. Recibes la imagen de UNA página de un PDF.
+export const TRANSCRIPTION_PROMPT = `You are a transcriber of academic material pages. You receive the image of ONE page of a PDF.
 
-Devuelve SOLO un objeto JSON con esta forma exacta, sin texto antes ni después:
+Return ONLY a JSON object with this exact shape, no text before or after:
 {"text": "...", "isBlank": false}
 
-Reglas:
-- \`text\` es la transcripción de todo lo legible en la página: títulos, párrafos, viñetas, código,
-  rótulos de diagramas, texto dentro de imágenes y pies de figura, en el orden en que se leen.
-- No traduzcas nada. Si la página dice \`set\`, escribes \`set\`. Si está en inglés, se queda en inglés.
-- El código se transcribe literal, respetando indentación y saltos de línea, dentro de una valla \`\`\`.
-- Lo que no se lea con seguridad se marca [ilegible]. No lo adivines.
-- No resumas, no expliques y no añadas nada que no esté en la página.
-- Si la página no tiene contenido legible (portada vacía, separador), \`isBlank\` es true y \`text\` es "".`;
+Rules:
+- \`text\` is the transcription of everything legible on the page: titles, paragraphs, bullet points,
+  code, diagram labels, text inside images and figure captions, in the order they are read.
+- Do not translate anything. If the page says \`set\`, you write \`set\`. If it is in English, it stays
+  in English.
+- Code is transcribed literally, respecting indentation and line breaks, inside a \`\`\` fence.
+- What cannot be read with certainty is marked [ilegible]. Do not guess it.
+- Do not summarize, do not explain and do not add anything that is not on the page.
+- If the page has no legible content (empty cover, separator), \`isBlank\` is true and \`text\` is "".`;
 
-export const topicsPrompt = () => `Recibes el texto indexado de un material académico, página a página, con el número de página delante
-de cada una.
+export const topicsPrompt = () => `You receive the indexed text of an academic material, page by page, with the page number in front of
+each one.
 
-Devuelve SOLO un objeto JSON con esta forma exacta, sin texto antes ni después:
+Return ONLY a JSON object with this exact shape, no text before or after:
 {"topics": [{"id": "kebab-case", "label": "...", "pages": [1, 2, 5], "parent": null}]}
 
-Reglas:
-- Un tema es una unidad de estudio del material, no una palabra suelta. Entre 3 y ${LIMITS.maxTopicsPerMaterial} temas en total.
-- \`label\` usa el vocabulario del propio material y no lo traduce. Si el material dice \`set\`, el tema se
-  llama \`set\`, nunca "conjunto".
-- \`pages\` son las páginas donde ese tema se trata de verdad, no donde se menciona de pasada.
-- Toda página con contenido debe aparecer en al menos un tema. Si una página no encaja en ninguno, crea
-  el tema que le corresponda.
-- Organiza los temas en una jerarquía de como mucho dos niveles: unos pocos temas generales (las áreas
-  del material) y, colgando de ellos, sus subtemas concretos. \`parent\` es el \`id\` de otro tema de esta
-  misma lista, o null si el tema es de primer nivel.
-- Entre 2 y 6 temas de primer nivel.
-- Un subtema trata un aspecto de su tema padre, no algo distinto. Si dudas, ponlo como tema de primer nivel.
-- No inventes temas ni relaciones que no aparezcan en el texto recibido.`;
+Rules:
+- A topic is a unit of study of the material, not a stray word. Between 3 and ${LIMITS.maxTopicsPerMaterial} topics in total.
+- \`label\` uses the material's own vocabulary and does not translate it. If the material says \`set\`,
+  the topic is called \`set\`, never "conjunto".
+- \`pages\` are the pages where that topic is actually covered, not where it is mentioned in passing.
+- Every page with content must appear in at least one topic. If a page does not fit any, create the
+  topic it belongs to.
+- Organize the topics into a hierarchy of at most two levels: a few general topics (the material's
+  areas) and, hanging from them, their specific subtopics. \`parent\` is the \`id\` of another topic in
+  this same list, or null if the topic is top-level.
+- Between 2 and 6 top-level topics.
+- A subtopic covers an aspect of its parent topic, not something different. If in doubt, make it a
+  top-level topic.
+- Do not invent topics or relationships that do not appear in the received text.`;
