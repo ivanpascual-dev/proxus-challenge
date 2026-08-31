@@ -232,11 +232,28 @@ const toolConfig = (options: LanguageModel.ProviderOptions) => {
 // veces. No es composición exótica: es el mismo adaptador con otra configuración.
 export interface GeminiGenerationConfig {
   readonly temperature: number;
+  readonly maxOutputTokens: number;
   readonly responseMimeType?: string;
+  // Nivel de pensamiento de Gemini 3 (`generationConfig.thinkingConfig.thinkingLevel`, verificado
+  // contra la API real). Ausente = sin pensamiento. Hoy solo lo fijan las capas de las evals de
+  // generación (tramo 4F); el enrutado por camino en producción y el nivel final de cada uno se
+  // deciden en el tramo 4G con el resultado de esas evals (decisión 14).
+  readonly thinkingConfig?: { readonly thinkingLevel: "low" | "high" };
 }
 
-const DEFAULT_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.modelTemperature };
-const JSON_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.jsonModelTemperature, responseMimeType: "application/json" };
+// Las dos capas que existen hoy en producción (tutor e indexación, y la JSON de preguntas y juez)
+// mantienen el techo del tutor: el mapa por camino de `modelOutputTokens` ya está en `packages/shared`
+// (tramo 4B), pero conectar cada camino a su techo es trabajo del tramo 4G, cuando la eval diga qué
+// nivel de pensamiento lleva cada uno.
+const DEFAULT_GENERATION: GeminiGenerationConfig = {
+  temperature: LIMITS.modelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.tutor
+};
+const JSON_GENERATION: GeminiGenerationConfig = {
+  temperature: LIMITS.jsonModelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.tutor,
+  responseMimeType: "application/json"
+};
 
 const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiGenerationConfig) => ({
   systemInstruction: promptSystemInstruction(options.prompt),
@@ -245,11 +262,9 @@ const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiG
   toolConfig: toolConfig(options),
   generationConfig: {
     temperature: generation.temperature,
-    // Fix mínimo de referencia (fase 4, tramo 4B dejó `modelOutputTokens` como mapa por camino): las
-    // seis capas con techo propio y `thinkingConfig` (sección 4.2 del plan) son trabajo de un tramo
-    // posterior, no de este. Hasta entonces, las dos capas que existen hoy usan el techo del tutor.
-    maxOutputTokens: LIMITS.modelOutputTokens.tutor,
-    ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType })
+    maxOutputTokens: generation.maxOutputTokens,
+    ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType }),
+    ...(generation.thinkingConfig === undefined ? {} : { thinkingConfig: generation.thinkingConfig })
   }
 });
 
@@ -395,6 +410,36 @@ export const GeminiLanguageModelLive = makeGeminiLanguageModel(DEFAULT_GENERATIO
 // de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se queda: el
 // modo JSON forzado reduce los fallos, no los elimina.
 export const GeminiJsonLanguageModelLive = makeGeminiLanguageModel(JSON_GENERATION);
+
+// --- capas de las evals de generación (tramo 4F) ------------------------------------------------
+//
+// `assessment-generation.eval.ts` y `note-generation.eval.ts` prueban su camino con el pensamiento
+// apagado, `low` y `high`, que es lo que decide su nivel en el tramo 4G (decisión 14, paso 21).
+// Hasta esa decisión NADIE MÁS las usa: la generación en producción sigue con las capas de arriba.
+// El techo de salida sale del mapa por camino de `packages/shared` (`modelOutputTokens.test` y
+// `.note`), que ya cuenta el pensamiento sumado a la salida (sección 4.2 del plan).
+
+export type ThinkingMode = "off" | "low" | "high";
+
+const thinkingConfigFor = (mode: ThinkingMode): Pick<GeminiGenerationConfig, "thinkingConfig"> =>
+  mode === "off" ? {} : { thinkingConfig: { thinkingLevel: mode } };
+
+// Camino "Examen" (`test`): temperatura JSON, formato JSON forzado, techo alto (§4.2).
+export const geminiAssessmentGenerationLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.jsonModelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.test,
+    responseMimeType: "application/json",
+    ...thinkingConfigFor(mode)
+  });
+
+// Camino "Apuntes" (`note`): temperatura de prosa, formato libre, techo del apunte (§4.2).
+export const geminiNoteGenerationLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.modelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.note,
+    ...thinkingConfigFor(mode)
+  });
 
 export const GeminiModel = AiModel.make(
   "google",

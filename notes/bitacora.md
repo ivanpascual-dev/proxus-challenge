@@ -876,3 +876,18 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   se sigue consumiendo (se descarta explícitamente) por si algún día alimenta un log de servidor, pero
   el cliente no lo renderiza. Guardado también en memoria del agente para no repetir el patrón en
   futuras fases.
+
+## 2026-08-31 · Fase 4 · tramo 4F, evals de generación
+
+- **Desviación de plan, aprobada por Iván: el "thinking" de Gemini 3 se adelanta desde el tramo 4G,
+  pero solo el plumbing mínimo.** Las evals de los pasos 18 y 19 necesitan poder elegir off/low/high
+  para el paso 21 (decisión 14), y ese mecanismo no estaba agendado hasta 4G (§4.2 del plan: seis capas
+  con techo propio y `thinkingConfig`, enrutadas por `request.kind` en `server.ts:383`). Se preguntó a
+  Iván en la sesión y decidió construir solo lo que las evals necesitan hoy: `thinkingConfig?` opcional
+  en `GeminiGenerationConfig` y dos factories nuevas, `geminiAssessmentGenerationLayer(mode)` y
+  `geminiNoteGenerationLayer(mode)`, usadas exclusivamente por las dos evals. Las dos capas que ya
+  existían en producción (`GeminiLanguageModelLive`, `GeminiJsonLanguageModelLive`) quedan intactas: se
+  verificó que `DEFAULT_GENERATION`/`JSON_GENERATION` siguen fijando el mismo techo
+  (`LIMITS.modelOutputTokens.tutor`) que antes del cambio. El resto de §4.2 (cuatro capas más, el
+  enrutado real por camino, los techos por vía) sigue pendiente del tramo 4G, que decidirá con el
+  resultado de estas evals qué nivel de pensamiento lleva cada camino.
