@@ -69,7 +69,17 @@ export const LIMITS = {
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
   jsonModelTemperature: 0, // camino JSON (generación de preguntas y juez): 0 para corregir igual dos veces (ADR-008, capa 4)
-  maxModelOutputTokens: 8_192,
+  // El techo de salida es el fusible contra una salida desbocada, no un control de coste: se paga por
+  // lo generado, no por el techo (fase 4, sección 4.2). Cada valor es el doble del caso peor calculado
+  // de ese camino, pensamiento incluido donde lo lleve, sin pasar del límite del modelo (65.536).
+  modelOutputTokens: {
+    tutor: 4_096, // respuesta larga (~1.500) + bloque de seguimiento (~120)
+    indexing: 4_096, // maxIndexedCharactersPerPage (8.000 caracteres) ≈ 2.500
+    note: 4_096, // medido: 842 de salida + 1.602 de pensamiento = 2.444
+    quiz: 8_192, // 8 preguntas × ~200 = 1.600
+    test: 16_384, // 30 preguntas × ~200 = 6.000, + ~1.600 de pensamiento = 7.600
+    judge: 4_096 // criterios y comentario (~1.000) + ~1.600 de pensamiento
+  },
 
   // Tiempo
   modelCallTimeoutMs: 60_000,
