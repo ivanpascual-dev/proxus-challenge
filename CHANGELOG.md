@@ -172,6 +172,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Los temas marcados como importantes reciben más preguntas al generar una prueba.** El reparto ya
   pesaba el énfasis, pero la generación no le pasaba qué temas estaban marcados, así que la marca no
   cambiaba nada. Ahora un tema marcado pesa el doble en el reparto.
+- **El tutor ya no se atasca leyendo un material que solo conoce por el contexto de pantalla.** Al
+  faltarle el número de páginas pedía la lectura sin rango y el comando la rechazaba. Ahora pide
+  directamente el máximo de páginas permitido; si el material tiene menos, el propio comando le dice
+  cuántas tiene y responde con el contenido en la misma llamada.
 
 ### Eliminado
 

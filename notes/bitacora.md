@@ -969,6 +969,16 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     comando ya exigía `pages` antes de esta fase); es fricción existente que este caso nuevo deja
     visible por primera vez. No se ha exento este caso del criterio genérico
     `should-not-have-tool-failures` para no esconder el tropiezo.
+    **Resuelto (2026-09-01, fix posterior al cierre del tramo).** Primer intento (llamar siempre a
+    `materials list` cuando no se conoce el número de páginas) quitó el `tool-result` fallido pero
+    introdujo una regresión nueva: el tutor volvía a listar un material que ya tenía por el contexto de
+    pantalla, violando `should-not-relist-materials-with-screen-context`. Descartado. Fix final, sin
+    ese efecto secundario: si no se conoce el número de páginas, pedir directamente el rango máximo
+    permitido por lectura (`1-20`, `maxIndexTextPagesPerRead`); si el material tiene menos páginas, el
+    propio comando devuelve el conteo real para cualquier página pedida por encima de ese conteo, así
+    que el tutor aprende el dato y recibe el contenido en la misma llamada
+    (`use-uploaded-materials.ts`, paso 2 del workflow). `eval:tutor:behaviour` corrido tres veces contra
+    el modelo real tras ambos arreglos: 6/6 casos, 0 fallos en las dos últimas corridas.
 - **Paso 22, batería de guardarraíles con `STRICT=1`:** primer intento bloqueado por `maxConversations`
   (50/50), lleno de conversaciones de prueba de corridas anteriores de la propia batería (título
   reconocible: el ataque B6 crea una por corrida y nadie las borra). Se vació

@@ -347,9 +347,11 @@ const shouldPointToTab = (): AcceptanceCriterion => ({
     if (context.case.expected.mustPointToTab !== true) {
       return Effect.succeed(passed("should-point-to-tab", "Not checked for this case."));
     }
-    // Iván (2026-09-01): "Controles y Exámenes" vale igual que "Pruebas" (mismo sitio de la interfaz,
-    // solo cambia el vocabulario). El regex acepta ambos en vez de forzar el nombre literal.
-    const mentionsTab = /pesta[ñn]a[^.]*pruebas|\bpruebas\b[^.]*(pesta[ñn]a|tab|material)|en\s+"?pruebas"?|controles?\s+y\s+ex[aá]menes/i.test(context.output);
+    // Iván (2026-09-01): "Controles y/o Exámenes" vale igual que "Pruebas" (mismo sitio de la interfaz,
+    // solo cambia el vocabulario). El regex acepta cualquier mención de "pestaña" cerca de esos nombres,
+    // en vez de forzar el nombre literal o una conjunción concreta ("Controles" o "Exámenes" separados
+    // por "o" cuenta igual que "Controles y Exámenes").
+    const mentionsTab = /pesta[ñn]a[^.]*(pruebas|controles|ex[aá]menes)|\bpruebas\b[^.]*(pesta[ñn]a|tab|material)|en\s+"?pruebas"?|controles?[^.]*ex[aá]menes|ex[aá]menes[^.]*controles?/i.test(context.output);
     return Effect.succeed(mentionsTab
       ? passed("should-point-to-tab", "The tutor points the student to the tests screen.")
       : failed("should-point-to-tab", "The tutor does not send the student to the tests screen.", { output: context.output }));
