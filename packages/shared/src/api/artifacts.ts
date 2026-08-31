@@ -35,7 +35,7 @@ import {
   HintNotAvailable,
   TimeLimitExceeded
 } from "../errors/assessment-errors.ts";
-import { RateLimited } from "../errors/limit-exceeded.ts";
+import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 const ArtifactKindQuery = Schema.Struct({
@@ -114,6 +114,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         AttemptNotFound.pipe(HttpApiSchema.status(404)),
         AttemptAlreadyClosed.pipe(HttpApiSchema.status(409)),
         TimeLimitExceeded.pipe(HttpApiSchema.status(409)),
+        LimitExceeded.pipe(HttpApiSchema.status(400)),
         RateLimited.pipe(HttpApiSchema.status(429)),
         ArtifactStorageError.pipe(HttpApiSchema.status(500))
       ]

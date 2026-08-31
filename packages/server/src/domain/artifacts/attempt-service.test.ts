@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Effect, Layer } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
-import type { MaterialIndex, TestAnswer } from "@proxus/shared";
+import { LIMITS, type MaterialIndex, type TestAnswer } from "@proxus/shared";
 import { MaterialNotFound, MaterialRepository, type PdfMaterial } from "../materials/material.ts";
 import {
   ArtifactNotFound,
@@ -57,6 +57,23 @@ const examReal: TestArtifact = {
     ...Array.from({ length: 9 }, (_, i) => ({
       type: "true-false" as const, id: `q${i + 2}`, prompt: `¿${i}?`, correctAnswer: true, explanation: "e", hint: null, source
     }))
+  ]
+};
+
+// Un Control con una pregunta de desarrollo corto, para el techo de caracteres de la respuesta abierta.
+const quizWithOpen: QuizArtifact = {
+  kind: "quiz",
+  id: "quiz-open",
+  title: "Control con desarrollo",
+  scope: { materialId: "m1", topicId: "t1", topicLabel: "Tema 1" },
+  origin: "material",
+  createdAt: "2026-08-20T00:00:00.000Z",
+  examTimeLimitSeconds: 600,
+  questions: [
+    {
+      type: "short-answer", id: "q1", prompt: "Explica el tema", expectedAnswer: "una respuesta modelo",
+      maxScore: 3, hint: null, rubric: [{ id: "c1", text: "menciona la definición" }], source
+    }
   ]
 };
 
@@ -200,6 +217,20 @@ test("entregar 2 respuestas de 10 preguntas da 2/10, no 2/2 (regresión del bug 
   assert.equal(graded.status, "graded");
   assert.equal(graded.rawScore, 2);
   assert.equal(graded.maxScore, 10);
+});
+
+test("una respuesta de desarrollo corto que supera el techo de caracteres se rechaza sin llamar al juez (invariante 11)", async () => {
+  const attempts: ArtifactAttempt[] = [];
+  const started = await run((s) => s.start("quiz-open"), [quizWithOpen], attempts);
+  const answers: readonly TestAnswer[] = [
+    { questionType: "short-answer", questionId: "q1", answer: "a".repeat(LIMITS.maxOpenAnswerCharacters + 1) }
+  ];
+  await assert.rejects(
+    run((s) => s.submit("quiz-open", started.id, answers), [quizWithOpen], attempts),
+    (e: unknown) => (e as { _tag?: string })._tag === "LimitExceeded"
+  );
+  const stored = attempts.find((a) => a.id === started.id);
+  assert.equal(stored?.status, "in-progress");
 });
 
 test("una pista en examen se rechaza en el código", async () => {

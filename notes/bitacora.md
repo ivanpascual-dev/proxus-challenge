@@ -695,3 +695,14 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   de preguntas en blanco del perfil se llama `blank`, no `asked` como decía §6.5: evita un total que
   sería suma de señales (lo que §6.5 justo prohíbe).
 
+## 2026-08-31 · Fase 3 · pasada de `/proxus-verifier` y sus arreglos
+
+- **Veredicto de la primera pasada: 🚨 NO CIERRA.** Servidor aislado en `PORT=3100` con copia
+  desechable de `.data`, para no chocar con el de la sesión hermana ni tocar datos reales. 279/279
+  tests, los tres checks en verde, tabla de invariantes e criterios F3 recorrida entera. Un hallazgo
+  🚨 (rompía la invariante 11) y dos ⚠️, más dos observaciones de diseño. Cerrado con Iván uno a uno:
+  - **`maxOpenAnswerCharacters` sin validar en el servidor (invariante 11), arreglado.**
+    `attempt-service.ts:submit` rechaza con `LimitExceeded` (400) antes de gastar ninguna llamada al
+    juez si una respuesta de desarrollo corto supera 1500 caracteres. El `maxLength` del `<textarea>`
+    era la única barrera; un cliente que no fuera la web se la saltaba entera. Test de regresión en
+    `attempt-service.test.ts`.

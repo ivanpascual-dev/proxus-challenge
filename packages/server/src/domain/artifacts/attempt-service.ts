@@ -11,6 +11,7 @@ import {
   AttemptNotGraded,
   HintNotAvailable,
   LIMITS,
+  LimitExceeded,
   QuestionNotFound,
   TimeLimitExceeded,
   type ActiveAttemptResponse,
@@ -61,7 +62,7 @@ export interface AttemptService {
   >;
   readonly submit: (artifactId: string, attemptId: string, answers: readonly TestAnswer[]) => Effect.Effect<
     GradedAttempt,
-    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptNotFound | AttemptAlreadyClosed | TimeLimitExceeded | ApiArtifactStorageError,
+    ApiArtifactNotFound | ApiArtifactTypeMismatch | AttemptNotFound | AttemptAlreadyClosed | TimeLimitExceeded | LimitExceeded | ApiArtifactStorageError,
     LanguageModel.LanguageModel
   >;
   readonly abandon: (attemptId: string, reason: "cancelled" | "expired") => Effect.Effect<
@@ -343,6 +344,19 @@ export const make = (
         attemptId,
         message: "El tiempo del examen se agotó. Este intento ya no se puede entregar."
       });
+    }
+
+    // El techo de caracteres del desarrollo corto lo impone el servidor, no el `maxLength` del
+    // `<textarea>` (invariante 11): un cliente que no sea la web podría saltárselo.
+    for (const answer of answers) {
+      if (answer.questionType === "short-answer" && answer.answer.length > LIMITS.maxOpenAnswerCharacters) {
+        return yield* new LimitExceeded({
+          limit: "maxOpenAnswerCharacters",
+          ceiling: LIMITS.maxOpenAnswerCharacters,
+          received: answer.answer.length,
+          message: `Una respuesta supera el máximo de ${LIMITS.maxOpenAnswerCharacters} caracteres (tiene ${answer.answer.length}).`
+        });
+      }
     }
 
     // El juez corrige el desarrollo corto; la aritmética la hace el código (ADR-019). Solo se le
