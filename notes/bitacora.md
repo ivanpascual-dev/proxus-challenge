@@ -833,3 +833,46 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   material, así que el huérfano era teórico. La bitácora guarda el contexto (por qué ahora sí hacía
   falta resolverlo, y por qué se descartaron la papelera y la confirmación en servidor); el ADR-024
   guarda la decisión en sí, y corrige el párrafo de ADR-011 que ya no era cierto.
+
+## 2026-08-31 · Fase 4 · tramo 4E, el agente que se ve
+
+- **`artifact-authoring.eval.ts` medida antes y después del tramo, para dar línea base al paso 19b
+  (tramo 4G).** El plan marca esta eval como obsoleta (riesgo #9) sin asignarle tramo; Iván decidió
+  dejar la reescritura para 19b pero pidió correrla hoy, antes de que el prompt y las skills se movieran
+  más, porque 19b necesita saber "cómo se comportaba antes" para medir el efecto de traducir los
+  prompts. Procedimiento: `git stash push -u` aislado a `academic-tutor.ts`, `academic-tutor/skills/` y
+  `harness/` (el eval llama al harness directo, sin pasar por `tutor-chat-service.ts`), eval corrida
+  contra ese estado pre-4E, `git stash pop`, eval corrida otra vez contra el estado post-4E. Las dos
+  salidas completas quedaron en el scratchpad de la sesión (no versionadas).
+  - **Los dos casos fallan en ambos estados, pero por razones distintas.** Antes de 4E: el tutor
+    autoraba el test entero pegado en el chat (el criterio `should-point-to-tab` falla porque no hay
+    ningún envío a pestaña que detectar) y la llamada a `artifacts list` fallaba por argumento mal
+    formado antes de nombrar el tema. Después de 4E: el tutor ya no reclama autoría y sí nombra el tema
+    con los datos reales del perfil, pero **los dos criterios que siguen fallando lo hacen por un
+    regex desalineado con el vocabulario y el nombre de pestaña actuales**, no por una regresión de
+    conducta: `should-point-to-tab` busca la palabra "Pruebas" y el modelo remite a "Controles"/
+    "Exámenes"; `should-name-topic-and-signal` para la señal "wrong" busca `fallaste|fallad|fallos|te
+    equivocaste` y el modelo dice "3 respuestas incorrectas". Es exactamente la foto que 19b necesita:
+    los cuatro criterios de hoy se conservan, pero su redacción hay que revisarla contra el
+    comportamiento real, no solo añadir los cuatro criterios nuevos del paso 19b.
+  - **Hallazgo colateral, relevante para el criterio de idioma/follow-up del propio 19b:** en una de las
+    corridas post-4E el modelo cerró la respuesta con `<<<FOLLOW-UP>>>` y las tres preguntas pero
+    **sin** el delimitador de cierre `<<<END FOLLOW-UP>>>`. `extractFollowUp` (decisión 8) exige el
+    bloque completo para no inventar nada, así que el texto crudo con el delimitador de apertura se
+    queda tal cual y **se ve en la respuesta al alumno**. Es el comportamiento correcto por diseño
+    (fail-safe: nunca completar un bloque mal formado), pero expone que el modelo a veces olvida el
+    cierre y hoy eso queda visible en pantalla en vez de invisible. No se ha arreglado en 4E (no estaba
+    en su alcance); queda para que 19b lo mida con más casos y decida si hace falta un reintento o un
+    prompt más insistente en el cierre del bloque.
+- **Ningún `ChatContextRef` de tipo `block` en esta fase.** El plan justifica `maxContextRefs: 3` con
+  "un bloque resaltado" dentro del contexto de pantalla, pero `NoteWorkspace.tsx` no tiene hoy ningún
+  concepto de bloque activo/resaltado (todos los bloques se muestran a la vez). Esa pieza de UI es el
+  rediseño de apuntes, ya anotado para después de cerrar las fases. El contrato ya soporta `block`;
+  `ChatContextBar` lo pintará el día que exista un origen real en la interfaz.
+- **`TurnCost` se construyó y se retiró en la misma fase.** Se implementó tal como pedía el paso 17 del
+  plan (mostrar el coste del turno en la interfaz), pero al probarlo Iván decidió que el coste en
+  tokens es un dato interno de logs/desarrolladores y nunca algo que el alumno vea en pantalla. Se
+  eliminó el componente y su estado (`lastUsage`) de `Chat.tsx`; el evento `usage` del stream NDJSON
+  se sigue consumiendo (se descarta explícitamente) por si algún día alimenta un log de servidor, pero
+  el cliente no lo renderiza. Guardado también en memoria del agente para no repetir el patrón en
+  futuras fases.
