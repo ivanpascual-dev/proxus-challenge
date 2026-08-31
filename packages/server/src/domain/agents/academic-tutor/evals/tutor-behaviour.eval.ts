@@ -1,7 +1,7 @@
 import { Console, Context, Data, Effect, Layer, Ref, Schema } from "effect";
-import type { StudyProfile } from "@proxus/shared";
+import { ChatContextRef, LIMITS, type StudyProfile } from "@proxus/shared";
 import { GeminiModel } from "../../gemini.ts";
-import { AgentSession } from "../../harness/index.ts";
+import { AgentSession, renderScreenContext } from "../../harness/index.ts";
 import { type AgentMessage } from "../../harness/message.ts";
 import { makeAcademicTutorHarness } from "../../academic-tutor.ts";
 import {
@@ -34,6 +34,12 @@ const CriterionStatus = Schema.Union([
   Schema.Literal("failed")
 ]);
 
+// Este eval se llamó `artifact-authoring.eval.ts` desde la fase 3, cuando lo único que comprobaba era
+// que el tutor no se atribuyera la autoría de una prueba. La fase 4 le añade comportamientos que no
+// tienen nada que ver con autoría (idioma, seguimiento, elección de skill, contexto de pantalla): el
+// nombre llevaba dos fases equivocado (fase 4, tramo 4G, paso 19b). Las 4 comprobaciones originales
+// se quedan tal cual; las 4 nuevas van detrás.
+//
 // La decisión 4 quitó al tutor la autoría de pruebas; la 7, la entrega y la corrección. Este eval ya
 // no comprueba que cree un quiz, sino lo contrario: que NO diga que lo ha creado, que remita a la
 // pestaña "Pruebas", y que al recomendar repaso nombre el tema y la señal del perfil que lo trae
@@ -44,13 +50,25 @@ const ReviewSignal = Schema.Union([
   Schema.Literal("emphasis")
 ]);
 
-const ArtifactAuthoringExpected = Schema.Struct({
+const TutorBehaviourExpected = Schema.Struct({
   mustNotClaimAuthoring: Schema.Boolean,
   mustPointToTab: Schema.optional(Schema.Boolean),
   mustNameTopic: Schema.optional(Schema.String),
-  mustNameSignal: Schema.optional(ReviewSignal)
+  mustNameSignal: Schema.optional(ReviewSignal),
+  // Decisión 9 (fase 4, tramo 4G, paso 19b): entrada en inglés, salida en español.
+  mustAnswerInSpanish: Schema.optional(Schema.Boolean),
+  // Decisión 8: el bloque de seguimiento son exactamente `LIMITS.followUpQuestions` preguntas en
+  // español, nunca menos completadas ni más recortadas.
+  mustHaveFollowUp: Schema.optional(Schema.Boolean),
+  // Distingue las dos skills que reemplazaron a `use-study-assessments` (decisión 17): cuál debe
+  // cargar el tutor y, opcionalmente, cuál NO debe cargar por confundirla con la otra.
+  mustLoadSkill: Schema.optional(Schema.String),
+  mustNotLoadSkill: Schema.optional(Schema.String),
+  // El contexto de pantalla (decisión 5, §6.2) ya trae el id del material: no hay que pedirle al
+  // tutor que lo redescubra con `materials list`.
+  mustNotRelistMaterials: Schema.optional(Schema.Boolean)
 });
-type ArtifactAuthoringExpected = typeof ArtifactAuthoringExpected.Type;
+type TutorBehaviourExpected = typeof TutorBehaviourExpected.Type;
 
 const SeededTopicProfile = Schema.Struct({
   topicId: Schema.String,
@@ -78,22 +96,25 @@ const MaterialFixture = Schema.Struct({
 });
 type MaterialFixture = typeof MaterialFixture.Type;
 
-const ArtifactAuthoringEvalCase = Schema.Struct({
+const TutorBehaviourEvalCase = Schema.Struct({
   id: EvalCaseId,
   input: Schema.String,
-  expected: ArtifactAuthoringExpected,
+  expected: TutorBehaviourExpected,
   materials: Schema.optional(Schema.Array(MaterialFixture)),
   profile: Schema.optional(Schema.Array(SeededTopicProfile)),
+  // Fase 4, tramo 4G, paso 19b: mismo `ChatContextRef` que manda `tutor-chat-service.ts`, para
+  // reproducir el caso "el material ya está en pantalla".
+  context: Schema.optional(Schema.Array(ChatContextRef)),
   maxSteps: Schema.optional(Schema.Number)
 });
-type ArtifactAuthoringEvalCase = typeof ArtifactAuthoringEvalCase.Type;
+type TutorBehaviourEvalCase = typeof TutorBehaviourEvalCase.Type;
 
-const ArtifactAuthoringEvalDataset = Schema.Struct({
+const TutorBehaviourEvalDataset = Schema.Struct({
   id: EvalId,
   description: Schema.String,
-  cases: Schema.Array(ArtifactAuthoringEvalCase)
+  cases: Schema.Array(TutorBehaviourEvalCase)
 });
-type ArtifactAuthoringEvalDataset = typeof ArtifactAuthoringEvalDataset.Type;
+type TutorBehaviourEvalDataset = typeof TutorBehaviourEvalDataset.Type;
 
 const CriterionResult = Schema.Struct({
   id: Schema.String,
@@ -113,10 +134,11 @@ const EvalCaseReport = Schema.Struct({
 type EvalCaseReport = typeof EvalCaseReport.Type;
 
 type EvalCaseContext = {
-  readonly dataset: ArtifactAuthoringEvalDataset;
-  readonly case: ArtifactAuthoringEvalCase;
+  readonly dataset: TutorBehaviourEvalDataset;
+  readonly case: TutorBehaviourEvalCase;
   readonly output: string;
   readonly messages: readonly AgentMessage[];
+  readonly followUpQuestions: readonly string[];
 };
 
 type AcceptanceCriterion = {
@@ -292,7 +314,7 @@ const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
   indexState: "not-indexed"
 });
 
-const makeEvalLayer = (testCase: ArtifactAuthoringEvalCase) => Layer.mergeAll(
+const makeEvalLayer = (testCase: TutorBehaviourEvalCase) => Layer.mergeAll(
   InMemoryArtifactRepository,
   Layer.succeed(MaterialRepository, makeMaterialRepository(testCase.materials ?? [])),
   seededProfileLayer(testCase.profile ?? []),
@@ -325,15 +347,20 @@ const shouldPointToTab = (): AcceptanceCriterion => ({
     if (context.case.expected.mustPointToTab !== true) {
       return Effect.succeed(passed("should-point-to-tab", "Not checked for this case."));
     }
-    const mentionsTab = /pesta[ñn]a[^.]*pruebas|\bpruebas\b[^.]*(pesta[ñn]a|tab|material)|en\s+"?pruebas"?/i.test(context.output);
+    // Iván (2026-09-01): "Controles y Exámenes" vale igual que "Pruebas" (mismo sitio de la interfaz,
+    // solo cambia el vocabulario). El regex acepta ambos en vez de forzar el nombre literal.
+    const mentionsTab = /pesta[ñn]a[^.]*pruebas|\bpruebas\b[^.]*(pesta[ñn]a|tab|material)|en\s+"?pruebas"?|controles?\s+y\s+ex[aá]menes/i.test(context.output);
     return Effect.succeed(mentionsTab
-      ? passed("should-point-to-tab", "The tutor points the student to the \"Pruebas\" tab.")
-      : failed("should-point-to-tab", "The tutor does not send the student to the \"Pruebas\" tab.", { output: context.output }));
+      ? passed("should-point-to-tab", "The tutor points the student to the tests screen.")
+      : failed("should-point-to-tab", "The tutor does not send the student to the tests screen.", { output: context.output }));
   }
 });
 
+// Fase 4, tramo 4E (bitácora 2026-08-31): "wrong" solo casaba `fallaste|fallad|fallos|te
+// equivocaste`, y el modelo real dice "3 respuestas incorrectas" o "has fallado 3 preguntas". 19b
+// amplía el regex contra el comportamiento observado, no solo añade los criterios nuevos.
 const SIGNAL_PHRASE: Record<"wrong" | "hint" | "emphasis", RegExp> = {
-  wrong: /fallaste|fallad|fallos|te equivocaste/i,
+  wrong: /fallaste|fallad|fallos|te equivocaste|incorrecta|incorrecto|respuestas? mal|erróneas?/i,
   hint: /pista/i,
   emphasis: /marcaste|marcad|import/i
 };
@@ -367,6 +394,96 @@ const shouldNotHaveToolFailures = (): AcceptanceCriterion => ({
   }
 });
 
+// --- las 4 comprobaciones nuevas de la fase 4 (tramo 4G, paso 19b) ------------------------------
+
+// Un indicio de inglés que un texto en español no produce por accidente: pronombres y artículos
+// ingleses de una sola palabra. No se usan palabras que puedan colarse como vocabulario propio del
+// material (el prompt del tutor prohíbe traducir ese vocabulario a propósito).
+const ENGLISH_TELL = /\b(the|you|your|this|that|with|and|is|are|have|has|will|would|should|about|what|how|because)\b/i;
+const SPANISH_TELL = /\b(el|la|los|las|que|para|con|es|est[áa]|una|uno|de|del|puedes|debes)\b/i;
+
+const isSpanish = (text: string): boolean => !ENGLISH_TELL.test(text) && SPANISH_TELL.test(text);
+
+const shouldAnswerInSpanish = (): AcceptanceCriterion => ({
+  id: "should-answer-in-spanish",
+  evaluate: (context) => {
+    if (context.case.expected.mustAnswerInSpanish !== true) {
+      return Effect.succeed(passed("should-answer-in-spanish", "Not checked for this case."));
+    }
+    return Effect.succeed(isSpanish(context.output)
+      ? passed("should-answer-in-spanish", "The reply is in Spanish.")
+      : failed("should-answer-in-spanish", "The reply is not in Spanish (English input, decision 9).", { output: context.output }));
+  }
+});
+
+const shouldGiveWellFormedFollowUp = (): AcceptanceCriterion => ({
+  id: "should-give-well-formed-follow-up",
+  evaluate: (context) => {
+    if (context.case.expected.mustHaveFollowUp !== true) {
+      return Effect.succeed(passed("should-give-well-formed-follow-up", "Not checked for this case."));
+    }
+    const { followUpQuestions } = context;
+    if (followUpQuestions.length !== LIMITS.followUpQuestions) {
+      return Effect.succeed(failed(
+        "should-give-well-formed-follow-up",
+        `Expected exactly ${LIMITS.followUpQuestions} follow-up questions, got ${followUpQuestions.length}.`,
+        { followUpQuestions }
+      ));
+    }
+    const notSpanish = followUpQuestions.filter((question) => !isSpanish(question));
+    if (notSpanish.length > 0) {
+      return Effect.succeed(failed("should-give-well-formed-follow-up", "A follow-up question is not in Spanish.", { notSpanish }));
+    }
+    return Effect.succeed(passed("should-give-well-formed-follow-up", `Exactly ${LIMITS.followUpQuestions} follow-up questions, all in Spanish.`));
+  }
+});
+
+const shouldLoadTheRightSkill = (): AcceptanceCriterion => ({
+  id: "should-load-the-right-skill",
+  evaluate: (context) => {
+    const { mustLoadSkill, mustNotLoadSkill } = context.case.expected;
+    if (mustLoadSkill === undefined && mustNotLoadSkill === undefined) {
+      return Effect.succeed(passed("should-load-the-right-skill", "Not checked for this case."));
+    }
+    const loadedSkills = context.messages
+      .filter((message) => message.role === "tool-call" && message.name === "load_skill")
+      .map((message) => (message as { readonly input: unknown }).input)
+      .filter((input): input is { readonly name: string } => typeof input === "object" && input !== null && "name" in input)
+      .map((input) => input.name);
+
+    if (mustLoadSkill !== undefined && !loadedSkills.includes(mustLoadSkill)) {
+      return Effect.succeed(failed("should-load-the-right-skill", `Expected the tutor to load skill "${mustLoadSkill}".`, { loadedSkills }));
+    }
+    if (mustNotLoadSkill !== undefined && loadedSkills.includes(mustNotLoadSkill)) {
+      return Effect.succeed(failed("should-load-the-right-skill", `The tutor should not have loaded skill "${mustNotLoadSkill}".`, { loadedSkills }));
+    }
+    return Effect.succeed(passed("should-load-the-right-skill", `Loaded skills: ${loadedSkills.join(", ")}.`));
+  }
+});
+
+const MATERIALS_LIST_COMMAND = /^\s*materials\s+list\b/i;
+
+const shouldNotRelistWhatScreenContextAlreadyGives = (): AcceptanceCriterion => ({
+  id: "should-not-relist-materials-with-screen-context",
+  evaluate: (context) => {
+    if (context.case.expected.mustNotRelistMaterials !== true) {
+      return Effect.succeed(passed("should-not-relist-materials-with-screen-context", "Not checked for this case."));
+    }
+    const relisted = context.messages.some((message) => {
+      if (message.role !== "tool-call" || message.name !== "cli") {
+        return false;
+      }
+      const input = message.input;
+      return typeof input === "object" && input !== null && "input" in input
+        && typeof (input as { readonly input: unknown }).input === "string"
+        && MATERIALS_LIST_COMMAND.test((input as { readonly input: string }).input);
+    });
+    return Effect.succeed(relisted
+      ? failed("should-not-relist-materials-with-screen-context", "The tutor ran `materials list` even though the material was already in the screen context.", { messages: context.messages })
+      : passed("should-not-relist-materials-with-screen-context", "The tutor did not re-request what the screen context already gave it."));
+  }
+});
+
 const passed = (id: string, message: string, details?: unknown): CriterionResult =>
   CriterionResult.make({ id, status: "passed", message, details });
 
@@ -384,9 +501,9 @@ const calculo: MaterialFixture = {
   ]
 };
 
-const dataset = ArtifactAuthoringEvalDataset.make({
-  id: "academic-tutor.artifact-authoring",
-  description: "The tutor does NOT author or grade assessments (decisions 4 and 7): it points the student to the \"Pruebas\" tab and, when recommending review, names the profile signal that brought a topic.",
+const dataset = TutorBehaviourEvalDataset.make({
+  id: "academic-tutor.behaviour",
+  description: "Comportamientos deterministas del tutor: no se atribuye autoría (decisiones 4 y 7), responde en español a una entrada en inglés y cierra con tres preguntas de seguimiento (decisiones 8 y 9), carga la skill que corresponde entre las que reemplazan a use-study-assessments (decisión 17), y no vuelve a pedir por comando lo que el contexto de pantalla ya le dio (decisión 5).",
   cases: [
     {
       id: "no-autora-remite-a-la-pestana",
@@ -405,6 +522,36 @@ const dataset = ArtifactAuthoringEvalDataset.make({
         { topicId: "limites", topicLabel: "Límites", correct: 4, incorrect: 0, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false }
       ],
       maxSteps: 6
+    },
+    {
+      id: "responde-en-espanol-con-seguimiento-a-entrada-en-ingles",
+      input: "In one short paragraph, what is a derivative? No need to look anything up, general knowledge is fine.",
+      expected: { mustNotClaimAuthoring: true, mustAnswerInSpanish: true, mustHaveFollowUp: true },
+      maxSteps: 4
+    },
+    {
+      id: "elige-review-progress-no-read-assessments",
+      input: "¿Qué llevo peor en el material calculo y qué debería repasar?",
+      expected: { mustNotClaimAuthoring: true, mustLoadSkill: "review-progress", mustNotLoadSkill: "read-assessments" },
+      materials: [calculo],
+      profile: [
+        { topicId: "derivadas", topicLabel: "Derivadas", correct: 1, incorrect: 3, unevaluated: 0, blank: 0, hintsRevealed: 0, emphasis: false }
+      ],
+      maxSteps: 6
+    },
+    {
+      id: "elige-read-assessments-no-review-progress",
+      input: "Enséñame las preguntas y las respuestas correctas de mis Controles guardados.",
+      expected: { mustNotClaimAuthoring: true, mustLoadSkill: "read-assessments", mustNotLoadSkill: "review-progress" },
+      maxSteps: 6
+    },
+    {
+      id: "no-relista-materiales-con-contexto-en-pantalla",
+      input: "¿Qué dice este material sobre las derivadas?",
+      expected: { mustNotClaimAuthoring: true, mustNotRelistMaterials: true },
+      materials: [calculo],
+      context: [{ type: "material", materialId: "calculo", title: "Cálculo I" }],
+      maxSteps: 6
     }
   ]
 });
@@ -413,12 +560,16 @@ const criteria = [
   shouldNotClaimAuthoring(),
   shouldPointToTab(),
   shouldNameTopicAndSignal(),
-  shouldNotHaveToolFailures()
+  shouldNotHaveToolFailures(),
+  shouldAnswerInSpanish(),
+  shouldGiveWellFormedFollowUp(),
+  shouldLoadTheRightSkill(),
+  shouldNotRelistWhatScreenContextAlreadyGives()
 ] as const;
 
 const runEvalCase = (
-  evalDataset: ArtifactAuthoringEvalDataset,
-  testCase: ArtifactAuthoringEvalCase
+  evalDataset: TutorBehaviourEvalDataset,
+  testCase: TutorBehaviourEvalCase
 ) => Effect.gen(function* () {
   const materialRepository = yield* MaterialRepository;
   const artifactRepository = yield* ArtifactRepository;
@@ -427,8 +578,14 @@ const runEvalCase = (
   const rateLimiter = yield* makeRateLimiter();
   const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval");
   const session = AgentSession.make(harness);
+
+  // Mismo ensamblado que `tutor-chat-service.ts`: el contexto de pantalla viaja al final del mensaje
+  // del usuario, nunca en el system prompt (decisión 11).
+  const screenContext = testCase.context === undefined ? undefined : renderScreenContext(testCase.context);
+  const turnInput = screenContext === undefined ? testCase.input : `${testCase.input}\n\n${screenContext}`;
+
   const result = yield* session.run({
-    input: testCase.input,
+    input: turnInput,
     maxSteps: testCase.maxSteps ?? 8
   }).pipe(Effect.provide(harness.layer));
 
@@ -436,7 +593,8 @@ const runEvalCase = (
     dataset: evalDataset,
     case: testCase,
     output: result.output,
-    messages: result.messages
+    messages: result.messages,
+    followUpQuestions: result.followUpQuestions
   };
 
   const criterionResults = yield* Effect.all(
@@ -454,7 +612,7 @@ const runEvalCase = (
   });
 });
 
-const runDataset = (evalDataset: ArtifactAuthoringEvalDataset) => Effect.gen(function* () {
+const runDataset = (evalDataset: TutorBehaviourEvalDataset) => Effect.gen(function* () {
   const reports: EvalCaseReport[] = [];
 
   for (const testCase of evalDataset.cases) {
@@ -483,16 +641,16 @@ const formatReport = (reports: readonly EvalCaseReport[]) => {
   return lines.join("\n");
 };
 
-class ArtifactAuthoringEvalFailed extends Data.TaggedError("ArtifactAuthoringEvalFailed")<{}> {}
+class TutorBehaviourEvalFailed extends Data.TaggedError("TutorBehaviourEvalFailed")<{}> {}
 
-export const artifactAuthoringEval = runDataset(dataset).pipe(
+export const tutorBehaviourEval = runDataset(dataset).pipe(
   Effect.tap((reports) => Console.log(formatReport(reports))),
   Effect.andThen((reports) => reports.some((report) => report.status === "failed")
-    ? Effect.fail(new ArtifactAuthoringEvalFailed())
+    ? Effect.fail(new TutorBehaviourEvalFailed())
     : Effect.succeed(reports)
   )
 );
 
 if (import.meta.main) {
-  Effect.runPromise(artifactAuthoringEval);
+  Effect.runPromise(tutorBehaviourEval);
 }
