@@ -48,3 +48,31 @@ test("RateLimiter concurrency rejects the request beyond the ceiling, and admits
 
   await Effect.runPromise(limiter.acquire("client-c"));
 });
+
+test("RateLimiter checkUpload rejects once the upload window fills up", async () => {
+  let clock = 0;
+  const limiter = await Effect.runPromise(make(() => clock));
+
+  for (let index = 0; index < LIMITS.uploadsPerWindow.limit; index++) {
+    await Effect.runPromise(limiter.checkUpload("client-d"));
+  }
+
+  await runFailure(limiter.checkUpload("client-d"));
+
+  clock += LIMITS.uploadsPerWindow.windowMs + 1;
+
+  await Effect.runPromise(limiter.checkUpload("client-d"));
+});
+
+test("RateLimiter upload grace is granted, holds within its TTL, and expires afterwards", async () => {
+  let clock = 0;
+  const limiter = await Effect.runPromise(make(() => clock));
+
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-x")), false);
+
+  await Effect.runPromise(limiter.grantUploadGrace("material-x"));
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-x")), true);
+
+  clock += LIMITS.uploadGraceMs + 1;
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-x")), false);
+});

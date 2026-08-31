@@ -48,6 +48,43 @@ export class MaterialRepositoryError extends Data.TaggedError("MaterialRepositor
   readonly reason: unknown;
 }> {}
 
+// Errores de la subida (fase 4, tramo 4D). Fallo por fichero: viaja dentro del resultado de ESE
+// fichero, no aborta el resto del lote (F4-02). El contentType que manda el navegador no se cree
+// (asunción A1): esto es lo que sale cuando los bytes mágicos `%PDF-` o `pdfinfo` rechazan el
+// fichero.
+export class UnsupportedFileType extends Data.TaggedError("UnsupportedFileType")<{
+  readonly fileName: string;
+  readonly reason: string;
+}> {}
+
+// Nombre de fichero repetido. El materialId sale del nombre del fichero (ADR-011); sobreescribir
+// cambiaría el material al que apuntan citas ya escritas, así que se rechaza en voz alta.
+export class MaterialAlreadyExists extends Data.TaggedError("MaterialAlreadyExists")<{
+  readonly fileName: string;
+  readonly materialId: string;
+}> {}
+
+// Fallo agregado: los materiales que ya existen más los que trae la subida pasan de `maxMaterials`.
+// Aborta la petición entera, antes de escribir nada (F4-04).
+export class TooManyMaterials extends Data.TaggedError("TooManyMaterials")<{
+  readonly limit: number;
+  readonly existing: number;
+  readonly requested: number;
+}> {}
+
+export interface UploadCandidate {
+  readonly fileName: string; // nombre original que mandó el navegador
+  readonly path: string; // ruta al fichero persistido; solo válida mientras dure la petición
+}
+
+export type MaterialUploadOutcome =
+  | { readonly fileName: string; readonly outcome: "created"; readonly material: PdfMaterial }
+  | {
+      readonly fileName: string;
+      readonly outcome: "rejected";
+      readonly reason: UnsupportedFileType | MaterialAlreadyExists;
+    };
+
 export interface RenderedPage {
   readonly material: PdfMaterial;
   readonly image: PageImage;
@@ -76,6 +113,11 @@ export interface MaterialRepository {
     MaterialNotFound | MaterialIndexingFailed | MaterialRepositoryError,
     LanguageModel.LanguageModel
   >;
+  // Sube un lote de PDFs. `TooManyMaterials` aborta la petición entera antes de escribir nada; el
+  // resto de rechazos (tipo, nombre duplicado) viajan por fichero dentro del resultado (F4-02).
+  readonly upload: (
+    candidates: readonly UploadCandidate[]
+  ) => Effect.Effect<readonly MaterialUploadOutcome[], TooManyMaterials | MaterialRepositoryError>;
 }
 
 export class MaterialIndexingFailed extends Data.TaggedError("MaterialIndexingFailed")<{

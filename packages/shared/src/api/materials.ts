@@ -43,7 +43,11 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
       error: [
         TooManyMaterials.pipe(HttpApiSchema.status(400)),
         LimitExceeded.pipe(HttpApiSchema.status(400)),
-        RateLimited.pipe(HttpApiSchema.status(429))
+        RateLimited.pipe(HttpApiSchema.status(429)),
+        // Fallo de disco al listar los materiales existentes o al escribir uno nuevo. No estaba en
+        // el contrato original del tramo 4B; sin él, un fallo de almacenamiento en la subida solo
+        // podría mapearse con `Effect.orDie` (invariante 6).
+        MaterialStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
     HttpApiEndpoint.get("get", "/:id", {

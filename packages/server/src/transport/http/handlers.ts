@@ -5,11 +5,15 @@ import {
   ArtifactNotFound as ApiArtifactNotFound,
   ArtifactStorageError as ApiArtifactStorageError,
   BlockNotFound as ApiBlockNotFound,
+  MaterialAlreadyExists as ApiMaterialAlreadyExists,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
   MaterialStorageError as ApiMaterialStorageError,
   PageOutOfRange as ApiPageOutOfRange,
-  ProxusApi
+  ProxusApi,
+  TooManyMaterials as ApiTooManyMaterials,
+  UnsupportedFileType as ApiUnsupportedFileType,
+  type MaterialUploadResult
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { GeminiJsonLanguageModelLive } from "../../domain/agents/gemini.ts";
@@ -23,7 +27,7 @@ import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts
 import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
-import { MaterialRepository } from "../../domain/materials/material.ts";
+import { MaterialRepository, type MaterialUploadOutcome } from "../../domain/materials/material.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
 
@@ -88,6 +92,30 @@ const logAndFailStorage = (materialId: string, reason: unknown) =>
     Effect.andThen(Effect.fail(storageError(materialId)))
   );
 
+// El resultado de la subida, por fichero: el domain trae sus propios `UnsupportedFileType` /
+// `MaterialAlreadyExists`, y aquí se traducen a los del contrato (mismo patrón que `notFound` /
+// `storageError` arriba para el resto de errores de materiales).
+const toApiUploadResult = (outcome: MaterialUploadOutcome): MaterialUploadResult => {
+  if (outcome.outcome === "created") {
+    return { fileName: outcome.fileName, outcome: "created", material: outcome.material };
+  }
+  const { reason } = outcome;
+  return {
+    fileName: outcome.fileName,
+    outcome: "rejected",
+    reason: reason._tag === "UnsupportedFileType"
+      ? new ApiUnsupportedFileType({
+          fileName: reason.fileName,
+          message: `"${reason.fileName}" no se pudo subir: ${reason.reason}`
+        })
+      : new ApiMaterialAlreadyExists({
+          fileName: reason.fileName,
+          materialId: reason.materialId,
+          message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
+        })
+  };
+};
+
 export const MaterialsHttpHandlers = HttpApiBuilder.group(
   ProxusApi,
   "materials",
@@ -95,12 +123,49 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
     const materials = yield* MaterialRepository;
     const artifacts = yield* ArtifactRepository;
     const profile = yield* StudyProfileService;
+    const rateLimiter = yield* RateLimiter;
 
     return handlers
       .handle("list", () => materials.list().pipe(
         Effect.map((items) => ({ materials: items })),
         Effect.orDie
       ))
+      // Sube un lote de PDFs (decisión 2: solo PDF). Frecuencia primero (fusible propio,
+      // `uploadsPerWindow`), después `maxMaterials` agregado dentro de `materials.upload`, que
+      // aborta antes de escribir nada; los rechazos por fichero (tipo, nombre duplicado) viajan
+      // dentro de la respuesta 200 (F4-02). Cada material creado abre su gracia de alta (decisión 4):
+      // su primera indexación y su primera generación de apuntes no cobran el cubo `artifacts`.
+      .handle("upload", ({ payload }) => Effect.gen(function* () {
+        const key = yield* clientKey;
+        yield* rateLimiter.checkUpload(key);
+
+        const candidates = payload.files.map((file) => ({ fileName: file.name, path: file.path }));
+
+        const outcomes = yield* materials.upload(candidates).pipe(
+          Effect.catchTag("MaterialRepositoryError", (error) => Effect.logWarning(
+            `fallo de almacenamiento en la subida: ${String(error.reason)}`
+          ).pipe(
+            Effect.andThen(Effect.fail(new ApiMaterialStorageError({
+              materialId: "upload",
+              message: "No se pudo completar la subida. Vuelve a intentarlo en un momento."
+            })))
+          )),
+          Effect.catchTag("TooManyMaterials", (error) => Effect.fail(new ApiTooManyMaterials({
+            limit: error.limit,
+            existing: error.existing,
+            requested: error.requested,
+            message: `Puedes tener hasta ${error.limit} materiales y ya tienes ${error.existing}. Borra alguno antes de subir ${error.requested} más.`
+          })))
+        );
+
+        yield* Effect.forEach(
+          outcomes,
+          (outcome) => outcome.outcome === "created" ? rateLimiter.grantUploadGrace(outcome.material.id) : Effect.void,
+          { discard: true }
+        );
+
+        return { results: outcomes.map(toApiUploadResult) };
+      }))
       // Controles y Exámenes del material, con su último intento (§5.6). Verifica que el material
       // existe; la prueba anclada a un material sin índice es un caso del riesgo 5, no un error aquí.
       .handle("assessments", ({ params }) => Effect.gen(function* () {

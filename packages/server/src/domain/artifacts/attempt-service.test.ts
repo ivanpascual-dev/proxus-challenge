@@ -93,7 +93,8 @@ const fakeMaterials = Layer.succeed(MaterialRepository, MaterialRepository.of({
   get: (id) => id === "m1" ? Effect.succeed(material) : Effect.fail(new MaterialNotFound({ materialId: id })),
   renderPage: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
   getIndex: (id) => id === "m1" ? Effect.succeed(index) : Effect.fail(new MaterialNotFound({ materialId: id })),
-  reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id }))
+  reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
+  upload: () => Effect.die("stub: upload no debería llamarse en este test")
 }));
 
 const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => Layer.succeed(ArtifactRepository, ArtifactRepository.of({

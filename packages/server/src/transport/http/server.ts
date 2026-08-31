@@ -151,10 +151,13 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
-    const rejected = yield* rateLimiter.check(key, "messages").pipe(
+    // La gracia de alta (fase 4, decisión 4): la primera indexación de un material recién subido no
+    // cobra su cubo, porque subir ya se cobró contra `uploadsPerWindow`.
+    const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const rejected = yield* (hasGrace ? Effect.succeed(Option.none<RateLimited>()) : rateLimiter.check(key, "messages").pipe(
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
-    );
+    ));
     if (Option.isSome(rejected)) {
       return yield* HttpServerResponse.json(encodeRateLimited(rejected.value), { status: 429 });
     }
@@ -222,8 +225,11 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const key = yield* clientKey;
     // Genera un artefacto y hace una llamada al modelo por tema: cuenta contra el cubo `artifacts`
     // (más estricto que `messages`) y toma un permiso de concurrencia, igual que el chat, porque es
-    // caro y no debe poder lanzarse en paralelo sin tope.
-    const rejected = yield* rateLimiter.check(key, "artifacts").pipe(
+    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (fase 4, decisión 4)
+    // salta el cubo, no la concurrencia, cuando es la primera generación de apuntes de un material
+    // recién subido: ya se cobró al decidir subir.
+    const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const rejected = yield* (hasGrace ? Effect.void : rateLimiter.check(key, "artifacts")).pipe(
       Effect.andThen(() => rateLimiter.acquire(key)),
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))

@@ -106,6 +106,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
   navegador, no a la pantalla.
+- **Subir tus propios PDFs.** La barra lateral tiene una zona para arrastrar uno o varios PDFs, o
+  elegir un fichero. Cada uno sube, se indexa y genera sus apuntes en cadena, sin pulsar nada más, con
+  su propio progreso (subiendo, indexando página N de M, generando apuntes tema N de M). Un fichero
+  que no es un PDF de verdad, o que repite el nombre de un material ya subido, se rechaza nombrando el
+  motivo, sin tumbar a los demás de la misma tanda.
 
 ### Cambiado
 

@@ -3,6 +3,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
+import { UploadDropzone } from "./UploadDropzone.tsx";
 import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
 
 interface SidebarProps {
@@ -27,6 +28,8 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
         </div>
         <ThemeToggle />
       </div>
+
+      <UploadDropzone />
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-4">

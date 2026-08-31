@@ -1,20 +1,26 @@
 import { Effect, FileSystem, Layer, Option, Path } from "effect";
 import type { LanguageModel } from "effect/unstable/ai";
-import type { MaterialIndex, MaterialIndexContent } from "@proxus/shared";
+import { LIMITS, type MaterialIndex, type MaterialIndexContent } from "@proxus/shared";
 import {
+  MaterialAlreadyExists,
   MaterialIndexingFailed,
   MaterialNotFound,
   MaterialNotIndexed,
   MaterialRepository,
   MaterialRepositoryError,
+  TooManyMaterials,
+  UnsupportedFileType,
   type MaterialRepository as MaterialRepositoryType,
+  type MaterialUploadOutcome,
   type PdfMaterial,
-  type RenderedPage
+  type RenderedPage,
+  type UploadCandidate
 } from "../../domain/materials/material.ts";
 import { PdfService } from "../../domain/materials/pdf-service.ts";
 import { MaterialIndexRepository } from "../../domain/materials/material-index-repository.ts";
 import { IndexingService, type IndexProgress } from "../../domain/materials/indexing-service.ts";
 import { hashContent } from "../../domain/materials/content-hash.ts";
+import { looksLikePdf } from "../../domain/materials/pdf-sniff.ts";
 
 interface PdfFile {
   readonly material: PdfMaterial;
@@ -186,7 +192,101 @@ export const FileMaterialRepository = {
       return { ...content, materialId: id, fileName: file.material.fileName };
     });
 
-    return { list, get, renderPage, getIndex, reindex };
+    // El materialId sale del nombre del fichero (ADR-011): `path.basename` primero descarta
+    // cualquier componente de directorio que traiga el nombre subido (el navegador no es de fiar),
+    // y solo entonces se le quita la extensión ".pdf".
+    const idFor = (fileName: string): string => {
+      const baseName = path.basename(fileName);
+      const extension = path.extname(baseName);
+      return extension.toLowerCase() === ".pdf" ? baseName.slice(0, baseName.length - extension.length) : baseName;
+    };
+
+    const upload = (
+      candidates: readonly UploadCandidate[]
+    ): Effect.Effect<readonly MaterialUploadOutcome[], TooManyMaterials | MaterialRepositoryError> => Effect.gen(function* () {
+      const existingFiles = yield* listFiles();
+      if (existingFiles.length + candidates.length > LIMITS.maxMaterials) {
+        return yield* new TooManyMaterials({
+          limit: LIMITS.maxMaterials,
+          existing: existingFiles.length,
+          requested: candidates.length
+        });
+      }
+
+      yield* fs.makeDirectory(directory, { recursive: true }).pipe(Effect.mapError(mapError));
+
+      const knownIds = new Set(existingFiles.map((file) => file.material.id));
+      const results: MaterialUploadOutcome[] = [];
+
+      for (const candidate of candidates) {
+        const id = idFor(candidate.fileName);
+
+        // Barato primero (sección 4.2 del plan): un nombre repetido no gasta el sniff ni pdfinfo.
+        if (knownIds.has(id)) {
+          results.push({
+            fileName: candidate.fileName,
+            outcome: "rejected",
+            reason: new MaterialAlreadyExists({ fileName: candidate.fileName, materialId: id })
+          });
+          continue;
+        }
+
+        const bytes = yield* fs.readFile(candidate.path).pipe(Effect.mapError(mapError));
+        if (!looksLikePdf(bytes)) {
+          results.push({
+            fileName: candidate.fileName,
+            outcome: "rejected",
+            reason: new UnsupportedFileType({
+              fileName: candidate.fileName,
+              reason: "El fichero no empieza con la cabecera de un PDF."
+            })
+          });
+          continue;
+        }
+
+        // pdfinfo tumba lo que pasó el sniff sin ser un PDF de verdad (un .txt que empieza por
+        // "%PDF-"). Falla como rechazo de ESTE fichero, nunca como fallo de la petición entera.
+        // `catchCause`, no `catch`: cuando pdfinfo no imprime una línea "Pages:" reconocible,
+        // `poppler-pdf-service.ts` lanza dentro de un `Effect.map` y eso llega como defecto, no
+        // como el `PdfServiceError` tipado que un `catch` normal esperaría.
+        const pageCount: number | null = yield* pdf.pageCount(candidate.path).pipe(
+          Effect.map((count): number | null => count),
+          Effect.catchCause(() => Effect.succeed(null))
+        );
+        if (pageCount === null) {
+          results.push({
+            fileName: candidate.fileName,
+            outcome: "rejected",
+            reason: new UnsupportedFileType({
+              fileName: candidate.fileName,
+              reason: "pdfinfo no pudo leer este fichero como PDF."
+            })
+          });
+          continue;
+        }
+
+        // La copia va al final y a partir de los bytes ya leídos (sección 4.2: "la trampa
+        // verificada"; `candidate.path` solo existe mientras dura esta petición, así que se
+        // resuelve entera aquí, no se difiere).
+        const fileName = `${id}.pdf`;
+        yield* fs.writeFile(pdfPath(fileName), bytes).pipe(Effect.mapError(mapError));
+
+        const material: PdfMaterial = {
+          id,
+          title: id,
+          fileName,
+          pageCount,
+          uploadedAt: new Date().toISOString(),
+          indexState: "not-indexed"
+        };
+        results.push({ fileName: candidate.fileName, outcome: "created", material });
+        knownIds.add(id);
+      }
+
+      return results;
+    });
+
+    return { list, get, renderPage, getIndex, reindex, upload };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };

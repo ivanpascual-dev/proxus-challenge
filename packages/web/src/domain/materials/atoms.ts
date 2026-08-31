@@ -37,3 +37,19 @@ export const materialPageQuery = Atom.family((key: string) => {
 });
 
 export const materialPageKey = (materialId: string, page: number) => `${materialId}:${page}`;
+
+// Sube un lote de PDFs (decisión 2: solo PDF). El payload es un FormData de verdad: el cliente
+// generado solo sabe codificar multipart cuando `request.payload instanceof FormData`
+// (`HttpApiClient.js`), así que aquí no hay schema que codifique nada.
+export const uploadMaterialsAction = apiRuntime.fn(
+  (files: readonly File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+    return ApiClient.use((client) =>
+      client.materials.upload({ payload: formData })
+    ).pipe(Effect.withSpan("materials.upload", { kind: "client" }));
+  },
+  { reactivityKeys: ["materials"] }
+);
