@@ -767,3 +767,15 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   ha investigado la diferencia porque no cambia ninguna decisión: el orden de magnitud (imágenes
   reenviadas en cada llamada posterior del mismo turno) es el mismo, que es lo único de lo que
   dependían las decisiones 1, 10 y 11.
+- **`gemini.ts`: `usageMetadata` en el esquema y parte `finish`.** `GeminiResponse` gana
+  `usageMetadata` (todos los campos opcionales: solo aparecen cuando hay algo que contar) y cada
+  `candidate` gana `finishReason`. `generateText` emite ahora
+  `Response.makePart("finish", { reason, usage })` con el mapeo de la §4.2 del plan. Sin
+  `usageMetadata`, todos los campos de `usage` quedan `undefined` (invariante 3: nunca se pinta un
+  cero donde no hay dato). `toUsage` y `toFinishReason` quedan exportadas y probadas en
+  `gemini.test.ts` (5 tests nuevos, sin red: fijan el mapeo con `usageMetadata` fabricado a mano, no
+  con una llamada real, que es lo que hace `measure-tokens.mjs`).
+- **285 tests en verde** (280 + 5 nuevos), los tres checks limpios.
+- **Pendiente de la fase**, no de este tramo: `session.ts` sigue sin acumular `usage` por paso ni
+  exponerlo (tramo 4C); el system prompt de este guion quedará desfasado en cuanto el tramo 4E entre
+  en vigor, y hay que actualizarlo entonces.

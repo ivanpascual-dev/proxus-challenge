@@ -19,12 +19,35 @@ const GeminiPart = Schema.Struct({
   functionCall: Schema.optional(FunctionCall)
 });
 
+// §4.2 del plan de fase 4: campos verificados contra la API real. Todos opcionales porque
+// `usageMetadata` (y `cacheTokensDetails` dentro de él) solo aparece cuando hay algo que contar.
+const GeminiTokensDetail = Schema.Struct({
+  modality: Schema.optional(Schema.String),
+  tokenCount: Schema.optional(Schema.Number)
+});
+
+const GeminiUsageMetadata = Schema.Struct({
+  promptTokenCount: Schema.optional(Schema.Number),
+  candidatesTokenCount: Schema.optional(Schema.Number),
+  totalTokenCount: Schema.optional(Schema.Number),
+  thoughtsTokenCount: Schema.optional(Schema.Number),
+  cachedContentTokenCount: Schema.optional(Schema.Number),
+  promptTokensDetails: Schema.optional(Schema.Array(GeminiTokensDetail)),
+  cacheTokensDetails: Schema.optional(Schema.Array(GeminiTokensDetail)),
+  serviceTier: Schema.optional(Schema.String)
+});
+type GeminiUsageMetadata = typeof GeminiUsageMetadata.Type;
+
+const GeminiCandidate = Schema.Struct({
+  content: Schema.optional(Schema.Struct({
+    parts: Schema.optional(Schema.Array(GeminiPart))
+  })),
+  finishReason: Schema.optional(Schema.String)
+});
+
 const GeminiResponse = Schema.Struct({
-  candidates: Schema.optional(Schema.Array(Schema.Struct({
-    content: Schema.optional(Schema.Struct({
-      parts: Schema.optional(Schema.Array(GeminiPart))
-    }))
-  })))
+  candidates: Schema.optional(Schema.Array(GeminiCandidate)),
+  usageMetadata: Schema.optional(GeminiUsageMetadata)
 });
 
 type GeminiPart = typeof GeminiPart.Type;
@@ -230,8 +253,49 @@ const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiG
 const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>
   parts.find((part) => part.functionCall?.name !== undefined)?.functionCall;
 
-const decodeGeminiResponse = (json: unknown) =>
+// Exportadas para el test: puras, sin fetch ni Config, así se prueban con `node:test` sin necesidad
+// de una clave de API ni de simular la llamada de red entera.
+export const decodeGeminiResponse = (json: unknown) =>
   Schema.decodeUnknownSync(GeminiResponse)(json);
+
+// Mapeo del plan §4.2: `inputTokens.total` ← `promptTokenCount`; `inputTokens.cacheRead` ←
+// `cachedContentTokenCount`; `inputTokens.uncached` ← `promptTokenCount - (cachedContentTokenCount ?? 0)`;
+// `outputTokens.total` ← `candidatesTokenCount`; `outputTokens.reasoning` ← `thoughtsTokenCount`.
+// Sin `usageMetadata`, todos los campos quedan `undefined`: invariante 3, nunca se pinta un cero
+// donde no hay dato (F4-19).
+export const toUsage = (usage: GeminiUsageMetadata | undefined) =>
+  new Response.Usage({
+    inputTokens: {
+      uncached: usage?.promptTokenCount === undefined
+        ? undefined
+        : usage.promptTokenCount - (usage.cachedContentTokenCount ?? 0),
+      total: usage?.promptTokenCount,
+      cacheRead: usage?.cachedContentTokenCount,
+      cacheWrite: undefined
+    },
+    outputTokens: {
+      total: usage?.candidatesTokenCount,
+      text: undefined,
+      reasoning: usage?.thoughtsTokenCount
+    }
+  });
+
+// Solo los dos motivos que el plan necesita distinguir (riesgo 10: una salida cortada por el techo
+// de tokens no puede leerse como "el tema no daba"). El resto de motivos de Gemini caen en "other",
+// que es justo lo que ese valor de `FinishReason` significa: un motivo real que este protocolo no
+// nombra, no lo mismo que "unknown" (el proveedor no dio ninguno).
+export const toFinishReason = (reason: string | undefined): Response.FinishReason => {
+  switch (reason) {
+    case "STOP":
+      return "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case undefined:
+      return "unknown";
+    default:
+      return "other";
+  }
+};
 
 const toResponseParts = (
   parts: ReadonlyArray<GeminiPart>,
@@ -299,7 +363,15 @@ const makeGeminiLanguageModel = (generation: GeminiGenerationConfig) => Layer.ef
             }
 
             const json = decodeGeminiResponse(await response.json());
-            return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
+            const candidate = json.candidates?.[0];
+            return [
+              ...toResponseParts(candidate?.content?.parts ?? [], options.tools),
+              Response.makePart("finish", {
+                reason: toFinishReason(candidate?.finishReason),
+                usage: toUsage(json.usageMetadata),
+                response: undefined
+              })
+            ];
           },
           catch: (cause) =>
             cause instanceof Error && cause.name === "TimeoutError"
