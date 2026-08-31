@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Option, Stream } from "effect";
 import { LanguageModel, Response } from "effect/unstable/ai";
 import type { GenerateAssessmentInput, MaterialIndex } from "@proxus/shared";
 import { MaterialNotFound, MaterialNotIndexed, MaterialRepository, type PdfMaterial } from "../materials/material.ts";
@@ -331,12 +331,24 @@ test("un material sin indexar falla con un motivo claro, sin crear nada", async 
   assert.equal(store.length, 0);
 });
 
-test("fuera de rango: pedir 3 preguntas se rechaza nombrando el rango", async () => {
-  const store: Artifact[] = [];
-  await assert.rejects(
-    generate({ ...quizInput, questionCount: 3 }, store, "good"),
-    (error: unknown) => /entre 4 y 8/.test((error as { reason: string }).reason)
+test("fuera de rango: pedir 3 preguntas se rechaza en el precheck (400), nombrando el rango", async () => {
+  const rejection = await Effect.runPromise(
+    Effect.gen(function* () {
+      const service = yield* AssessmentGenerationService;
+      return yield* service.precheck(material.id, { ...quizInput, questionCount: 3 });
+    }).pipe(
+      Effect.provide(AssessmentGenerationServiceLive.pipe(
+        Layer.provide(fakeArtifacts([])),
+        Layer.provide(fakeMaterials()),
+        Layer.provide(fakeProfile())
+      ))
+    )
   );
+
+  assert.equal(Option.isSome(rejection), true);
+  const value = Option.getOrThrow(rejection);
+  assert.equal(value.status, 400);
+  assert.match(value.message, /entre 4 y 8/);
 });
 
 test("si un segundo Control del mismo tema saldría idéntico pregunta por pregunta, la generación falla", async () => {

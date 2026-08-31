@@ -182,8 +182,18 @@ export const make = (
       )
     );
 
-  const precheck = (materialId: string, input: GenerateAssessmentInput) =>
-    materials.getIndex(materialId).pipe(
+  const precheck = (materialId: string, input: GenerateAssessmentInput): Effect.Effect<Option.Option<GenerationRejection>> => {
+    // Comprobación pura, no necesita el índice: va primero para que un `questionCount` fuera de rango
+    // rechace con 400 antes de abrir el stream (§6.9), en vez de colarse como `failed` a mitad.
+    const range = questionCountRange(input.kind);
+    if (!Number.isInteger(input.questionCount) || input.questionCount < range.min || input.questionCount > range.max) {
+      return Effect.succeed(Option.some<GenerationRejection>({
+        status: 400,
+        message: `el número de preguntas de un ${input.kind === "quiz" ? "Control" : "Examen"} está entre ${range.min} y ${range.max} (pediste ${input.questionCount})`
+      }));
+    }
+
+    return materials.getIndex(materialId).pipe(
       Effect.matchEffect({
         onFailure: (error) => {
           switch (error._tag) {
@@ -234,6 +244,7 @@ export const make = (
           )
       })
     );
+  };
 
   const generateForTopic = (
     topic: MaterialTopic,
@@ -377,13 +388,9 @@ export const make = (
       );
       const index = yield* readIndex(materialId);
 
-      const range = questionCountRange(input.kind);
-      if (!Number.isInteger(input.questionCount) || input.questionCount < range.min || input.questionCount > range.max) {
-        return yield* new AssessmentGenerationError({
-          reason: `el número de preguntas de un ${input.kind === "quiz" ? "Control" : "Examen"} está entre ${range.min} y ${range.max} (pediste ${input.questionCount})`
-        });
-      }
-
+      // El rango de `questionCount` ya no se comprueba aquí por duplicado: `precheck` lo hace antes
+      // de abrir el stream (§6.9), y `plan()` (más abajo) lo vuelve a comprobar como red de
+      // seguridad propia si algo llama a `forMaterial` sin pasar por `precheck` (los tests).
       const scopeTopics = resolveScopeTopics(index.topics, input.kind === "test" ? null : input.topicId);
       if (scopeTopics.length === 0) {
         return yield* new AssessmentGenerationError({

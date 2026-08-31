@@ -52,11 +52,15 @@ fallo de generación. También responde `429` si se supera la frecuencia.
 servicio del dominio con ruta, igual que la indexación y los apuntes (ADR-016, ADR-019). El cuerpo
 lleva `kind` (`quiz` \| `test`), `topicId` (el tema del Control, `null` para un Examen), `origin`
 (`material` \| `review`), `questionCount` (dentro del rango que fija `LIMITS`) y, para el Examen,
-`mode` (`practice` \| `exam`). Las precondiciones (material inexistente, sin indexar, techo de pruebas
-alcanzado, repaso sin nada que repasar) salen como **JSON con `message` y su estado** (404, 409) antes
-de abrir el stream; una vez abierto, emite el progreso tema a tema y termina con `done` (id de la
-prueba, número de preguntas, reintentos) o `failed` (el motivo). O la prueba sale con las
-`questionCount` pedidas o no sale (F3-44). `429` si se supera la frecuencia del cubo `artifacts`.
+`mode` (`practice` \| `exam`). Las precondiciones que no necesitan el índice ni el perfil (`questionCount`
+fuera de rango) o que solo necesitan el índice (material inexistente, sin indexar, techo de pruebas
+alcanzado) salen como **JSON con `message` y su estado** (400, 404, 409) antes de abrir el stream, en
+`precheck`; una vez abierto, emite el progreso tema a tema y termina con `done` (id de la prueba, número
+de preguntas, reintentos) o `failed` (el motivo). El alcance sin nada que generar o repasar (huecos
+vacíos) todavía se comprueba dentro de `forMaterial`, así que hoy llega como `failed` con HTTP 200, no
+como un JSON con estado propio: misma familia de gap que tenía `questionCount`, sin resolver. O la
+prueba sale con las `questionCount` pedidas o no sale (F3-44). `429` si se supera la frecuencia del
+cubo `artifacts`.
 
 `GET /:id/assessments` (`MaterialAssessmentsResponse`) lista los Controles y Exámenes del material con
 su último intento, para pintar la pestaña Pruebas sin descargar cada prueba entera. `GET /:id/profile`

@@ -723,3 +723,12 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     lo gastaba siempre, aunque un examen 100% opción múltiple no llama al juez; ahora solo lo gasta
     (`check`+`acquire`) si `payload.answers` trae de verdad una respuesta de desarrollo corto no vacía
     (decisión de Iván: cargar solo si hay algo que corregir).
+  - **`questionCount` fuera de rango llegaba como HTTP 200, arreglado.** La ruta de generación es un
+    stream: en cuanto se abre, el estado queda fijado en 200 y ya no cambia. La comprobación del rango
+    vivía dentro de `forMaterial` (después de abrir el stream) en vez de en `precheck` (antes). Movida
+    a `precheck`, con test de regresión (antes probaba el `forMaterial`, ahora prueba el `precheck`
+    directamente). **Deuda emparentada, sin tocar:** el alcance sin huecos que generar o repasar
+    (`planned.holes.length === 0`) tiene el mismo problema y sigue dentro de `forMaterial`; no se
+    movió porque necesita el perfil de estudio y `plan()`, que hoy no corren en `precheck`. Documentado
+    en `docs/api.md`.
+- **280 tests en verde, los tres checks limpios**, tras todos los arreglos anteriores.
