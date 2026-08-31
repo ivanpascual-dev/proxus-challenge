@@ -1,5 +1,5 @@
 import { Option } from "effect";
-import { LIMITS, LimitExceeded } from "@proxus/shared";
+import { LIMITS, LimitExceeded, type ChatContextRef } from "@proxus/shared";
 
 // Fase 4, decisión 6: la sesión vive en el servidor y el historial ya no llega en la petición
 // (cierra D3, ADR-008 barrera 3), así que `messages` dejó de tener algo que comprobar aquí. El
@@ -9,9 +9,21 @@ import { LIMITS, LimitExceeded } from "@proxus/shared";
 export interface ChatRequestLimitsInput {
   readonly input: string;
   readonly maxSteps?: number | undefined;
+  // El contexto de pantalla (decisión 5): `maxContextRefs` es lo máximo que la interfaz de hoy puede
+  // mostrar a la vez (sección 5 del plan). Opcional para no romper las pruebas que no lo ejercitan.
+  readonly context?: readonly ChatContextRef[] | undefined;
 }
 
 export const checkChatRequestLimits = (request: ChatRequestLimitsInput): Option.Option<LimitExceeded> => {
+  if (request.context !== undefined && request.context.length > LIMITS.maxContextRefs) {
+    return Option.some(new LimitExceeded({
+      limit: "maxContextRefs",
+      ceiling: LIMITS.maxContextRefs,
+      received: request.context.length,
+      message: `Como máximo puedes tener ${LIMITS.maxContextRefs} elementos en el contexto de pantalla, tienes ${request.context.length}. Quita alguno con la ×.`
+    }));
+  }
+
   if (request.maxSteps !== undefined) {
     // El techo es un número, pero también hay que exigir que sea un entero >= 1: `maxSteps: 12.9`
     // pasaría el `> 12` y el bucle de pasos (`session.ts`) correría 13 iteraciones, una llamada al

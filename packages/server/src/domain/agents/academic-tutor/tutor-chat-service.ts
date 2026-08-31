@@ -17,6 +17,7 @@ import { make as makeStudyProfileService, StudyProfileRepository } from "../../p
 import { checkConversationHistoryLimit, conversationHistoryWarning } from "../../limits/chat-limits.ts";
 import {
   AgentSession,
+  renderScreenContext,
   SessionRepository,
   type AgentSessionRunResult,
   type SessionNotFound,
@@ -127,9 +128,15 @@ export const TutorChatServiceLive = Layer.effect(
       const { harness, session } = yield* makeTurnHarness(clientKey);
       const startedAt = new Date().toISOString();
 
+      // Decisión 5 y 11: el contexto de pantalla viaja dentro del mensaje del usuario, nunca en el
+      // system prompt. `ChatContextRef` solo lleva ids y título, así que anexarlo aquí nunca cuela
+      // texto libre del material.
+      const screenContext = renderScreenContext(input.context);
+      const turnInput = screenContext === undefined ? input.input : `${input.input}\n\n${screenContext}`;
+
       const result = yield* session.runTurn(
         {
-          input: input.input,
+          input: turnInput,
           messages: stored.messages,
           maxSteps: input.maxSteps ?? LIMITS.maxAgentSteps
         },
@@ -170,6 +177,10 @@ export const TutorChatServiceLive = Layer.effect(
             if (lastStep?.error !== undefined) {
               yield* Queue.offer(queue, { type: "error" as const, message: lastStep.error.message });
               return;
+            }
+
+            if (result.followUpQuestions.length > 0) {
+              yield* Queue.offer(queue, { type: "follow-up" as const, questions: result.followUpQuestions });
             }
 
             if (lastStep !== undefined && (lastStep.usage.inputTokens !== undefined || lastStep.usage.outputTokens !== undefined)) {

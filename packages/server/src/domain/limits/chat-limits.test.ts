@@ -8,6 +8,21 @@ import { checkChatRequestLimits, checkConversationHistoryLimit, conversationHist
 // que `messages`/`maxHistoryMessages`/`maxHistoryCharacters` dejaron de tener algo que comprobar
 // aquí (cierra D3). Solo quedan `maxSteps` y `input`.
 
+const materialRef = (id: string) => ({ type: "material" as const, materialId: id, title: id });
+
+test("checkChatRequestLimits accepts context at the ceiling", () => {
+  const context = Array.from({ length: LIMITS.maxContextRefs }, (_, index) => materialRef(`m${index}`));
+  const result = checkChatRequestLimits({ input: "hola", context });
+  assert.equal(Option.isNone(result), true);
+});
+
+test("checkChatRequestLimits rejects context above the ceiling", () => {
+  const context = Array.from({ length: LIMITS.maxContextRefs + 1 }, (_, index) => materialRef(`m${index}`));
+  const result = checkChatRequestLimits({ input: "hola", context });
+  assert.equal(Option.isSome(result), true);
+  assert.equal(Option.getOrThrow(result).limit, "maxContextRefs");
+});
+
 test("checkChatRequestLimits accepts maxSteps at the ceiling", () => {
   const result = checkChatRequestLimits({ input: "hola", maxSteps: LIMITS.maxAgentSteps });
   assert.equal(Option.isNone(result), true);
