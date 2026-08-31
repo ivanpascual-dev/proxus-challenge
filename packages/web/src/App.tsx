@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import type { ActiveAttemptResponse } from "@proxus/shared";
+import type { ActiveAttemptResponse, ChatContextRef } from "@proxus/shared";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { Chat } from "./components/Chat.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
@@ -32,6 +32,9 @@ const NO_ACTIVE_EXAM: ActiveAttemptResponse = {
 export function App() {
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [enteredExam, setEnteredExam] = useState<EnteredExam | null>(null);
+  // Contexto de pantalla (fase 4, decisión 5): lo reporta `MaterialPanel` (material más artefacto de
+  // su pestaña activa); vacío cuando no hay panel de material abierto.
+  const [screenContext, setScreenContext] = useState<readonly ChatContextRef[]>([]);
   const materials = useAtomValue(materialsQuery);
   const refreshActiveExam = useAtomRefresh(activeAttemptQuery);
   const activeExam = AsyncResult.getOrElse(useAtomValue(activeAttemptQuery), () => NO_ACTIVE_EXAM);
@@ -111,11 +114,12 @@ export function App() {
             pageCount={selectedMaterial.pageCount}
             onStartExam={(artifactId, title) =>
               setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
+            onContextChange={setScreenContext}
           />
         </ErrorBoundary>
       )}
       <ErrorBoundary label="el chat">
-        <Chat />
+        <Chat proposedContext={hasMiddlePanel ? screenContext : []} />
       </ErrorBoundary>
     </div>
   );

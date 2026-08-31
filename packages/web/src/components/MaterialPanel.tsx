@@ -1,5 +1,5 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
-import type { MaterialIndex } from "@proxus/shared";
+import type { ChatContextRef, MaterialIndex } from "@proxus/shared";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, artifactsQuery, deleteArtifactAction } from "../domain/artifacts/atoms.ts";
@@ -26,6 +26,10 @@ interface MaterialPanelProps {
   // Empezar un Examen real saca de aquí: la aplicación entera pasa a ser el panel del examen
   // (decisión 18).
   readonly onStartExam: (artifactId: string, title: string) => void;
+  // Contexto de pantalla (fase 4, decisión 5): el material siempre, más el artefacto de la pestaña
+  // activa cuando lo hay (la nota en "Apuntes", la prueba abierta en "Pruebas"). `ChatContextBar` lo
+  // muestra antes de enviar y el alumno lo puede quitar.
+  readonly onContextChange: (refs: readonly ChatContextRef[]) => void;
 }
 
 type Tab = "pdf" | "mindmap" | "notes" | "assessments";
@@ -33,11 +37,31 @@ type Tab = "pdf" | "mindmap" | "notes" | "assessments";
 // Marca de procedencia de una página, tal como la pinta el visor.
 type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
-export function MaterialPanel({ materialId, indexState, title, pageCount, onStartExam }: MaterialPanelProps) {
+export function MaterialPanel({ materialId, indexState, title, pageCount, onStartExam, onContextChange }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [pendingControl, setPendingControl] = useState<PendingControl | null>(null);
+  const [activeAssessmentArtifact, setActiveAssessmentArtifact] = useState<{ readonly id: string; readonly title: string } | undefined>();
+  const artifacts = useAtomValue(artifactsQuery);
+  const noteArtifact = AsyncResult.getOrElse(artifacts, () => ({ artifacts: [] as const, unreadable: [] as const }))
+    .artifacts.find((artifact) => artifact.kind === "note" && artifact.materialId === materialId);
+
+  useEffect(() => {
+    const refs: ChatContextRef[] = [{ type: "material", materialId, title }];
+    if (tab === "notes" && noteArtifact !== undefined) {
+      refs.push({ type: "artifact", artifactId: noteArtifact.id, title: noteArtifact.title });
+    }
+    if (tab === "assessments" && activeAssessmentArtifact !== undefined) {
+      refs.push({ type: "artifact", artifactId: activeAssessmentArtifact.id, title: activeAssessmentArtifact.title });
+    }
+    onContextChange(refs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialId, title, tab, noteArtifact?.id, noteArtifact?.title, activeAssessmentArtifact]);
+
+  // Al salir del panel del material (otro material, o ninguno), el contexto que proponía deja de
+  // aplicar: nada de lo que ya no está en pantalla debe seguir viajando al tutor.
+  useEffect(() => () => onContextChange([]), [onContextChange]);
 
   const openPageInPdf = (page: number) => {
     setTab("pdf");
@@ -98,6 +122,7 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onStar
             pendingControl={pendingControl}
             onPendingControlConsumed={() => setPendingControl(null)}
             onStartExam={onStartExam}
+            onActiveArtifactChange={setActiveAssessmentArtifact}
           />
         </div>
       )}

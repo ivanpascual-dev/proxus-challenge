@@ -37,6 +37,15 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Aviso cuando una conversación con el tutor se hace muy larga.** Al acercarse al techo de historial
   aparece un aviso con un botón para empezar una conversación nueva, sin dejar de poder seguir
   escribiendo; al superar el techo, el mensaje siguiente se rechaza pidiendo lo mismo.
+- **Varias conversaciones con el tutor, guardadas.** Una lista lateral junto al chat muestra las
+  conversaciones anteriores, deja crear una nueva y borrar las que sobren; cambiar de una a otra
+  recupera su historial completo.
+- **El tutor propone hasta tres preguntas de seguimiento.** Al final de cada respuesta aparecen, como
+  botones, hasta tres preguntas relacionadas con lo que acaba de explicar; pulsar una la envía como si
+  se hubiera escrito. Si no puede ofrecer las tres, o vienen a medias, no aparece ninguna.
+- **El tutor ve lo que tienes abierto, y se enseña antes de enviar.** Con un material abierto, y su
+  apunte o su prueba a la vista, aparece como una etiqueta encima del cuadro de texto; se puede quitar
+  con la "×" antes de enviar y solo lleva el título y el identificador, nunca el contenido.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
   un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
