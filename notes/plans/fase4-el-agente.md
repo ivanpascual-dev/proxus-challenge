@@ -18,14 +18,14 @@ Medido sobre las sesiones reales de `packages/server/.data/agent-sessions`:
 Medición reproducible con `scripts/measure-tokens.mjs` sobre `verifier-f105b` (9,15 MB en disco, 10
 mensajes, un turno de 5 llamadas):
 
-| Paso | Entrada | Cacheados  | Salida | Bytes de la petición |
-| ---- | ------- | ---------- | ------ | -------------------- |
-| 0    | 456     | 0          | 20     | ~0 MB                |
-| 1    | 684     | 0          | 15     | ~0 MB                |
-| 2    | 843     | 0          | 58     | ~0 MB                |
-| 3    | 14.033  | 0          | 28     | 5,66 MB              |
-| 4    | 22.865  | **12.226** | 186    | 9,15 MB              |
-| **Turno** | **38.881** | 12.226 | 307 | **14,82 MB** |
+| Paso      | Entrada    | Cacheados  | Salida | Bytes de la petición |
+| --------- | ---------- | ---------- | ------ | -------------------- |
+| 0         | 456        | 0          | 20     | ~0 MB                |
+| 1         | 684        | 0          | 15     | ~0 MB                |
+| 2         | 843        | 0          | 58     | ~0 MB                |
+| 3         | 14.033     | 0          | 28     | 5,66 MB              |
+| 4         | 22.865     | **12.226** | 186    | 9,15 MB              |
+| **Turno** | **38.881** | 12.226     | 307    | **14,82 MB**         |
 
 El **99,98%** de ese historial son imágenes base64 dentro de los `tool-result` de `materials view`.
 La causa está en dos sitios del mismo fichero: [`session.ts:83`](../../packages/server/src/domain/agents/harness/session.ts)
@@ -244,11 +244,11 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
     propone, y para leer remite a la otra. **`use-uploaded-materials`** se queda con el PDF: `read`,
     `view`, procedencia y presupuesto de imágenes. Su descripción pierde el `or read the study note`,
     que era la señal de que ahí dentro había dos skills.
+
 17. **Quinta skill: `use-study-assessments` se parte en dos.** Hoy (3.828 bytes) contesta a dos
     preguntas que no se parecen: _"enséñame el Examen 3"_ y _"¿qué llevo peor?"_. La primera es leer un
     artefacto; la segunda es un diagnóstico con la invariante 5 encima (las tres señales nunca se
     funden), y arrastrarla entera para enseñar una prueba es pagar el manual del perfil sin usarlo.
-
     - **`read-assessments`**: `artifacts list quiz|test`, `artifacts show`, cómo se lee una prueba,
       el vocabulario de la interfaz (Control y Examen, no `quiz` y `test`) y la barrera de "no creo ni
       corrijo, eso es la pestaña Pruebas".
@@ -695,12 +695,27 @@ Cada tramo deja el repo funcionando y los tres checks en verde.
 2. `gemini.ts`: `usageMetadata` en el esquema y parte `finish`. Volver a correr el guion: ahora los
    números salen del sistema, no de una sonda aparte.
 
-**Tramo 4B · Contratos.** 3. `limits.ts` con los límites nuevos. 4. `api/tutor.ts`, `api/materials.ts`, `schemas/chat-context.ts`. Correr `typecheck` y usar la lista
-de errores como mapa.
+**Tramo 4B · Contratos.**
 
-**Tramo 4C · La sesión en el servidor.** 5. `message-degrade.ts` y `system-prompt.ts` con sus tests, antes de conectarlos. 6. Modelo de sesión ampliado y `FileSessionRepository`. 7. `session.ts`: degradación, observabilidad por paso, y el error del modelo sin disfrazar. 8. `tutor-chat-service.ts` y las rutas de conversaciones. 9. **Correr `pnpm test:guardarrailes` y comprobar que D3 pasa.** Si no pasa, el tramo no está. 10. Volver a correr el guion de medición y anotar la diferencia.
+3. `limits.ts` con los límites nuevos.
+4. `api/tutor.ts`, `api/materials.ts`, `schemas/chat-context.ts`. Correr `typecheck` y usar la lista
+   de errores como mapa.
 
-**Tramo 4D · La subida y su cadena.** 11. `pdf-sniff.ts` con sus tests. 12. Ruta de subida, con la copia dentro del scope y el orden de validación de la sección 4.2. 13. Gracia de alta en el limitador. 14. `UploadDropzone` y la cadena de progreso por fichero.
+**Tramo 4C · La sesión en el servidor.**
+
+5. `message-degrade.ts` y `system-prompt.ts` con sus tests, antes de conectarlos.
+6. Modelo de sesión ampliado y `FileSessionRepository`.
+7. `session.ts`: degradación, observabilidad por paso, y el error del modelo sin disfrazar.
+8. `tutor-chat-service.ts` y las rutas de conversaciones.
+9. **Correr `pnpm test:guardarrailes` y comprobar que D3 pasa.** Si no pasa, el tramo no está.
+10. Volver a correr el guion de medición y anotar la diferencia.
+
+**Tramo 4D · La subida y su cadena.**
+
+11. `pdf-sniff.ts` con sus tests.
+12. Ruta de subida, con la copia dentro del scope y el orden de validación de la sección 4.2.
+13. Gracia de alta en el limitador.
+14. `UploadDropzone` y la cadena de progreso por fichero.
 
 **Tramo 4E · El agente que se ve.**
 
@@ -739,35 +754,43 @@ bitácora y a `NOTES.md`.
     - **Ratio de longitud** entre apunte y fuente.
     - Una llamada por bloque; todo lo demás es código. Se corre con thinking apagado y encendido.
 
-**Tramo 4G · Idioma y medición final.** 20. Traducir los cinco prompts. 21. Correr las tres evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
-Decidir con el resultado, no con la impresión, y anotarlo: - Juez: `open-answer-judge.eval.ts`. **`low` y `high` empatan en coste (decisión 14), así que si
-empatan también en la eval, gana `low`**: mismo resultado con menos varianza. - Examen: `assessment-generation.eval.ts`, mirando la **diferencia** entre acertar con material y
-sin él, no la cifra absoluta. - Apuntes: `note-generation.eval.ts`, mirando sobre todo las cifras inventadas y los términos
-traducidos. - **Si un camino no mejora de forma visible, se queda sin thinking**: el que paga la duda es el
-coste. Y si la traducción empeora un prompt, **se revierte ese prompt** y se anota. 22. Correr la batería completa, con `STRICT=1`. 23. Barrido de límites: la tabla de la sección 3 revisada entera, cada valor con veredicto, más los
-techos de salida por camino de la sección 4.2. **Incluye los tres listados de comando que hoy no
-tienen techo ninguno** (invariante 11, sin límites implícitos), frente a `materials read`, que sí lo
-tiene con `maxIndexTextCharactersPerTurn`:
-    - **`artifacts show` de un `quiz` o un `test`** devuelve `JSON.stringify(artifact)` entero
-      (`artifact-commands.ts:108-109`). Un Examen de 30 preguntas con enunciados, opciones,
-      explicaciones y citas entra de golpe en el historial: del orden de 6.000 a 8.000 tokens en una
-      sola llamada, y ahí se queda el resto de la conversación.
-    - **`artifacts attempts` sin argumento** devuelve todos los intentos de todas las pruebas
-      (`:255-271`).
-    - **`artifacts list` sin filtro** devuelve todos los artefactos (`:201-217`). 24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
-`docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
-`CHANGELOG.md` y `NOTES.md`. 25. **Corregir el apartado "Tutor agent" de [`docs/architecture.md:218-225`](../../docs/architecture.md).**
-Hoy dice "el modelo debe cargarlas mediante `load_skill`" sin decir que el modelo **ya ve** el
-nombre y la descripción de cada skill en el system prompt (`harness.ts:57` y `81-82`, y el propio
-prompt lo declara en `harness.ts:59`: _"You initially only know skill names and short
-descriptions"_). La frase describe mal el estado **actual**, no solo el futuro. El apartado debe
-decir: **dos herramientas y solo dos** (`load_skill` y `cli`); el system prompt lleva el catálogo
-de skills como nombre más una línea; el **cuerpo** de la skill (comandos, orden de preferencia,
-advertencias) exige `load_skill`, y ejecutar exige `cli`. Añadir que el cuerpo se envía **una vez
-por sesión** (palanca 3a) y que eso es optimización de transporte, no un cambio del mecanismo. 26. **Corregir [`docs/ai-agent.md:49`](../../docs/ai-agent.md).** Dice `cli({ command })` y el
-parámetro real es `input` (`harness.ts:16-18`, y las skills escriben
-`cli({ "input": "materials list" })`). Un lector que copie el doc escribe una llamada que no
-valida.
+**Tramo 4G · Idioma y medición final.**
+
+20. Traducir los cinco prompts.
+21. Correr las tres evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
+    Decidir con el resultado, no con la impresión, y anotarlo: - Juez: `open-answer-judge.eval.ts`.
+    **`low` y `high` empatan en coste (decisión 14), así que si empatan también en la eval, gana `low`**:
+    mismo resultado con menos varianza. - Examen: `assessment-generation.eval.ts`, mirando la **diferencia**
+    entre acertar con material y sin él, no la cifra absoluta. - Apuntes: `note-generation.eval.ts`, mirando
+    sobre todo las cifras inventadas y los términos traducidos. - **Si un camino no mejora de forma visible,**
+    **se queda sin thinking**: el que paga la duda es el coste. Y si la traducción empeora un prompt,
+    **se revierte ese prompt** y se anota.
+22. Correr la batería completa, con `STRICT=1`.
+23. Barrido de límites: la tabla de la sección 3 revisada entera, cada valor con veredicto, más los
+    techos de salida por camino de la sección 4.2. **Incluye los tres listados de comando que hoy**
+    **no tienen techo ninguno** (invariante 11, sin límites implícitos), frente a `materials read`, que sí
+    lo tiene con `maxIndexTextCharactersPerTurn`: - **`artifacts show` de un `quiz` o un `test`** devuelve
+    `JSON.stringify(artifact)` entero(`artifact-commands.ts:108-109`). Un Examen de 30 preguntas con enunciados,
+    opciones, explicaciones y citas entra de golpe en el historial: del orden de 6.000 a 8.000 tokens en una
+    sola llamada, y ahí se queda el resto de la conversación. - **`artifacts attempts` sin argumento** devuelve
+    todos los intentos de todas las pruebas(`:255-271`). - **`artifacts list` sin filtro** devuelve todos los artefactos
+    (`:201-217`).
+24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
+    `docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
+    `CHANGELOG.md` y `NOTES.md`.
+25. **Corregir el apartado "Tutor agent" de [`docs/architecture.md:218-225`](../../docs/architecture.md).**
+    Hoy dice "el modelo debe cargarlas mediante `load_skill`" sin decir que el modelo **ya ve** el
+    nombre y la descripción de cada skill en el system prompt (`harness.ts:57` y `81-82`, y el propio
+    prompt lo declara en `harness.ts:59`: _"You initially only know skill names and short
+    descriptions"_). La frase describe mal el estado **actual**, no solo el futuro. El apartado debe
+    decir: **dos herramientas y solo dos** (`load_skill` y `cli`); el system prompt lleva el catálogo
+    de skills como nombre más una línea; el **cuerpo** de la skill (comandos, orden de preferencia,
+    advertencias) exige `load_skill`, y ejecutar exige `cli`. Añadir que el cuerpo se envía **una vez
+    por sesión** (palanca 3a) y que eso es optimización de transporte, no un cambio del mecanismo.
+26. **Corregir [`docs/ai-agent.md:49`](../../docs/ai-agent.md).** Dice `cli({ command })` y el
+    parámetro real es `input` (`harness.ts:16-18`, y las skills escriben
+    `cli({ "input": "materials list" })`). Un lector que copie el doc escribe una llamada que no
+    valida.
 
 > **Si el calendario aprieta, lo primero que cae es el tramo 4F**, y se cae entero, no a medias: sin
 > evals, el nivel de thinking de apuntes y Examen se decide comparando a mano dos muestras **y se dice
