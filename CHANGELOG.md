@@ -34,6 +34,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Techos del tutor visibles y en voz alta.** El cuadro del chat cuenta los caracteres contra el
   máximo. Pedir más páginas de la cuenta, un mensaje demasiado largo o demasiadas peticiones seguidas
   se rechaza nombrando el techo y lo que se pidió, nunca en silencio.
+- **Aviso cuando una conversación con el tutor se hace muy larga.** Al acercarse al techo de historial
+  aparece un aviso con un botón para empezar una conversación nueva, sin dejar de poder seguir
+  escribiendo; al superar el techo, el mensaje siguiente se rechaza pidiendo lo mismo.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
   un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de

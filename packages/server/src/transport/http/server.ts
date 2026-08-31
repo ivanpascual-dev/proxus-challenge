@@ -41,6 +41,7 @@ import { AttemptServiceLive } from "../../domain/artifacts/attempt-service.ts";
 import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts";
 import { StudyProfileServiceLive } from "../../domain/profile/study-profile.ts";
 import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
+import { FileSessionRepository } from "../../infra/agents/file-session-repository.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
@@ -413,7 +414,8 @@ const InfraLive = Layer.mergeAll(
     Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer)))
   ),
   FileArtifactRepository.layer(".data/artifacts"),
-  FileStudyProfileRepository.layer(".data/profile")
+  FileStudyProfileRepository.layer(".data/profile"),
+  FileSessionRepository.layer(".data/agent-sessions")
 );
 
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(

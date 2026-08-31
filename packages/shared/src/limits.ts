@@ -5,8 +5,13 @@ export const LIMITS = {
   // 1). Sin él no hay texto pegado que limitar: no aplica, y se deja documentado en vez de fingir que
   // se cumple (riesgo 8 de la fase 4).
   maxPastedCharactersPerTurn: 12_000,
-  maxHistoryMessages: 400,
-  maxHistoryCharacters: 200_000,
+  // Fusible de coste sobre la conversación entera (no del turno individual, eso ya lo hacen
+  // `maxMessageCharacters`/`maxAgentSteps`): techo sobre el tamaño real y medido del historial
+  // guardado, tomado de los tokens de entrada reales del último paso del último turno, nunca
+  // estimado (invariante 3). Al 75% se avisa en el propio turno; al 100% el turno siguiente se
+  // rechaza antes de llamar al modelo, sugiriendo empezar una conversación nueva (decisión de Iván,
+  // 2026-08-31).
+  maxConversationHistoryTokens: 80_000,
   maxBlockCharacters: 5_000,
   maxUploadBytes: 25 * 1024 * 1024,
   maxMaterials: 5,

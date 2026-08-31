@@ -1,9 +1,13 @@
 import { Option } from "effect";
-import { LIMITS, LimitExceeded, type AgentMessage } from "@proxus/shared";
+import { LIMITS, LimitExceeded } from "@proxus/shared";
 
+// Fase 4, decisión 6: la sesión vive en el servidor y el historial ya no llega en la petición
+// (cierra D3, ADR-008 barrera 3), así que `messages` dejó de tener algo que comprobar aquí. El
+// techo sobre cuánto puede crecer una conversación guardada (`maxConversationHistoryTokens`) es
+// `checkConversationHistoryLimit`, más abajo: necesita la sesión ya cargada, así que no es parte de
+// esta comprobación de forma de la petición.
 export interface ChatRequestLimitsInput {
   readonly input: string;
-  readonly messages: readonly AgentMessage[];
   readonly maxSteps?: number | undefined;
 }
 
@@ -34,36 +38,35 @@ export const checkChatRequestLimits = (request: ChatRequestLimitsInput): Option.
     }));
   }
 
-  if (request.messages.length > LIMITS.maxHistoryMessages) {
-    return Option.some(new LimitExceeded({
-      limit: "maxHistoryMessages",
-      ceiling: LIMITS.maxHistoryMessages,
-      received: request.messages.length,
-      message: `El historial supera el máximo de ${LIMITS.maxHistoryMessages} mensajes (tiene ${request.messages.length}).`
-    }));
-  }
-
-  const historyCharacters = request.messages.reduce((sum, message) => sum + messageCharacters(message), 0);
-  if (historyCharacters > LIMITS.maxHistoryCharacters) {
-    return Option.some(new LimitExceeded({
-      limit: "maxHistoryCharacters",
-      ceiling: LIMITS.maxHistoryCharacters,
-      received: historyCharacters,
-      message: `El historial supera el máximo de ${LIMITS.maxHistoryCharacters} caracteres (tiene ${historyCharacters}).`
-    }));
-  }
-
   return Option.none();
 };
 
-const messageCharacters = (message: AgentMessage): number => {
-  switch (message.role) {
-    case "user":
-    case "assistant":
-      return message.content.length;
-    case "tool-call":
-      return JSON.stringify(message.input).length;
-    case "tool-result":
-      return JSON.stringify(message.result).length;
+// El fusible de coste sobre la conversación entera. `lastTurnInputTokens` es el dato REAL, medido,
+// de `usageMetadata` del último paso del último turno guardado (nunca una estimación): sin ese dato
+// (conversación nueva, o el modelo no lo trajo esa vez) no hay nada que comparar, así que no se
+// rechaza (invariante 3: no se fabrica un cero ni un límite superado donde no hay dato).
+export const checkConversationHistoryLimit = (lastTurnInputTokens: number | undefined): Option.Option<LimitExceeded> => {
+  if (lastTurnInputTokens === undefined || lastTurnInputTokens < LIMITS.maxConversationHistoryTokens) {
+    return Option.none();
   }
+
+  return Option.some(new LimitExceeded({
+    limit: "maxConversationHistoryTokens",
+    ceiling: LIMITS.maxConversationHistoryTokens,
+    received: lastTurnInputTokens,
+    message: `Esta conversación ya pasa de los ${LIMITS.maxConversationHistoryTokens.toLocaleString("es")} tokens de historial. Empieza una conversación nueva para seguir.`
+  }));
+};
+
+// El 75% del mismo techo: informativo, no rechaza el turno que ya se está completando. `undefined`
+// mientras no haya un aviso que dar (mismo criterio que arriba: sin dato real, sin aviso).
+const CONVERSATION_HISTORY_WARNING_RATIO = 0.75;
+
+export const conversationHistoryWarning = (lastTurnInputTokens: number | undefined): string | undefined => {
+  const threshold = LIMITS.maxConversationHistoryTokens * CONVERSATION_HISTORY_WARNING_RATIO;
+  if (lastTurnInputTokens === undefined || lastTurnInputTokens < threshold) {
+    return undefined;
+  }
+
+  return `Esta conversación se está haciendo larga (unos ${Math.round(lastTurnInputTokens / 1000).toLocaleString("es")} mil tokens de historial). Cuando puedas, empieza una nueva para que siga siendo rápida y barata.`;
 };

@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { degradeHistory } from "../../domain/agents/harness/message-degrade.ts";
 import {
   SessionAlreadyExists,
   SessionNotFound,
@@ -6,10 +7,12 @@ import {
   SessionRepositorySerializationError,
   SessionRepositoryStorageError,
   type AppendMessagesInput,
+  type AppendTurnInput,
   type MakeSessionInput,
   type SessionRepository as SessionRepositoryType,
   type SessionRepositoryError,
-  type StoredAgentSession
+  type StoredAgentSession,
+  type StoredAgentSessionSummary
 } from "../../domain/agents/harness/index.ts";
 
 const UserMessageSchema = Schema.Struct({
@@ -42,9 +45,39 @@ const AgentMessageSchema = Schema.Union([
   ToolResultMessageSchema
 ]);
 
+const StoredStepUsageSchema = Schema.Struct({
+  inputTokens: Schema.optional(Schema.Number),
+  cachedInputTokens: Schema.optional(Schema.Number),
+  outputTokens: Schema.optional(Schema.Number)
+});
+
+const StoredStepToolCallSchema = Schema.Struct({
+  name: Schema.String,
+  input: Schema.Unknown
+});
+
+const StoredStepErrorSchema = Schema.Struct({
+  message: Schema.String,
+  at: Schema.String
+});
+
+const StoredStepSchema = Schema.Struct({
+  index: Schema.Number,
+  usage: StoredStepUsageSchema,
+  toolCalls: Schema.Array(StoredStepToolCallSchema),
+  error: Schema.optional(StoredStepErrorSchema)
+});
+
+const StoredTurnSchema = Schema.Struct({
+  startedAt: Schema.String,
+  steps: Schema.Array(StoredStepSchema)
+});
+
 const StoredAgentSessionSchema = Schema.Struct({
   id: Schema.String,
+  title: Schema.String,
   messages: Schema.Array(AgentMessageSchema),
+  turns: Schema.Array(StoredTurnSchema),
   createdAt: Schema.String,
   updatedAt: Schema.String
 });
@@ -114,7 +147,9 @@ export const FileSessionRepository = {
       const now = new Date().toISOString();
       const session: StoredAgentSession = {
         id: input.id,
+        title: "",
         messages: [],
+        turns: [],
         createdAt: now,
         updatedAt: now
       };
@@ -124,6 +159,8 @@ export const FileSessionRepository = {
       return session;
     });
 
+    // Nada crudo toca disco (palanca 1, "también en disco"): se degrada aquí, en el único punto de
+    // escritura, para que ni este método ni `appendTurn` puedan olvidarlo.
     const appendMessages = (input: AppendMessagesInput) => Effect.gen(function* () {
       if (input.messages.length === 0) {
         return;
@@ -132,17 +169,70 @@ export const FileSessionRepository = {
       const session = yield* readSessionFile(input.sessionId);
       const updatedSession: StoredAgentSession = {
         ...session,
-        messages: [...session.messages, ...input.messages],
+        messages: [...session.messages, ...degradeHistory(input.messages)],
         updatedAt: new Date().toISOString()
       };
 
       yield* writeSessionFile(updatedSession);
     });
 
+    const appendTurn = (input: AppendTurnInput) => Effect.gen(function* () {
+      const session = yield* readSessionFile(input.sessionId);
+      const updatedSession: StoredAgentSession = {
+        ...session,
+        title: session.title.length === 0 && input.title !== undefined ? input.title : session.title,
+        messages: [...session.messages, ...degradeHistory(input.messages)],
+        turns: [...session.turns, input.turn],
+        updatedAt: new Date().toISOString()
+      };
+
+      yield* writeSessionFile(updatedSession);
+    });
+
+    const listFiles = () => Effect.gen(function* () {
+      const exists = yield* fs.exists(directory).pipe(Effect.mapError(mapStorageError));
+      if (!exists) {
+        return [] as readonly string[];
+      }
+      return yield* fs.readDirectory(directory).pipe(Effect.mapError(mapStorageError));
+    });
+
+    // Igual que `file-artifact-repository.ts`: un fichero ilegible se anota en el log del servidor y
+    // se salta, en vez de tumbar el listado entero de conversaciones (invariante 3).
+    const listSessions = (): Effect.Effect<readonly StoredAgentSessionSummary[], SessionRepositoryError> => Effect.gen(function* () {
+      const files = (yield* listFiles()).filter((file) => file.endsWith(".json"));
+      const [, sessions] = yield* Effect.partition(files, (file) => {
+        const sessionId = decodeURIComponent(file.replace(/\.json$/, ""));
+        return readSessionFile(sessionId).pipe(
+          Effect.tapError((error) => Effect.logWarning(`sesión ilegible ${file}: ${String("reason" in error ? error.reason : error._tag)}`)),
+          Effect.mapError(() => file)
+        );
+      });
+
+      return sessions.map((session): StoredAgentSessionSummary => ({
+        id: session.id,
+        title: session.title,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt
+      }));
+    });
+
+    const deleteSession = (id: string): Effect.Effect<void, SessionRepositoryError> => Effect.gen(function* () {
+      const sessionPath = pathForSession(id);
+      const exists = yield* fs.exists(sessionPath).pipe(Effect.mapError(mapStorageError));
+      if (!exists) {
+        return yield* new SessionNotFound({ sessionId: id });
+      }
+      yield* fs.remove(sessionPath).pipe(Effect.mapError(mapStorageError));
+    });
+
     return {
       getSession,
       makeSession,
-      appendMessages
+      appendMessages,
+      appendTurn,
+      listSessions,
+      deleteSession
     };
   }),
   layer: (directory: string) => Layer.effect(SessionRepository)(FileSessionRepository.make(directory))

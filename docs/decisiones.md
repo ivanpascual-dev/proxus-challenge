@@ -1049,3 +1049,49 @@ alumno desde la interfaz (F3-31).
 - El perfil es por material; cruzarlos es otra fase.
 - Quitarle tres comandos al tutor puede dejarlo pobre en la demo (riesgo 8): la fase 4 es la que lo
   compensa.
+
+## ADR-023 · El historial de una conversación tiene un techo de tokens, con aviso al 75% y corte al 100%
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-31
+
+**Contexto.** La fase 4 mueve la sesión del tutor al servidor (decisión 6 del plan): una conversación
+guardada puede crecer sin límite mientras la persona siga escribiendo. Nada del plan escrito cubría
+ese caso; surgió al preguntar Iván, tras cerrar el tramo 4C, qué pasaba con una conversación que no
+termina nunca. Se decidió en esta misma sesión, no en la planificación de la fase.
+
+**Decisión.** Un fusible sobre la conversación **entera**, no sobre el turno individual (eso ya lo
+hacen `maxMessageCharacters`/`maxAgentSteps`): `maxConversationHistoryTokens = 80.000`. Al 75% se
+avisa al terminar el turno, informativo, la conversación sigue usándose. Al 100% el turno siguiente se
+rechaza **antes** de llamar al modelo, sin gastar la llamada. Ambos casos sugieren empezar una
+conversación nueva; no hay resumen ni compactación automática del historial.
+
+El tamaño se mide con el dato **real**: los `inputTokens` medidos (`usageMetadata` de Gemini) del
+último paso del último turno ya guardado, nunca una estimación de caracteres. Sin ese dato
+(conversación nueva, o el modelo no lo trajo esa vez) no se avisa ni se rechaza (invariante 3: no
+fabricar un límite superado donde no hay dato).
+
+**Opciones consideradas.**
+
+- **Resumir o compactar el historial automáticamente** al acercarse al techo (lo que hacen varios
+  agentes de código). Descartada por sobre-ingeniería para este caso: exige un camino de resumen con
+  su propio presupuesto y sus propios fallos, para un techo (80.000 tokens) que una sesión de estudio
+  normal tarda en alcanzar. Empezar una conversación nueva es gratis y ya existe.
+- **Contar caracteres del historial guardado**, como hacía el mecanismo retirado
+  (`maxHistoryMessages`/`maxHistoryCharacters`, fase 1). Descartada: un carácter no cuesta lo mismo
+  que otro en tokens (código, símbolos, idioma), y el coste real que importa es el que cobra el
+  modelo, no una aproximación.
+- **Cortar solo al 100%, sin aviso previo.** Descartada: la persona pierde el mensaje que estaba
+  escribiendo sin ninguna señal previa; el aviso al 75% deja margen para terminar la idea y migrar a
+  una conversación nueva sin perder nada.
+
+**Consecuencias.**
+
+- El fusible depende de que exista un turno guardado con `usage` medido: la primera conversación, o
+  una donde el modelo nunca devolvió `usageMetadata`, no tiene nada que comparar y no bloquea nunca
+  (mismo criterio que el resto de la fase 4 con datos de coste, F4-19).
+- Una conversación que se queda justo por debajo del 75% para siempre es posible (no hay techo de
+  turnos ni de tiempo, solo de tokens): aceptado, es el mismo fusible de coste que el resto de la fase,
+  no una cuota de uso.
+- Si el techo resulta corto o largo en uso real, se ajusta la cifra en `limits.ts`; no hace falta
+  tocar el mecanismo.

@@ -797,3 +797,28 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   (`gemini.ts` sigue leyendo `LIMITS.maxModelOutputTokens`, que ya no existe; `tutor-chat-service.ts`,
   `handlers.ts`, `server.ts` y `Chat.tsx` siguen con la forma vieja de `TutorChatRequest`/Response).
   Es el mapa de los tramos 4C-4E, no una regresión de este commit.
+
+## 2026-08-31 · Fase 4 · tramo 4C, la sesión en el servidor
+
+- **D3 cierra de verdad, no solo de forma parcial.** El hueco conocido desde la fase 1 (ADR-008
+  barrera 3: un `tool-result` fabricado por el cliente podía colarse en el historial que se reenvía al
+  modelo) se cierra porque el contrato de `POST /api/tutor/chat` ya no tiene `messages`: no hay canal
+  por el que ese campo fabricado pueda entrar en la conversación guardada. `scripts/test-guardarrailes.mjs`
+  cambia D3 de "hueco conocido, no bloquea" a comprobar que el texto fabricado no aparece en la
+  conversación leída del servidor tras mandarlo. `D5` (historial por encima de
+  `maxHistoryMessages`) se retira: sin `messages` en la petición no hay nada que inundar desde ahí.
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión, ya no forma parte del plan escrito:
+  el fusible de coste sobre la conversación entera (ADR-023).** Surgió al preguntar Iván, tras cerrar
+  el resto del tramo 4C, qué pasaba con una conversación que no termina nunca. La bitácora guarda el
+  contexto: se consideró resumir o compactar el historial automáticamente al acercarse al techo (como
+  hacen otros agentes de código) y se descartó por sobre-ingeniería para este caso, prefiriendo que la
+  persona empiece una conversación nueva, que ya es gratis. El ADR guarda la decisión en sí
+  (`maxConversationHistoryTokens`, el 75%/100%, medir con datos reales).
+- **Deuda: el aviso al 75% solo está probado por unit test, no de punta a punta contra el servidor
+  real.** Verificarlo de punta a punta habría exigido fabricar un historial de texto real de decenas
+  de miles de caracteres para que un turno ejecutado de verdad devolviera un `inputTokens` medido por
+  encima del umbral; se consideró desproporcionado porque el aviso es solo informativo (no bloquea ni
+  gasta nada). El corte duro al 100% sí se verificó de punta a punta, fabricando a mano el
+  `inputTokens` del último turno guardado en el fichero de sesión (sin gastar una llamada real de
+  80.000 tokens contra Gemini). Se desbloquea, si algún día hace falta, con un guion que genere ese
+  historial largo de verdad.

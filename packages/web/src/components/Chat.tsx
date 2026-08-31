@@ -1,10 +1,11 @@
 import { useAtomRefresh, useAtomSet } from "@effect/atom-react";
 import { LIMITS, type AgentMessage } from "@proxus/shared";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import { invalidateArtifactsAction } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
+import { createConversationAction } from "../domain/tutor/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
 import { messageOf } from "../lib/error-message.ts";
@@ -20,31 +21,92 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [historyWarning, setHistoryWarning] = useState<string | undefined>();
   const invalidateArtifacts = useAtomSet(invalidateArtifactsAction);
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
+
+  // La sesión vive en el servidor (fase 4, decisión 6): hace falta una conversación antes de mandar
+  // el primer mensaje. Minimal para el tramo 4C, sin volver a una conversación anterior al recargar
+  // ni lista lateral: eso es el tramo 4E (`ConversationList`).
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationError, setConversationError] = useState<string | undefined>();
+  const createConversation = useAtomSet(createConversationAction, { mode: "promise" });
+
+  useEffect(() => {
+    let cancelled = false;
+    createConversation()
+      .then((conversation) => {
+        if (!cancelled) {
+          setConversationId(conversation.id);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          setConversationError(messageOf(cause));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // El techo lo impone el servidor en voz alta (F1-02); el contador es la cortesía que evita mandar
   // un mensaje que ya se sabe que va a rebotar. La cifra sale de LIMITS, nunca escrita a mano (F1-09).
   const overMessageLimit = input.length > LIMITS.maxMessageCharacters;
 
+  const clearChat = async () => {
+    setMessages([]);
+    setError(undefined);
+    setHistoryWarning(undefined);
+    setConversationError(undefined);
+    setConversationId(undefined);
+    try {
+      const conversation = await createConversation();
+      setConversationId(conversation.id);
+    } catch (cause) {
+      setConversationError(messageOf(cause));
+    }
+  };
+
   const submit = async (nextInput: string) => {
     const trimmed = nextInput.trim();
-    if (trimmed.length === 0 || isSending || trimmed.length > LIMITS.maxMessageCharacters) {
+    if (trimmed.length === 0 || isSending || trimmed.length > LIMITS.maxMessageCharacters || conversationId === undefined) {
       return;
     }
 
     setIsSending(true);
     setError(undefined);
+    setHistoryWarning(undefined);
     pendingInvalidations.current = [];
 
     try {
       for await (const event of streamTutorMessage({
+        conversationId,
         input: trimmed,
-        messages,
+        // Chips de contexto de pantalla: tramo 4E (`ChatContextBar`).
+        context: [],
         maxSteps: LIMITS.maxAgentSteps
       })) {
         if (event.type === "done") {
+          continue;
+        }
+
+        if (event.type === "error") {
+          setError(event.message);
+          continue;
+        }
+
+        // El aviso al 75% de `maxConversationHistoryTokens`: informativo, la conversación sigue
+        // usable, solo sugiere empezar una nueva cuando convenga.
+        if (event.type === "warning") {
+          setHistoryWarning(event.message);
+          continue;
+        }
+
+        // Preguntas de seguimiento y coste del turno: tramo 4E (`FollowUpQuestions`, `TurnCost`).
+        if (event.type === "follow-up" || event.type === "usage") {
           continue;
         }
 
@@ -84,7 +146,7 @@ export function Chat() {
         <button
           className="rounded-full border border-border-strong px-4 py-2 text-body hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          onClick={() => setMessages([])}
+          onClick={() => void clearChat()}
           disabled={messages.length === 0}
         >
           Vaciar el chat
@@ -116,7 +178,24 @@ export function Chat() {
           : messages.map((message, index) => <MessageBubble key={index} message={message} />)}
       </section>
 
+      {conversationError === undefined
+        ? null
+        : <p className="m-0 px-6 pb-3 text-danger-ink">No se pudo preparar la conversación: {conversationError}</p>}
       {error === undefined ? null : <p className="m-0 px-6 pb-3 text-danger-ink">{error}</p>}
+      {historyWarning === undefined
+        ? null
+        : (
+            <p className="m-0 flex flex-wrap items-center gap-2 px-6 pb-3 text-muted">
+              {historyWarning}
+              <button
+                className="rounded-full border border-border-strong px-3 py-1 text-body text-xs hover:border-brand"
+                type="button"
+                onClick={() => void clearChat()}
+              >
+                Nueva conversación
+              </button>
+            </p>
+          )}
 
       <form
         className="grid grid-cols-[1fr_auto] gap-3 border-border border-t bg-canvas/90 px-6 pt-4 pb-6"
@@ -132,9 +211,10 @@ export function Chat() {
             }`}
             value={input}
             onChange={(event) => setInput(event.currentTarget.value)}
-            placeholder="Pregúntale algo a tu tutor…"
+            placeholder={conversationId === undefined ? "Preparando conversación…" : "Pregúntale algo a tu tutor…"}
             rows={3}
             aria-invalid={overMessageLimit}
+            disabled={conversationId === undefined}
           />
           <p
             className={`self-end text-xs ${overMessageLimit ? "text-danger-ink" : "text-muted"}`}
@@ -148,7 +228,7 @@ export function Chat() {
         <button
           className="self-start rounded-full border border-border-strong bg-surface px-5 py-3 text-heading hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
           type="submit"
-          disabled={isSending || input.trim().length === 0 || overMessageLimit}
+          disabled={isSending || input.trim().length === 0 || overMessageLimit || conversationId === undefined}
         >
           {isSending ? "Pensando…" : "Enviar"}
         </button>

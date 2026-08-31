@@ -50,9 +50,9 @@ domicilio.
   sistema DEBERÁ rechazarla con 400 sin llamar al modelo, nombrando el techo y el valor recibido.
 - **F1-02.** CUANDO el cliente envíe un mensaje de más de `maxMessageCharacters` caracteres, EL sistema
   DEBERÁ rechazarlo con 400, nombrando el techo y la longitud recibida.
-- **F1-03.** CUANDO el cliente envíe un historial de más de `maxHistoryMessages` mensajes o de más de
-  `maxHistoryCharacters` caracteres, EL sistema DEBERÁ rechazarlo con 400, nombrando el techo y lo
-  recibido.
+- **F1-03.** Retirado en la fase 4 (tramo 4C): la sesión pasa a vivir en el servidor y el historial ya
+  no llega en la petición de chat (`maxHistoryMessages`/`maxHistoryCharacters` se retiraron de
+  `limits.ts`). Lo sustituyen F4-11 y F4-12.
 - **F1-04.** CUANDO una selección de páginas resuelva a más de `maxPagesPerTurn` páginas, EL sistema
   DEBERÁ rechazarla nombrando el techo y el número pedido, y NO DEBERÁ renderizar ninguna.
 - **F1-05.** MIENTRAS un turno tenga agotado su presupuesto de páginas o de bytes, EL sistema DEBERÁ
@@ -577,6 +577,19 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 - **F4-40.** CUANDO se decida el nivel de razonamiento de un camino, EL sistema DEBERÁ dejar registrado
   con qué evaluación se decidió y con qué resultado; SI se decidió sin evaluación, ENTONCES DEBERÁ
   registrarse que la comparación fue manual y con cuántas muestras.
+
+#### Fusible de coste del historial
+
+- **F4-41.** EL sistema DEBERÁ medir el tamaño de una conversación con los tokens de entrada reales del
+  último paso del último turno guardado, y NO DEBERÁ estimarlo a partir de caracteres.
+- **F4-42.** MIENTRAS una conversación no tenga ningún turno guardado con tokens de entrada medidos, EL
+  sistema NO DEBERÁ avisar ni rechazar por este fusible.
+- **F4-43.** CUANDO el último turno guardado alcance el 75% de `maxConversationHistoryTokens`, EL
+  sistema DEBERÁ avisar al terminar ese turno sugiriendo empezar una conversación nueva, sin impedir
+  que la conversación siga usándose.
+- **F4-44.** SI el último turno guardado de una conversación alcanza `maxConversationHistoryTokens`,
+  ENTONCES EL sistema DEBERÁ rechazar el turno siguiente antes de llamar al modelo, nombrando el techo
+  y sugiriendo empezar una conversación nueva.
 
 ### Fase 5 · Pulido y prueba
 

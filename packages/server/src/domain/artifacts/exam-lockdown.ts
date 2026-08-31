@@ -40,6 +40,15 @@ export const findActiveExam = (attempts: readonly ArtifactAttempt[], nowIso: str
 export const CLOSED_ROUTES: readonly string[] = [
   "POST /api/tutor/chat",
   "POST /api/tutor/chat/stream",
+  // Conversaciones del tutor (fase 4, decisión 6): son acceso al tutor tanto como el propio chat, así
+  // que se cierran con él.
+  "GET /api/tutor/conversations",
+  "POST /api/tutor/conversations",
+  "GET /api/tutor/conversations/:id",
+  "DELETE /api/tutor/conversations/:id",
+  // Subir un material nuevo (fase 4) da acceso a material que no estaba en el examen: se cierra igual
+  // que el resto de rutas que tocan materiales.
+  "POST /api/materials",
   "GET /api/materials/:id",
   "GET /api/materials/:id/index",
   "GET /api/materials/:id/assessments",

@@ -39,23 +39,27 @@ export const TutorHttpHandlers = HttpApiBuilder.group(
     const tutor = yield* TutorChatService;
     const rateLimiter = yield* RateLimiter;
 
-    return handlers.handle("chat", ({ payload }) =>
-      Effect.gen(function* () {
-        const limitExceeded = checkChatRequestLimits(payload);
-        if (Option.isSome(limitExceeded)) {
-          return yield* limitExceeded.value;
-        }
+    return handlers
+      .handle("chat", ({ payload }) =>
+        Effect.gen(function* () {
+          const limitExceeded = checkChatRequestLimits(payload);
+          if (Option.isSome(limitExceeded)) {
+            return yield* limitExceeded.value;
+          }
 
-        const key = yield* clientKey;
-        yield* rateLimiter.check(key, "messages");
-        yield* rateLimiter.acquire(key);
+          const key = yield* clientKey;
+          yield* rateLimiter.check(key, "messages");
+          yield* rateLimiter.acquire(key);
 
-        return yield* tutor.sendMessage(payload, key).pipe(
-          Effect.orDie,
-          Effect.ensuring(rateLimiter.release(key))
-        );
-      })
-    );
+          return yield* tutor.sendMessage(payload, key).pipe(
+            Effect.ensuring(rateLimiter.release(key))
+          );
+        })
+      )
+      .handle("listConversations", () => tutor.listConversations())
+      .handle("createConversation", () => tutor.createConversation())
+      .handle("getConversation", ({ params }) => tutor.getConversation(params.id))
+      .handle("deleteConversation", ({ params }) => tutor.deleteConversation(params.id));
   })
 );
 
