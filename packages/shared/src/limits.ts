@@ -1,6 +1,9 @@
 export const LIMITS = {
   // Tamaño de entrada
   maxMessageCharacters: 2_000,
+  // Su razón de ser era el `@` manual de contexto, que queda fuera de alcance en la fase 4 (decisión
+  // 1). Sin él no hay texto pegado que limitar: no aplica, y se deja documentado en vez de fingir que
+  // se cumple (riesgo 8 de la fase 4).
   maxPastedCharactersPerTurn: 12_000,
   maxHistoryMessages: 400,
   maxHistoryCharacters: 200_000,
@@ -8,6 +11,14 @@ export const LIMITS = {
   maxUploadBytes: 25 * 1024 * 1024,
   maxMaterials: 5,
   maxFilesPerUpload: 5,
+  // El máximo simultáneo que la interfaz puede mostrar hoy: un material, el artefacto de su pestaña
+  // activa (apunte o prueba) y un bloque resaltado dentro de él (`MaterialPanel.tsx`, pestañas
+  // mutuamente excluyentes sobre un único material).
+  maxContextRefs: 3,
+  maxConversations: 50,
+  maxConversationTitleCharacters: 80,
+  followUpQuestions: 3,
+  maxFollowUpQuestionCharacters: 120,
 
   // Coste por turno
   maxPagesPerTurn: 20,

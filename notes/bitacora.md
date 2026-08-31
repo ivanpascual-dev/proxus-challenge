@@ -779,3 +779,21 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
 - **Pendiente de la fase**, no de este tramo: `session.ts` sigue sin acumular `usage` por paso ni
   exponerlo (tramo 4C); el system prompt de este guion quedará desfasado en cuanto el tramo 4E entre
   en vigor, y hay que actualizarlo entonces.
+
+## 2026-08-31 · Fase 4 · tramo 4B, contratos
+
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión: cómo conviven "varios ficheros por
+  subida" con "un fichero inválido no tumba a los demás" (F4-02).** El plan (§5) pedía el endpoint
+  `upload` con `UnsupportedFileType`, `MaterialAlreadyExists` y `TooManyMaterials` "mapeados, nunca
+  `orDie`", pero no decía por qué canal viaja cada uno. Se resolvió así: los fallos agregados
+  (`TooManyMaterials`, `LimitExceeded` de `maxFilesPerUpload`, `RateLimited` de `uploadsPerWindow`)
+  abortan la petición entera como error HTTP, antes de escribir nada; los fallos por fichero
+  (`UnsupportedFileType`, nombre duplicado con `MaterialAlreadyExists`) van dentro de la respuesta 200,
+  uno por fichero, en `MaterialUploadResult` (`schemas/material.ts`), sin abortar a los demás del
+  lote. No sube a ADR porque es la forma de un contrato HTTP ya acotado por F4-02/F4-03/F4-04, no una
+  decisión de producto nueva.
+- **Tramo deliberadamente a medias, como documenta el propio plan.** Con solo `packages/shared`
+  tocado, `pnpm run typecheck` (raíz) y `pnpm --filter @proxus/server run typecheck` quedan rotos
+  (`gemini.ts` sigue leyendo `LIMITS.maxModelOutputTokens`, que ya no existe; `tutor-chat-service.ts`,
+  `handlers.ts`, `server.ts` y `Chat.tsx` siguen con la forma vieja de `TutorChatRequest`/Response).
+  Es el mapa de los tramos 4C-4E, no una regresión de este commit.

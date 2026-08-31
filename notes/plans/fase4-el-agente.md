@@ -546,8 +546,12 @@ del typecheck son el mapa de lo que queda por tocar.
 
 - **`limits.ts`**, límites nuevos:
   - `maxFilesPerUpload: 5`
-  - `uploadsPerWindow: { limit: 20, windowMs: 60 * 60 * 1000 }` (documentos por hora, decisión 4)
-  - `maxContextRefs: 4`
+  - `uploadsPerWindow: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }` (documentos por día, decisión 4;
+    revisado en la ejecución del tramo 4B: frena la frecuencia de subidas, no cuántos materiales hay
+    vivos a la vez, que ya cubre `maxMaterials`; 20/hora era demasiado holgado para ese propósito)
+  - `maxContextRefs: 3` (revisado en la ejecución del tramo 4B: es lo máximo que la interfaz de hoy
+    puede mostrar a la vez, `MaterialPanel.tsx` con pestañas mutuamente excluyentes sobre un único
+    material: el material, el artefacto de su pestaña activa y un bloque resaltado dentro de él)
   - `maxConversations: 50`
   - `maxConversationTitleCharacters: 80`
   - `followUpQuestions: 3`
