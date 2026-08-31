@@ -332,6 +332,16 @@ export const make = (
         continue;
       }
 
+      // No cara al alumno (F3-08 solo pide no adivinar el campo y no colar la pregunta): diagnóstico
+      // de por qué el modelo dio menos preguntas útiles de las que devolvió, para quien lea el log.
+      if (parsed.dropped.length > 0) {
+        yield* Effect.logWarning(
+          `generación de prueba: el tema "${topic.label}" descartó ${parsed.dropped.length} pregunta(s) indecodificable(s): ${
+            parsed.dropped.map((item) => `#${item.index} (${item.reason})`).join("; ")
+          }`
+        );
+      }
+
       for (const question of parsed.questions) {
         if (!acceptsQuestionType(kind, question.type)) {
           continue;

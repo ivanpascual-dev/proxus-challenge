@@ -706,3 +706,11 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     juez si una respuesta de desarrollo corto supera 1500 caracteres. El `maxLength` del `<textarea>`
     era la única barrera; un cliente que no fuera la web se la saltaba entera. Test de regresión en
     `attempt-service.test.ts`.
+  - **F3-08/F3-09 (el motivo de cada pregunta descartada), reescritos, no el código.** El reparto ya
+    era todo o nada (si el tema no da para las N pedidas tras los reintentos, la generación entera
+    falla nombrando el motivo, `assessment-generation-service.ts:490-494`); lo que faltaba era el
+    motivo de cada descarte individual (`parsed.dropped`), que se calculaba y se tiraba. Decisión de
+    Iván: no exponerlo al alumno (el todo-o-nada ya lo protege), pero tampoco perderlo: ahora se
+    registra en el log del servidor como diagnóstico (`generateForTopic`). F3-08/F3-09 reescritos en
+    `especificacion.md` para que digan "al log", no "al resultado", y "guardadas = pedidas o falla
+    entero" en vez de pedir un desglose por pregunta que el diseño no da.

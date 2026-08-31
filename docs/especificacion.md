@@ -284,10 +284,12 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 #### La generación falla en voz alta
 
 - **F3-08.** SI una pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema DEBERÁ
-  descartarla nombrando el motivo en el resultado de la generación, y NO DEBERÁ completarla adivinando
-  ningún campo.
-- **F3-09.** CUANDO termine de generarse una prueba, EL sistema DEBERÁ informar de cuántas preguntas se
-  pidieron, cuántas se guardaron y por qué se cayeron las demás.
+  descartarla y registrar el motivo en el log del servidor (diagnóstico para quien desarrolla, no cara
+  al alumno), y NO DEBERÁ completarla adivinando ningún campo.
+- **F3-09.** El reparto es todo o nada (F3-10): CUANDO una prueba termine de generarse con éxito, las
+  preguntas guardadas DEBERÁN ser exactamente las pedidas. SI un tema no da para completar su parte del
+  reparto tras los reintentos (`maxGenerationRetriesPerTopic`), ENTONCES la generación entera DEBERÁ
+  fallar nombrando el tema y cuántas de las pedidas no se pudieron sacar.
 - **F3-10.** SI no sobrevive ninguna pregunta, ENTONCES EL sistema DEBERÁ fallar la generación con su
   motivo, y NO DEBERÁ guardar una prueba sin preguntas.
 
