@@ -15,10 +15,10 @@ nadie sabe lo que cuesta.
 
 Medido sobre las sesiones reales de `packages/server/.data/agent-sessions`:
 
-| Sesión | Mensajes | Historial en disco | Bytes enviados a Gemini en **un turno** |
-| --- | --- | --- | --- |
-| `verifier-f105b` | 10 | 8,73 MB | **22,85 MB** |
-| `academic-tutor-demo` | 10 | 4,32 MB | 8,64 MB |
+| Sesión                | Mensajes | Historial en disco | Bytes enviados a Gemini en **un turno** |
+| --------------------- | -------- | ------------------ | --------------------------------------- |
+| `verifier-f105b`      | 10       | 8,73 MB            | **22,85 MB**                            |
+| `academic-tutor-demo` | 10       | 4,32 MB            | 8,64 MB                                 |
 
 El **99,98%** de ese historial son imágenes base64 dentro de los `tool-result` de `materials view`.
 La causa está en dos sitios del mismo fichero: [`session.ts:83`](../../packages/server/src/domain/agents/harness/session.ts)
@@ -42,10 +42,10 @@ arranca con ~9 KB en vez de con 8,73 MB.
 prefijo idéntico (17.800 tokens):
 
 | Llamada | `promptTokenCount` | `cachedContentTokenCount` |
-| --- | --- | --- |
-| 1 | 17.843 | (ninguno) |
-| 2 | 17.845 | (ninguno) |
-| 3 | 17.846 | **12.263** |
+| ------- | ------------------ | ------------------------- |
+| 1       | 17.843             | (ninguno)                 |
+| 2       | 17.845             | (ninguno)                 |
+| 3       | 17.846             | **12.263**                |
 
 Tres cosas que salen de ahí y que mandan sobre el diseño: **funciona sin escribir gestión de caché
 ninguna**; **no salta hasta la tercera llamada**, así que los primeros pasos de un turno se pagan
@@ -54,15 +54,22 @@ de la palanca 1**, la complementa. La 1 quita el arrastre entre turnos, la 2 aba
 dentro del turno.
 
 El requisito que impone: **el prefijo tiene que ser estable y crecer solo por el final**
-(*append-only*). Nada variable en el system prompt (ni hora, ni ids aleatorios, ni orden de un `Map`),
+(_append-only_). Nada variable en el system prompt (ni hora, ni ids aleatorios, ni orden de un `Map`),
 y nada que reescriba mensajes viejos a mitad de conversación.
 
-**Palanca 3, menos pasos.** En `verifier-f105b`, dos de las cinco llamadas se fueron en `load_skill`
-y `materials list` antes de tocar nada útil, y la skill cargada son ~900 tokens que ya no se van del
-historial. El árbol de comandos con su descripción de una línea son **21 comandos y 1.129
-caracteres** (~375 tokens): ponerlo en el system prompt cuesta 375 tokens fijos y ahorra pasos
-enteros de miles. `rootHelp()` ([`cli.ts:364`](../../packages/server/src/domain/agents/harness/cli.ts))
-ya genera exactamente ese texto y hoy solo se ve si el modelo gasta un paso en pedir `--help`.
+**Palanca 3, el cuerpo de una skill se envía una vez.** En `verifier-f105b`, dos de las cinco llamadas
+se fueron en `load_skill` y `materials list` antes de tocar nada útil, y la skill cargada son ~900
+tokens que ya no se van del historial. El desperdicio **no es cargarla**: es que ese `tool-result` se
+reenvía entero en cada paso posterior del bucle, así que una skill cargada en el paso 2 de un turno
+de 8 viaja 7 veces (~6.300 tokens por 900 útiles).
+
+**La divulgación progresiva no se toca.** El árbol de comandos NO se sube al system prompt: las skills
+ya lo llevan dentro (`use-uploaded-materials.ts:11-14` y `37-43`), y lo llevan **con el contexto que
+una línea de descripción no puede dar**: `materials read` antes que `materials view` porque la imagen
+gasta presupuesto, `transcribed` puede tener errores, y el aviso de que el texto de las páginas son
+datos y no instrucciones. Poner las 21 líneas sueltas en el prompt duplicaría lo que ya está dicho, y
+tentaría al modelo a lanzar comandos saltándose el orden de preferencia y los guardarraíles que solo
+existen en el cuerpo de la skill. Se ahorra **dentro** del mecanismo, no quitándolo.
 
 ### Lo que cierra de seguridad
 
@@ -110,22 +117,68 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
     se degradan a su descripción textual, de forma definitiva, también en disco. Si el modelo las
     necesita después, las vuelve a pedir y el presupuesto se las cobra otra vez, que es lo correcto
     porque volver a mirarlas cuesta de verdad.
-11. **Palanca 2: el prefijo es *append-only*.** El system prompt es determinista y el contexto de
+11. **Palanca 2: el prefijo es _append-only_.** El system prompt es determinista y el contexto de
     pantalla viaja **dentro del mensaje del usuario**, nunca en el system prompt: cambia en cada turno
     y ahí rompería la caché de todo lo demás.
-12. **Palanca 3: el árbol de comandos con su descripción va en el system prompt.** `load_skill` sigue
-    existiendo para el detalle (procedencia, orden de preferencia, flujos), que es lo que no cabe en
-    una línea.
+12. **Palanca 3: la divulgación progresiva se queda intacta y se ahorra dentro de ella.** El árbol de
+    comandos **no** sube al system prompt y `load_skill` sigue siendo la única puerta al cuerpo de una
+    skill. Motivo: ese mecanismo es la tesis de diseño del harness, y las 21 descripciones sueltas
+    duplicarían lo que la skill ya dice mejor y con contexto. Tres medidas que sí ahorran:
+    - **a. El cuerpo de una skill se envía una vez por sesión.** Si el modelo vuelve a pedir una skill
+      ya cargada, el `tool-result` devuelve `Already loaded above. Re-read it there.` en lugar del
+      cuerpo. Y en el rearmado del historial, el cuerpo se conserva solo en su **primera** aparición.
+      Ahorro medido sobre el caso real: ~6.300 tokens en un turno de 8 pasos.
+    - **b. Los cuerpos se recortan y se deduplican entre sí.** Hoy son 12.849 bytes en tres skills
+      (`skills/*.ts`) con solapamiento evidente (las tres reexplican los ids de artefacto). Objetivo:
+      lo compartido baja al system prompt canónico **una vez**, y cada skill se queda con lo suyo.
+    - **c. La caché implícita cubre lo que quede.** El cuerpo de la skill entra en el prefijo estable
+      y a partir de la tercera llamada se cachea (69% medido), así que lo que sobreviva a (a) y (b)
+      se paga barato.
+
+    **El catálogo se queda en el system prompt exactamente como está hoy** (`harness.ts:57` con
+    `skillsHelp`): nombre y descripción de cada skill, nada más. Medido: **620 caracteres, ~155
+    tokens**, frente a los 12.849 bytes (~3.200 tokens) que costarían los tres cuerpos. Las
+    descripciones **no se tocan** en esta fase. El catálogo es el índice: sin él el modelo no sabe qué
+    existe, y con `gemini.ts:317-321` reencaminando toda función desconocida a `load_skill`, se
+    dedicaría a inventar nombres y a cobrarse pasos en `Unknown skill`.
+
+    **Descartado: sacar el catálogo a un comando** tipo `skills list`. No elimina el problema, lo
+    mueve: para llamarlo, el modelo necesita saber que existe, o sea que igualmente hay que decírselo
+    en el prompt. Y a cambio de ahorrar 155 tokens fijos y cacheados al 69%, cuesta **un paso entero
+    del bucle por conversación**, que reenvía todo el prefijo (miles de tokens). Sale a pérdidas desde
+    la primera llamada.
+
+    **Punto de ruptura, para cuando alguien lo relea dentro de un año:** con 3 skills el catálogo
+    plano es lo correcto. Extrapolado a 20 skills al tamaño de descripción de hoy serían ~1.035
+    tokens, y ahí sí tocaría acortar las descripciones (a ~90 caracteres bajan a ~525) o agrupar por
+    área. Solo en ese escenario `skills list` tendría sentido, y **como segundo nivel** (el prompt
+    lleva las áreas, el comando expande una), nunca como sustituto del índice. **Hoy no aplica y no
+    se construye.**
+
+    **El harness está montado sobre esta premisa, no solo documentado así.** `gemini.ts:312-325`:
+    cuando el modelo llama a una función que no es una tool registrada, el adaptador **la reencamina a
+    `load_skill`** con ese nombre. El fallback da por hecho que lo que el modelo no conoce se resuelve
+    cargando una skill. Y `harness.ts:60` ya avisa en el prompt: _"Skills are not tools and their
+    names are not callable functions"_. Poner 21 nombres de comando en el prompt añadiría un segundo
+    catálogo de nombres no invocables junto al de skills: si el modelo intentase `materials_list` como
+    función, el fallback lo mandaría a `load_skill({ name: "materials_list" })` y cobraría un paso para
+    devolver `Unknown skill`. Es un fallo inferido del código, no medido, pero el mecanismo está a la
+    vista y el prompt ya tiene una línea dedicada a contener justo esa confusión.
+
+    **Nada de esto toca la traza ni cómo se pinta.** Siguen siendo dos herramientas, siguen emitiendo
+    `tool-call` y `tool-result` (`shared/src/schemas/agent-message.ts:16,23`) y `Chat.tsx:160-172` los
+    sigue pintando igual: en la pantalla se seguirá viendo `load_skill` y luego `cli`, como hoy.
+
 13. **System prompt canónico**, en inglés, con el texto literal de la sección 6.
 14. **Thinking en cuatro caminos y en ninguno más, con el nivel decidido por la eval.** Medido contra
     la API real con el prompt de apuntes y 4 páginas de un material del corpus (3.002 tokens de
     entrada):
 
     | Configuración | entrada | pensamiento | salida | salida facturable | total |
-    | --- | --- | --- | --- | --- | --- |
-    | sin thinking | 3.002 | 0 | 625 | 625 | 3.627 |
-    | `low` | 3.002 | 1.602 | 733 | **2.335** | 5.337 |
-    | `high` | 3.002 | 1.454 | 842 | **2.296** | 5.298 |
+    | ------------- | ------- | ----------- | ------ | ----------------- | ----- |
+    | sin thinking  | 3.002   | 0           | 625    | 625               | 3.627 |
+    | `low`         | 3.002   | 1.602       | 733    | **2.335**         | 5.337 |
+    | `high`        | 3.002   | 1.454       | 842    | **2.296**         | 5.298 |
 
     Tres lecturas, y las tres mandan sobre la decisión. **La entrada no se mueve**: el pensamiento se
     suma a la salida, así que el sobrecoste no escala con el tamaño del material. **La salida
@@ -134,17 +187,18 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
     tarea (incluso `low` pensó más), con una sola muestra: entre los dos niveles **no se elige por
     precio, se elige por calidad con la eval**.
 
-    | Camino | Thinking | Motivo |
-    | --- | --- | --- |
-    | Apuntes | **Sí** | Una llamada por tema, una sola vez en la vida del material, y es lo primero que ve el alumno |
-    | Examen (`test`) | **Sí** | `maxTestsPerMaterial: 2`: volumen bajo y es la prueba que cuenta |
-    | Control (`quiz`) | No | `maxQuizzesPerTopic: 2` **por tema**: el camino de más volumen, y es práctica |
-    | Juez de respuesta abierta | **Sí** | Máximo 8 llamadas por intento, y un falso negativo manda al alumno a reestudiar lo que ya sabía (invariante 5) |
-    | Indexación | No | 261 páginas de una tirada, y transcribir no se beneficia de razonar |
-    | Chat del tutor | No | Se multiplicaría por cada paso del bucle |
+    | Camino                    | Thinking | Motivo                                                                                                         |
+    | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+    | Apuntes                   | **Sí**   | Una llamada por tema, una sola vez en la vida del material, y es lo primero que ve el alumno                   |
+    | Examen (`test`)           | **Sí**   | `maxTestsPerMaterial: 2`: volumen bajo y es la prueba que cuenta                                               |
+    | Control (`quiz`)          | No       | `maxQuizzesPerTopic: 2` **por tema**: el camino de más volumen, y es práctica                                  |
+    | Juez de respuesta abierta | **Sí**   | Máximo 8 llamadas por intento, y un falso negativo manda al alumno a reestudiar lo que ya sabía (invariante 5) |
+    | Indexación                | No       | 261 páginas de una tirada, y transcribir no se beneficia de razonar                                            |
+    | Chat del tutor            | No       | Se multiplicaría por cada paso del bucle                                                                       |
 
     Examen y control comparten servicio y prompt: **se separan por `kind`**, que ya está disponible en
     el punto donde hoy se elige la capa del modelo (`server.ts:383`).
+
 15. **Nada de model routing con clasificador.** Añade una llamada por turno solo para decidir, y hoy
     no hay datos de dónde falla el modelo porque el adaptador los tira. El enrutado que sí entra es el
     determinista por camino, extendiendo el patrón que ya existe con `GeminiJsonLanguageModelLive`.
@@ -164,34 +218,35 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
 
 Comprobado leyendo el repo, no los documentos.
 
-| Qué | Dónde | Estado real |
-| --- | --- | --- |
-| `maxSteps` acotado | `chat-limits.ts:11-26` | Hecho, con entero y rango |
-| Historial del cliente | `api/tutor.ts:8`, `Chat.tsx:19` | **Sigue viniendo del cliente y vive en `useState`**: se pierde al recargar |
-| Sesión en servidor | `session-repository.ts`, `.data/agent-sessions` | Existe, **solo la usa el CLI** (`academic-tutor.ts:63`) |
-| Modelo de sesión | `session-repository.ts:4-9` | `id`, `messages`, `createdAt`, `updatedAt`. Ni tokens, ni pasos, ni errores |
-| `usage` de Gemini | `gemini.ts:22-28` | **Se descarta**: el esquema solo decodifica `candidates` |
-| `usage` en Effect | `LanguageModel.ts:422-439` | `Response.makePart("finish", { reason, usage })` existe; sin parte `finish`, `response.usage` devuelve todo `undefined` |
-| System prompt | `academic-tutor.ts:37-40` | Cuatro líneas. Sin anti-manipulación, sin no-invención, sin tabla de comandos |
-| Árbol de comandos | `cli.ts:364` (`rootHelp`) | Escrito y **solo accesible gastando un paso en `--help`** |
-| Envoltura de material | `assessment-prompts.ts:74-77` | Hecha: `<<<BEGIN STUDENT MATERIAL>>>` ya se usa en `materials read` y en los prompts de generación |
-| Batería de ataques | `scripts/test-guardarrailes.mjs` | **Ya existe**, D1-D5 y B1-B9. Único hueco abierto: **D3** |
-| Subida de ficheros | `api/materials.ts` | No existe. Solo `list`, `get`, `index`, `assessments`, `profile`, `page` |
-| Multipart en Effect | `httpapi/HttpApiSchema.ts:537`, `http/Multipart.ts` | `HttpApiSchema.asMultipart(opts)`, `Multipart.FilesSchema`, `PersistedFile { key, name, contentType, path }` |
-| Errores de multipart | `http/Multipart.ts:197-212` | Tipados: `FileTooLarge`, `BodyTooLarge`, `TooManyParts`, `FieldTooLarge`, `Parse` |
-| Prompts en español | `assessment-prompts.ts`, `note-generation-prompts.ts`, `rewrite-block-prompts.ts`, `url-source-prompts.ts`, `indexing-prompts.ts` | 6.581 caracteres de prompt en español |
-| Skills del tutor | `skills/*.ts` | **Ya en inglés**, 9.697 caracteres |
-| Eval del juez | `open-answer-judge.eval.ts` | Existe y sirve para decidir el nivel de thinking |
-| Eval de autoría | `evals/artifact-authoring.eval.ts` | **Obsoleta**: prueba `artifacts create`, que el tutor perdió en la fase 3 (ADR-022) |
+| Qué                   | Dónde                                                                                                                             | Estado real                                                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maxSteps` acotado    | `chat-limits.ts:11-26`                                                                                                            | Hecho, con entero y rango                                                                                                                                                                                   |
+| Historial del cliente | `api/tutor.ts:8`, `Chat.tsx:19`                                                                                                   | **Sigue viniendo del cliente y vive en `useState`**: se pierde al recargar                                                                                                                                  |
+| Sesión en servidor    | `session-repository.ts`, `.data/agent-sessions`                                                                                   | Existe, **solo la usa el CLI** (`academic-tutor.ts:63`)                                                                                                                                                     |
+| Modelo de sesión      | `session-repository.ts:4-9`                                                                                                       | `id`, `messages`, `createdAt`, `updatedAt`. Ni tokens, ni pasos, ni errores                                                                                                                                 |
+| `usage` de Gemini     | `gemini.ts:22-28`                                                                                                                 | **Se descarta**: el esquema solo decodifica `candidates`                                                                                                                                                    |
+| `usage` en Effect     | `LanguageModel.ts:422-439`                                                                                                        | `Response.makePart("finish", { reason, usage })` existe; sin parte `finish`, `response.usage` devuelve todo `undefined`                                                                                     |
+| System prompt         | `academic-tutor.ts:37-40`                                                                                                         | Cuatro líneas. Sin anti-manipulación, sin no-invención, sin tabla de comandos                                                                                                                               |
+| Árbol de comandos     | `cli.ts:364` (`rootHelp`)                                                                                                         | Escrito, se sirve en `--help` y ante comando desconocido. **Los comandos ya están documentados dentro de las skills** (`use-uploaded-materials.ts:11-14`, `37-43`), con orden de preferencia y advertencias |
+| Cuerpos de las skills | `academic-tutor/skills/*.ts`                                                                                                      | 12.849 bytes en tres ficheros, con solapamiento entre ellos. Se reenvían enteros en cada paso del bucle                                                                                                     |
+| Envoltura de material | `assessment-prompts.ts:74-77`                                                                                                     | Hecha: `<<<BEGIN STUDENT MATERIAL>>>` ya se usa en `materials read` y en los prompts de generación                                                                                                          |
+| Batería de ataques    | `scripts/test-guardarrailes.mjs`                                                                                                  | **Ya existe**, D1-D5 y B1-B9. Único hueco abierto: **D3**                                                                                                                                                   |
+| Subida de ficheros    | `api/materials.ts`                                                                                                                | No existe. Solo `list`, `get`, `index`, `assessments`, `profile`, `page`                                                                                                                                    |
+| Multipart en Effect   | `httpapi/HttpApiSchema.ts:537`, `http/Multipart.ts`                                                                               | `HttpApiSchema.asMultipart(opts)`, `Multipart.FilesSchema`, `PersistedFile { key, name, contentType, path }`                                                                                                |
+| Errores de multipart  | `http/Multipart.ts:197-212`                                                                                                       | Tipados: `FileTooLarge`, `BodyTooLarge`, `TooManyParts`, `FieldTooLarge`, `Parse`                                                                                                                           |
+| Prompts en español    | `assessment-prompts.ts`, `note-generation-prompts.ts`, `rewrite-block-prompts.ts`, `url-source-prompts.ts`, `indexing-prompts.ts` | 6.581 caracteres de prompt en español                                                                                                                                                                       |
+| Skills del tutor      | `skills/*.ts`                                                                                                                     | **Ya en inglés**, 9.697 caracteres                                                                                                                                                                          |
+| Eval del juez         | `open-answer-judge.eval.ts`                                                                                                       | Existe y sirve para decidir el nivel de thinking                                                                                                                                                            |
+| Eval de autoría       | `evals/artifact-authoring.eval.ts`                                                                                                | **Obsoleta**: prueba `artifacts create`, que el tutor perdió en la fase 3 (ADR-022)                                                                                                                         |
 
 ### Límites declarados y nunca aplicados
 
 Comprobado con `grep LIMITS.<nombre>` fuera de `limits.ts`:
 
-| Límite | Usos | Veredicto |
-| --- | --- | --- |
-| `maxUploadBytes` (25 MB) | **0** | Correcto hasta hoy: no había subida. Se aplica en esta fase |
-| `maxMaterials` (5) | **0** | **Hueco de la invariante 11.** Se aplica en esta fase, en la subida |
+| Límite                                | Usos  | Veredicto                                                                                                                                               |
+| ------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maxUploadBytes` (25 MB)              | **0** | Correcto hasta hoy: no había subida. Se aplica en esta fase                                                                                             |
+| `maxMaterials` (5)                    | **0** | **Hueco de la invariante 11.** Se aplica en esta fase, en la subida                                                                                     |
 | `maxPastedCharactersPerTurn` (12.000) | **0** | **Hueco de la invariante 11.** Sin el `@` manual no hay texto pegado que limitar: se documenta como no aplicable y se anota, en vez de dejarlo colgando |
 
 ---
@@ -208,8 +263,10 @@ el mundo.
 ```ts
 // Sustituye las imágenes de un tool-result por su descripción. Idempotente y determinista:
 // aplicado dos veces da lo mismo, que es lo que la caché por prefijo necesita.
-export const degradeImages: (message: AgentMessage) => AgentMessage
-export const degradeHistory: (messages: readonly AgentMessage[]) => readonly AgentMessage[]
+export const degradeImages: (message: AgentMessage) => AgentMessage;
+export const degradeHistory: (
+  messages: readonly AgentMessage[],
+) => readonly AgentMessage[];
 ```
 
 El `result` de un `material-page-images` pasa de `{ pages: [{ page, mediaType, data }] }` a
@@ -224,9 +281,9 @@ mismo objeto; el resto de roles pasan intactos.
 // Si el bloque falta, está a medias, trae menos de 3 o más de 3, o alguna pasa del techo de
 // caracteres, devuelve `questions: []` y el texto tal cual: nunca se completa ni se inventa.
 export const extractFollowUp: (text: string) => {
-  readonly text: string
-  readonly questions: readonly string[]
-}
+  readonly text: string;
+  readonly questions: readonly string[];
+};
 ```
 
 Tests: bloque bien formado; bloque ausente; bloque sin cerrar; dos preguntas en vez de tres; una
@@ -236,26 +293,55 @@ un bloque de código.
 **`packages/server/src/domain/materials/pdf-sniff.ts`** (nuevo). La asunción A1.
 
 ```ts
-export const looksLikePdf: (bytes: Uint8Array) => boolean   // bytes mágicos %PDF-
+export const looksLikePdf: (bytes: Uint8Array) => boolean; // bytes mágicos %PDF-
 ```
 
 Tests: un PDF real del fixture pasa; un PNG no; un fichero vacío no; un `.txt` que empieza por
 `%PDF-` pasa el sniff y lo tumba `pdfinfo` después (test del camino completo en el servicio).
 
-**`packages/server/src/domain/agents/harness/system-prompt.ts`** (nuevo). La palanca 3 y el texto
-canónico. Función pura que compone el system prompt a partir de la identidad, la lista de skills y el
-árbol de comandos.
+**`packages/server/src/domain/agents/harness/system-prompt.ts`** (nuevo). El texto canónico. Función
+pura que compone el system prompt a partir de la identidad y el catálogo de skills (nombre más
+descripción, como ya hace `skillsHelp` en `harness.ts:81-82`). **Sin árbol de comandos:** los comandos
+se siguen descubriendo cargando la skill que los explica.
 
 ```ts
 export const renderSystemPrompt: (input: {
-  readonly identity: string
-  readonly skills: readonly AgentSkill[]
-  readonly commands: readonly AgentCli.Command[]
-}) => string
+  readonly template: string; // la plantilla del agente, con {{SKILLS}}
+  readonly skills: readonly AgentSkill[];
+}) => string;
 ```
 
-Test que importa: **el mismo input produce byte a byte el mismo string** (la palanca 2 depende de
-eso), y el árbol de comandos aparece con una línea por comando.
+**Reparto de responsabilidades**, porque hoy está mezclado (`harness.ts:52-62` compone el prompt
+entero pegando `spec.name` delante de un andamio genérico):
+
+- **El agente** aporta la plantilla completa: es el texto de la sección 6.1, con `{{SKILLS}}` donde
+  quiere el catálogo. Vive en `academic-tutor.ts` y sustituye a las cuatro líneas de `:37-40`.
+- **El harness** rellena `{{SKILLS}}` con `skillsHelp` **más las tres líneas mecánicas** que hoy están
+  en `harness.ts:59-62` ("solo conoces nombres y descripciones", "las skills no son tools ni funciones
+  invocables", "llama a load_skill con el nombre"). Van ahí y no en la plantilla del agente porque son
+  verdad para cualquier agente montado sobre este harness, y porque `gemini.ts:317-321` reencamina a
+  `load_skill` cualquier función desconocida: si un agente futuro olvidase esas líneas, se comería
+  pasos en `Unknown skill`.
+- `AgentHarness.make` pasa a recibir `systemPromptTemplate` en lugar de `name`, y **falla al construir
+  si la plantilla no contiene `{{SKILLS}}`**. Un agente sin catálogo de skills no es un agente
+  degradado, es uno que no puede trabajar, y eso se ve al arrancar y no en producción.
+
+Tests: el mismo input produce **byte a byte el mismo string** (la palanca 2 depende de eso); una
+plantilla sin `{{SKILLS}}` no construye; el bloque sustituido contiene una línea por skill y las tres
+líneas mecánicas.
+
+**`packages/server/src/domain/agents/harness/skill-dedup.ts`** (nuevo, puro). La palanca 3a: dado el
+historial de la sesión, deja el cuerpo de cada skill solo en su primera aparición y sustituye las
+repeticiones por el puntero.
+
+```ts
+export const dedupeSkillLoads: (
+  messages: readonly AgentMessage[],
+) => readonly AgentMessage[];
+```
+
+Tests: dos cargas de la misma skill dejan un cuerpo y un puntero; dos skills distintas conservan los
+dos cuerpos; el orden de los mensajes no cambia nunca (la palanca 2 depende de eso también).
 
 ### 4.2 Servidor
 
@@ -263,7 +349,7 @@ eso), y el árbol de comandos aparece con una línea por comando.
 
 1. Ampliar `GeminiResponse` con `usageMetadata`. Verificado contra la API real, el cuerpo trae:
    `promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`, `promptTokensDetails[{ modality,
-   tokenCount }]`, `serviceTier`, y `cachedContentTokenCount` más `cacheTokensDetails` **solo cuando
+tokenCount }]`, `serviceTier`, y `cachedContentTokenCount` más `cacheTokensDetails` **solo cuando
    hay acierto de caché**. Todos opcionales en el esquema.
 2. Emitir `Response.makePart("finish", { reason, usage })` con el mapeo:
    `inputTokens.total` ← `promptTokenCount`; `inputTokens.cacheRead` ← `cachedContentTokenCount`;
@@ -273,14 +359,14 @@ eso), y el árbol de comandos aparece con una línea por comando.
    pasa a exponer **una capa por camino**, que es el enrutado determinista de la decisión 15: el
    código ya sabe qué está haciendo, no necesita preguntárselo a un modelo.
 
-   | Capa | Temperatura | Formato | Thinking | Techo de salida | Quién la usa |
-   | --- | --- | --- | --- | --- | --- |
-   | `GeminiLanguageModelLive` | `modelTemperature` | libre | no | 4.096 | Tutor (herramientas: forzar JSON las rompería) |
-   | `GeminiIndexLanguageModelLive` | `jsonModelTemperature` | JSON | no | 4.096 | Indexación |
-   | `GeminiJsonLanguageModelLive` | `jsonModelTemperature` | JSON | no | 8.192 | Control (`quiz`) |
-   | `GeminiJsonThinkingLanguageModelLive` | `jsonModelTemperature` | JSON | sí | **16.384** | Examen (`test`) |
-   | `GeminiJudgeLanguageModelLive` | `jsonModelTemperature` | JSON | sí | 4.096 | Juez de respuesta abierta |
-   | `GeminiProseThinkingLanguageModelLive` | `modelTemperature` | libre | sí | 4.096 | Generación de apuntes |
+   | Capa                                   | Temperatura            | Formato | Thinking | Techo de salida | Quién la usa                                   |
+   | -------------------------------------- | ---------------------- | ------- | -------- | --------------- | ---------------------------------------------- |
+   | `GeminiLanguageModelLive`              | `modelTemperature`     | libre   | no       | 4.096           | Tutor (herramientas: forzar JSON las rompería) |
+   | `GeminiIndexLanguageModelLive`         | `jsonModelTemperature` | JSON    | no       | 4.096           | Indexación                                     |
+   | `GeminiJsonLanguageModelLive`          | `jsonModelTemperature` | JSON    | no       | 8.192           | Control (`quiz`)                               |
+   | `GeminiJsonThinkingLanguageModelLive`  | `jsonModelTemperature` | JSON    | sí       | **16.384**      | Examen (`test`)                                |
+   | `GeminiJudgeLanguageModelLive`         | `jsonModelTemperature` | JSON    | sí       | 4.096           | Juez de respuesta abierta                      |
+   | `GeminiProseThinkingLanguageModelLive` | `modelTemperature`     | libre   | sí       | 4.096           | Generación de apuntes                          |
 
    La ruta de generación elige entre las capas JSON **según `request.kind`**, en el mismo sitio donde
    hoy provee `GeminiJsonLanguageModelLive` (`server.ts:383`). **La capa del tutor no se toca.**
@@ -291,14 +377,14 @@ eso), y el árbol de comandos aparece con una línea por comando.
    el doble del caso peor calculado de ese camino, con el pensamiento sumado donde lo lleve, y nunca
    por encima del límite del modelo (65.536).
 
-   | Camino | Caso peor calculado | Techo |
-   | --- | --- | --- |
-   | Tutor | Respuesta larga (~1.500) más el bloque de seguimiento (~120) | 4.096 |
-   | Indexación | `maxIndexedCharactersPerPage` (8.000 caracteres) ≈ 2.500 | 4.096 |
-   | Apuntes | Medido: 842 de salida más 1.602 de pensamiento = 2.444 | 4.096 |
-   | Control | 8 preguntas × ~200 = 1.600 | 8.192 |
+   | Camino     | Caso peor calculado                                                | Techo      |
+   | ---------- | ------------------------------------------------------------------ | ---------- |
+   | Tutor      | Respuesta larga (~1.500) más el bloque de seguimiento (~120)       | 4.096      |
+   | Indexación | `maxIndexedCharactersPerPage` (8.000 caracteres) ≈ 2.500           | 4.096      |
+   | Apuntes    | Medido: 842 de salida más 1.602 de pensamiento = 2.444             | 4.096      |
+   | Control    | 8 preguntas × ~200 = 1.600                                         | 8.192      |
    | **Examen** | **30 preguntas × ~200 = 6.000, más ~1.600 de pensamiento = 7.600** | **16.384** |
-   | Juez | Criterios y comentario (~1.000) más ~1.600 de pensamiento | 4.096 |
+   | Juez       | Criterios y comentario (~1.000) más ~1.600 de pensamiento          | 4.096      |
 
    **El Examen es el que obliga a este cambio.** La generación va tema a tema, así que el caso peor
    (un material de un solo tema, Examen de `questionsPerTest.max`) mete 30 preguntas en una sola
@@ -318,22 +404,29 @@ eso), y el árbol de comandos aparece con una línea por comando.
 
 ```ts
 interface StoredAgentSession {
-  readonly id: string
-  readonly title: string
-  readonly messages: readonly AgentMessage[]   // ya degradados
-  readonly turns: readonly StoredTurn[]
-  readonly createdAt: string
-  readonly updatedAt: string
+  readonly id: string;
+  readonly title: string;
+  readonly messages: readonly AgentMessage[]; // ya degradados
+  readonly turns: readonly StoredTurn[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 interface StoredTurn {
-  readonly startedAt: string
-  readonly steps: readonly StoredStep[]
+  readonly startedAt: string;
+  readonly steps: readonly StoredStep[];
 }
 interface StoredStep {
-  readonly index: number
-  readonly usage: { inputTokens?: number; cachedInputTokens?: number; outputTokens?: number }
-  readonly toolCalls: readonly { readonly name: string; readonly input: unknown }[]
-  readonly error?: { readonly message: string; readonly at: string }
+  readonly index: number;
+  readonly usage: {
+    inputTokens?: number;
+    cachedInputTokens?: number;
+    outputTokens?: number;
+  };
+  readonly toolCalls: readonly {
+    readonly name: string;
+    readonly input: unknown;
+  }[];
+  readonly error?: { readonly message: string; readonly at: string };
 }
 ```
 
@@ -394,7 +487,7 @@ del typecheck son el mapa de lo que queda por tocar.
   - `maxFollowUpQuestionCharacters: 120`
   - `uploadGraceMs: 10 * 60 * 1000` (la gracia de alta)
   - **`maxModelOutputTokens` deja de ser un número suelto** y pasa a ser `modelOutputTokens: { tutor,
-    indexing, note, quiz, test, judge }`, con los valores calculados en la sección 4.2. El valor viejo
+indexing, note, quiz, test, judge }`, con los valores calculados en la sección 4.2. El valor viejo
     (8.192) se conserva donde toca y sube donde el cálculo lo pide. Es un límite, así que su domicilio
     sigue siendo este fichero (ADR-007).
 - **`api/tutor.ts`**: `TutorChatRequest` pierde `messages` y gana `conversationId` y `context`.
@@ -418,8 +511,9 @@ del typecheck son el mapa de lo que queda por tocar.
 
 ### 6.1 System prompt del tutor
 
-Sustituye a `academic-tutor.ts:37-40`. El bloque `{{COMMANDS}}` lo rellena `renderSystemPrompt` con
-la salida de `rootHelp` más una línea por subcomando.
+Sustituye a `academic-tutor.ts:37-40`. El bloque `{{SKILLS}}` lo rellena `renderSystemPrompt` con una
+línea por skill (nombre y descripción), como ya hace `skillsHelp`. **No hay bloque de comandos:** los
+comandos viven dentro de las skills.
 
 ```text
 You are the academic tutor of Proxus. You help one student study their own uploaded PDF materials,
@@ -440,12 +534,14 @@ You never answer about the student's materials from memory. Everything you state
 note, an assessment, an attempt or the study profile comes from a command result in THIS
 conversation. If you have not run the command, you do not know it.
 
-Commands, run with cli({ "input": "..." }):
+Skills, loaded with load_skill({ "name": "..." }):
 
-{{COMMANDS}}
+{{SKILLS}}
 
-Use `--help` on any command for its arguments and examples. Load a skill when you need the workflow
-behind a group of commands, not just their names.
+You know only these names and descriptions. Each skill holds the commands for its area, the order to
+try them in, and what each result can and cannot be trusted for. When a task matches a description,
+load that skill FIRST and follow it: do not guess command names. Every command runs through
+cli({ "input": "..." }), and `--help` on any command gives its arguments and examples.
 
 ## Tool first, cheapest path first
 
@@ -521,35 +617,22 @@ sobrar o contradecirse, se anota en la bitácora y se pregunta; no se borra.
 Cada tramo deja el repo funcionando y los tres checks en verde.
 
 **Tramo 4A · Medir antes de tocar.**
+
 1. Guion de medición en `scripts/` que corre un turno tipo contra el endpoint y vuelca tokens de
    entrada, cacheados y de salida. **Se ejecuta ahora y el resultado se anota en la bitácora**: es la
    línea base contra la que se compara todo lo demás. Sin esto, el ahorro es una opinión.
 2. `gemini.ts`: `usageMetadata` en el esquema y parte `finish`. Volver a correr el guion: ahora los
    números salen del sistema, no de una sonda aparte.
 
-**Tramo 4B · Contratos.**
-3. `limits.ts` con los límites nuevos.
-4. `api/tutor.ts`, `api/materials.ts`, `schemas/chat-context.ts`. Correr `typecheck` y usar la lista
-   de errores como mapa.
+**Tramo 4B · Contratos.** 3. `limits.ts` con los límites nuevos. 4. `api/tutor.ts`, `api/materials.ts`, `schemas/chat-context.ts`. Correr `typecheck` y usar la lista
+de errores como mapa.
 
-**Tramo 4C · La sesión en el servidor.**
-5. `message-degrade.ts` y `system-prompt.ts` con sus tests, antes de conectarlos.
-6. Modelo de sesión ampliado y `FileSessionRepository`.
-7. `session.ts`: degradación, observabilidad por paso, y el error del modelo sin disfrazar.
-8. `tutor-chat-service.ts` y las rutas de conversaciones.
-9. **Correr `pnpm test:guardarrailes` y comprobar que D3 pasa.** Si no pasa, el tramo no está.
-10. Volver a correr el guion de medición y anotar la diferencia.
+**Tramo 4C · La sesión en el servidor.** 5. `message-degrade.ts` y `system-prompt.ts` con sus tests, antes de conectarlos. 6. Modelo de sesión ampliado y `FileSessionRepository`. 7. `session.ts`: degradación, observabilidad por paso, y el error del modelo sin disfrazar. 8. `tutor-chat-service.ts` y las rutas de conversaciones. 9. **Correr `pnpm test:guardarrailes` y comprobar que D3 pasa.** Si no pasa, el tramo no está. 10. Volver a correr el guion de medición y anotar la diferencia.
 
-**Tramo 4D · La subida y su cadena.**
-11. `pdf-sniff.ts` con sus tests.
-12. Ruta de subida, con la copia dentro del scope y el orden de validación de la sección 4.2.
-13. Gracia de alta en el limitador.
-14. `UploadDropzone` y la cadena de progreso por fichero.
+**Tramo 4D · La subida y su cadena.** 11. `pdf-sniff.ts` con sus tests. 12. Ruta de subida, con la copia dentro del scope y el orden de validación de la sección 4.2. 13. Gracia de alta en el limitador. 14. `UploadDropzone` y la cadena de progreso por fichero.
 
-**Tramo 4E · El agente que se ve.**
-15. System prompt canónico y árbol de comandos.
-16. `follow-up.ts` conectado, y los tres botones.
-17. Chips de contexto de pantalla, lista de conversaciones y coste del turno.
+**Tramo 4E · El agente que se ve.** 15. System prompt canónico, `skill-dedup.ts` conectado al bucle y los cuerpos de las tres skills
+recortados y desduplicados entre sí (palanca 3, a y b). 16. `follow-up.ts` conectado, y los tres botones. 17. Chips de contexto de pantalla, lista de conversaciones y coste del turno.
 
 **Tramo 4F · Las dos evals nuevas.**
 
@@ -578,24 +661,26 @@ bitácora y a `NOTES.md`.
     - **Ratio de longitud** entre apunte y fuente.
     - Una llamada por bloque; todo lo demás es código. Se corre con thinking apagado y encendido.
 
-**Tramo 4G · Idioma y medición final.**
-20. Traducir los cinco prompts.
-21. Correr las tres evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
-    Decidir con el resultado, no con la impresión, y anotarlo:
-    - Juez: `open-answer-judge.eval.ts`. **`low` y `high` empatan en coste (decisión 14), así que si
-      empatan también en la eval, gana `low`**: mismo resultado con menos varianza.
-    - Examen: `assessment-generation.eval.ts`, mirando la **diferencia** entre acertar con material y
-      sin él, no la cifra absoluta.
-    - Apuntes: `note-generation.eval.ts`, mirando sobre todo las cifras inventadas y los términos
-      traducidos.
-    - **Si un camino no mejora de forma visible, se queda sin thinking**: el que paga la duda es el
-      coste. Y si la traducción empeora un prompt, **se revierte ese prompt** y se anota.
-22. Correr la batería completa, con `STRICT=1`.
-23. Barrido de límites: la tabla de la sección 3 revisada entera, cada valor con veredicto, más los
-    techos de salida por camino de la sección 4.2.
-24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
-    `docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
-    `CHANGELOG.md` y `NOTES.md`.
+**Tramo 4G · Idioma y medición final.** 20. Traducir los cinco prompts. 21. Correr las tres evals **antes y después de traducir**, y con thinking en off, `low` y `high`.
+Decidir con el resultado, no con la impresión, y anotarlo: - Juez: `open-answer-judge.eval.ts`. **`low` y `high` empatan en coste (decisión 14), así que si
+empatan también en la eval, gana `low`**: mismo resultado con menos varianza. - Examen: `assessment-generation.eval.ts`, mirando la **diferencia** entre acertar con material y
+sin él, no la cifra absoluta. - Apuntes: `note-generation.eval.ts`, mirando sobre todo las cifras inventadas y los términos
+traducidos. - **Si un camino no mejora de forma visible, se queda sin thinking**: el que paga la duda es el
+coste. Y si la traducción empeora un prompt, **se revierte ese prompt** y se anota. 22. Correr la batería completa, con `STRICT=1`. 23. Barrido de límites: la tabla de la sección 3 revisada entera, cada valor con veredicto, más los
+techos de salida por camino de la sección 4.2. 24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
+`docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
+`CHANGELOG.md` y `NOTES.md`. 25. **Corregir el apartado "Tutor agent" de [`docs/architecture.md:218-225`](../../docs/architecture.md).**
+Hoy dice "el modelo debe cargarlas mediante `load_skill`" sin decir que el modelo **ya ve** el
+nombre y la descripción de cada skill en el system prompt (`harness.ts:57` y `81-82`, y el propio
+prompt lo declara en `harness.ts:59`: _"You initially only know skill names and short
+descriptions"_). La frase describe mal el estado **actual**, no solo el futuro. El apartado debe
+decir: **dos herramientas y solo dos** (`load_skill` y `cli`); el system prompt lleva el catálogo
+de skills como nombre más una línea; el **cuerpo** de la skill (comandos, orden de preferencia,
+advertencias) exige `load_skill`, y ejecutar exige `cli`. Añadir que el cuerpo se envía **una vez
+por sesión** (palanca 3a) y que eso es optimización de transporte, no un cambio del mecanismo. 26. **Corregir [`docs/ai-agent.md:49`](../../docs/ai-agent.md).** Dice `cli({ command })` y el
+parámetro real es `input` (`harness.ts:16-18`, y las skills escriben
+`cli({ "input": "materials list" })`). Un lector que copie el doc escribe una llamada que no
+valida.
 
 > **Si el calendario aprieta, lo primero que cae es el tramo 4F**, y se cae entero, no a medias: sin
 > evals, el nivel de thinking de apuntes y Examen se decide comparando a mano dos muestras **y se dice
@@ -624,39 +709,40 @@ por eso miden en vez de aprobar.
 
 ### Procedimientos
 
-| Criterios | Cómo se prueba | Qué se tiene que ver |
-| --- | --- | --- |
-| F4-01, F4-07, F4-08 | Arrastrar 2 PDFs a la zona de subida | Los dos aparecen, cada uno con su progreso de indexado y luego de apuntes, sin pulsar nada |
-| F4-01, F4-02 | Renombrar un `.png` a `.pdf` y subirlo junto a un PDF bueno | Rechazo nombrando el fichero; nada suyo en `.data`; el PDF bueno sigue su cadena |
-| F4-03 | Un PDF por encima de `maxUploadBytes`, y una subida de 6 ficheros | 400 con el motivo, **antes** de escribir nada |
-| F4-04 | Subir hasta pasar de `maxMaterials` | Rechazo nombrando cuántos caben y cuántos hay |
-| F4-05 | Subir dos veces el mismo nombre de fichero | Rechazo por conflicto; el material original intacto |
-| F4-06 | Repetir subidas hasta pasar `uploadsPerWindow` | 429 diciendo cuánto falta |
-| F4-09 | Cortar la red a mitad del indexado del segundo fichero | Ese fichero dice qué paso falló; el primero terminó su cadena |
-| F4-10 | Subir 5 PDFs y después generar una prueba | La prueba se genera: la subida no agotó el cubo `artifacts` |
-| F4-11, F4-12, D3 | `pnpm test:guardarrailes` | D3 en verde **sin `knownGap`**: el `tool-result` fabricado se rechaza |
-| F4-13, F4-14 | Conversar, recargar, crear otra conversación, volver a la primera | Las dos enteras, cada una con su título |
-| F4-15 | Crear conversaciones hasta `maxConversations` | Rechazo nombrando el techo |
-| F4-16, F4-18 | Un turno cualquiera | Tokens de entrada, de caché y de salida del turno, a la vista |
-| F4-17 | Arrancar aparte con una clave inválida y preguntar algo | Se ve como error del turno, no como respuesta del tutor, y sigue ahí al recargar |
-| F4-19 | Forzar una respuesta sin `usageMetadata` | Dice que no hay dato. **No** pinta cero |
-| F4-20, F4-21 | Turno con `materials view`, después otro turno cualquiera | El segundo turno no reenvía las imágenes; el guion de medición lo enseña en tokens |
-| F4-22 | Dos peticiones seguidas con el mismo estado | El mensaje de sistema es idéntico byte a byte |
-| F4-22, palanca 2 | Tres turnos seguidos en la misma conversación | `cachedInputTokens > 0` a partir del tercero |
-| F4-23 | "lista mis materiales" en una conversación nueva | Llega a `materials list` **sin** gastar un paso en `load_skill` |
-| F4-24, F4-26 | Abrir un material y preguntar "¿de qué trata esto?" | El chip se ve antes de enviar, y en el registro del turno viaja el id, no el texto |
-| F4-25 | Quitar el chip y enviar la misma pregunta | Nada del material viaja; el tutor pregunta a qué se refiere |
-| F4-27 | Abrir material, artefacto y bloques hasta pasar `maxContextRefs` | Rechazo nombrando el techo |
-| F4-28, F4-30 | Cualquier respuesta | Tres botones en español; el delimitador **no** aparece en el texto |
-| F4-29 | Forzar una respuesta sin bloque (o con dos preguntas) | Ningún botón, y ninguna pregunta inventada |
-| F4-31, F4-33 | `STRICT=1 pnpm test:guardarrailes` | B1-B9 en verde, incluida la inyección desde el PDF |
-| F4-31 | Generar unos apuntes y una prueba tras la traducción | Salen en español y con el vocabulario del material sin traducir |
-| F4-34, F4-35 | Generar un Control y un Examen del mismo material | El Examen registra tokens de pensamiento; el Control, cero |
-| F4-36 | Leer `limits.ts` | Un techo de salida por camino, no uno solo. Los seis valores, con el cálculo detrás |
-| F4-37 | Generar el Examen más grande que permita el reparto (un material de un tema, `questionsPerTest.max`) | Ninguna llamada acaba con `finishReason: "length"`; si acabara, se ve como tal y **no** como "el tema no daba" |
-| F4-38 | `pnpm eval:assessments` con thinking off y on | Informe con acierto con material, sin material y **la diferencia**. Nunca una nota absoluta |
-| F4-39 | `pnpm eval:notes` con thinking off y on | Cifras inventadas, términos traducidos y reglas incumplidas, por bloque. Cero llamadas a un juez |
-| F4-40 | Leer la bitácora y `NOTES.md` al cerrar | Cada camino con thinking dice con qué eval se decidió; y si fue a mano, lo dice y con cuántas muestras |
+| Criterios           | Cómo se prueba                                                                                                      | Qué se tiene que ver                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| F4-01, F4-07, F4-08 | Arrastrar 2 PDFs a la zona de subida                                                                                | Los dos aparecen, cada uno con su progreso de indexado y luego de apuntes, sin pulsar nada                     |
+| F4-01, F4-02        | Renombrar un `.png` a `.pdf` y subirlo junto a un PDF bueno                                                         | Rechazo nombrando el fichero; nada suyo en `.data`; el PDF bueno sigue su cadena                               |
+| F4-03               | Un PDF por encima de `maxUploadBytes`, y una subida de 6 ficheros                                                   | 400 con el motivo, **antes** de escribir nada                                                                  |
+| F4-04               | Subir hasta pasar de `maxMaterials`                                                                                 | Rechazo nombrando cuántos caben y cuántos hay                                                                  |
+| F4-05               | Subir dos veces el mismo nombre de fichero                                                                          | Rechazo por conflicto; el material original intacto                                                            |
+| F4-06               | Repetir subidas hasta pasar `uploadsPerWindow`                                                                      | 429 diciendo cuánto falta                                                                                      |
+| F4-09               | Cortar la red a mitad del indexado del segundo fichero                                                              | Ese fichero dice qué paso falló; el primero terminó su cadena                                                  |
+| F4-10               | Subir 5 PDFs y después generar una prueba                                                                           | La prueba se genera: la subida no agotó el cubo `artifacts`                                                    |
+| F4-11, F4-12, D3    | `pnpm test:guardarrailes`                                                                                           | D3 en verde **sin `knownGap`**: el `tool-result` fabricado se rechaza                                          |
+| F4-13, F4-14        | Conversar, recargar, crear otra conversación, volver a la primera                                                   | Las dos enteras, cada una con su título                                                                        |
+| F4-15               | Crear conversaciones hasta `maxConversations`                                                                       | Rechazo nombrando el techo                                                                                     |
+| F4-16, F4-18        | Un turno cualquiera                                                                                                 | Tokens de entrada, de caché y de salida del turno, a la vista                                                  |
+| F4-17               | Arrancar aparte con una clave inválida y preguntar algo                                                             | Se ve como error del turno, no como respuesta del tutor, y sigue ahí al recargar                               |
+| F4-19               | Forzar una respuesta sin `usageMetadata`                                                                            | Dice que no hay dato. **No** pinta cero                                                                        |
+| F4-20, F4-21        | Turno con `materials view`, después otro turno cualquiera                                                           | El segundo turno no reenvía las imágenes; el guion de medición lo enseña en tokens                             |
+| F4-22               | Dos peticiones seguidas con el mismo estado                                                                         | El mensaje de sistema es idéntico byte a byte                                                                  |
+| F4-22, palanca 2    | Tres turnos seguidos en la misma conversación                                                                       | `cachedInputTokens > 0` a partir del tercero                                                                   |
+| F4-23               | "lista mis materiales" en una conversación nueva                                                                    | La traza enseña `load_skill` y después `cli`, como hoy. El prompt volcado no contiene ningún nombre de comando |
+| F4-23b              | En la misma conversación, forzar dos cargas de `use-uploaded-materials` (preguntar por un material, luego por otro) | El segundo `tool-result` es el puntero, no el cuerpo. El coste del turno lo confirma: no sube ~900 tokens      |
+| F4-24, F4-26        | Abrir un material y preguntar "¿de qué trata esto?"                                                                 | El chip se ve antes de enviar, y en el registro del turno viaja el id, no el texto                             |
+| F4-25               | Quitar el chip y enviar la misma pregunta                                                                           | Nada del material viaja; el tutor pregunta a qué se refiere                                                    |
+| F4-27               | Abrir material, artefacto y bloques hasta pasar `maxContextRefs`                                                    | Rechazo nombrando el techo                                                                                     |
+| F4-28, F4-30        | Cualquier respuesta                                                                                                 | Tres botones en español; el delimitador **no** aparece en el texto                                             |
+| F4-29               | Forzar una respuesta sin bloque (o con dos preguntas)                                                               | Ningún botón, y ninguna pregunta inventada                                                                     |
+| F4-31, F4-33        | `STRICT=1 pnpm test:guardarrailes`                                                                                  | B1-B9 en verde, incluida la inyección desde el PDF                                                             |
+| F4-31               | Generar unos apuntes y una prueba tras la traducción                                                                | Salen en español y con el vocabulario del material sin traducir                                                |
+| F4-34, F4-35        | Generar un Control y un Examen del mismo material                                                                   | El Examen registra tokens de pensamiento; el Control, cero                                                     |
+| F4-36               | Leer `limits.ts`                                                                                                    | Un techo de salida por camino, no uno solo. Los seis valores, con el cálculo detrás                            |
+| F4-37               | Generar el Examen más grande que permita el reparto (un material de un tema, `questionsPerTest.max`)                | Ninguna llamada acaba con `finishReason: "length"`; si acabara, se ve como tal y **no** como "el tema no daba" |
+| F4-38               | `pnpm eval:assessments` con thinking off y on                                                                       | Informe con acierto con material, sin material y **la diferencia**. Nunca una nota absoluta                    |
+| F4-39               | `pnpm eval:notes` con thinking off y on                                                                             | Cifras inventadas, términos traducidos y reglas incumplidas, por bloque. Cero llamadas a un juez               |
+| F4-40               | Leer la bitácora y `NOTES.md` al cerrar                                                                             | Cada camino con thinking dice con qué eval se decidió; y si fue a mano, lo dice y con cuántas muestras         |
 
 ---
 

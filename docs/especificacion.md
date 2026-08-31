@@ -513,8 +513,11 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 - **F4-22.** EL sistema DEBERÁ construir el mensaje de sistema de forma determinista, de modo que dos
   peticiones con el mismo estado produzcan un texto idéntico.
 - **F4-23.** EL sistema DEBERÁ incluir en el mensaje de sistema el nombre y la descripción de cada
-  comando disponible, y NO DEBERÁ incluir el texto completo de ninguna skill hasta que el modelo la
-  cargue.
+  skill disponible, y NO DEBERÁ incluir en él ni el texto completo de ninguna skill ni el árbol de
+  comandos: el modelo solo conoce un comando después de cargar la skill que lo documenta.
+- **F4-23b.** CUANDO el modelo cargue una skill que ya cargó antes en la misma conversación, EL
+  sistema DEBERÁ devolver una referencia a la carga anterior en lugar del texto completo, y NO DEBERÁ
+  enviar al modelo el cuerpo de una misma skill más de una vez por conversación.
 
 #### Contexto de pantalla
 
