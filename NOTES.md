@@ -328,11 +328,11 @@ comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno
 
 ### Fallos conocidos
 
-- **Un `tool-result` fabricado por el cliente se acepta** y llega al prompt como salida de herramienta
-  fiable (check D3 de la batería). Es deliberado en la fase 1: el arreglo es mover la sesión al
-  servidor, que se hace en la fase 4 (decisión 9 del plan, ADR-008 barrera 3). El script lo marca como
-  hueco conocido y no bloquea por él. Radio de daño acotado: sin autenticación ni comando destructivo,
-  el peor caso es una respuesta rara que el usuario ve.
+- **Cerrado en la fase 4 (tramo 4G):** el `tool-result` fabricado por el cliente que antes se aceptaba
+  (check D3 de la batería) ya no tiene ningún canal para entrar en la conversación: la sesión vive en
+  el servidor (decisión 6, ADR-008 barrera 3) y el contrato de `POST /api/tutor/chat` ya no lleva
+  `messages`. D3 pasa como barrera dura real (`STRICT=1 pnpm test:guardarrailes`, 2026-09-01); el
+  script ya no lo marca como hueco conocido.
 - **La inyección de prompt no queda resuelta.** El material y el texto pegado se tratan como dato, pero
   el envoltorio con delimitador es de la fase 4. De la batería, el tutor **revela los nombres de sus
   herramientas** (`cli`, las skills) ante pregunta directa (check B4); es hardening de comportamiento
@@ -383,6 +383,15 @@ comandos del CLI: no hay comando destructivo ni que edite los apuntes del alumno
   página desde la cita, y que una reescritura no se guarda hasta aceptarla.
 - **Coste y latencia:** `pnpm index:materials` imprime cuánto tardó y cuántas páginas fueron al modelo.
   El camino de extracción no cuesta ninguna llamada, y ese es el ahorro que se mide.
+- **Nivel de pensamiento de Gemini 3, decidido por camino con datos (fase 4, tramo 4G):** `eval:notes`,
+  `eval:assessments` y `eval:judge --thinking=` corridas en off/low/high, dos veces cada una (antes y
+  después de traducir los prompts al inglés). Apuntes se queda en "high" (baja los términos traducidos
+  de forma consistente, lejos del techo de salida). Examen se queda en "low", no "high": "high" revienta
+  el techo de salida (`finishReason: "length"`) en 1 de 3 temas del fixture en las dos pasadas, con un
+  pensamiento inestable (1,7k-15,7k tokens); "low" iguala o mejora a "sin pensamiento" con un
+  pensamiento estable. Juez se queda "off": ningún nivel mejora el acierto de forma visible, y "high"
+  tuvo una caída real de parseo que "off" no tuvo. Detalle completo en `notes/bitacora.md`
+  (2026-09-01) y en el comentario de `gemini.ts:451-471`.
 - **Seguridad del tutor:** `pnpm dev` en una terminal y `pnpm test:guardarrailes` en otra. Comprueba
   propiedades negativas de la respuesta (no aparece ningún marcador del prompt, no cita una página
   inexistente), nunca una frase de rechazo concreta. Las D bloquean; las B avisan (con `STRICT=1`

@@ -16,7 +16,13 @@ packages/server/.data/
   materials/
     pdfs/
       *.pdf
+    index/
+      <sha256>.json
 ```
+
+El índice se archiva por huella del contenido (`sha256`), no por `materialId` (ADR-011): dos PDFs con
+el mismo contenido y distinto nombre comparten fichero de índice, y uno editado deja su índice viejo
+huérfano en disco a propósito (vuelve a servir si se deshace la edición).
 
 ## Materials
 
@@ -36,10 +42,12 @@ El tutor puede usar:
 
 ```txt
 materials list
+materials read <materialId> <pages>
 materials view <materialId> <pages>
 ```
 
-`materials view` renderiza páginas como imágenes para Gemini multimodal.
+`materials read` devuelve el texto ya indexado, la primera opción por ser la más barata; `materials
+view` renderiza páginas como imágenes para Gemini multimodal, para cuando el texto no basta.
 
 ## Artifacts
 
@@ -98,7 +106,7 @@ Después arranca el server y pide al tutor:
 
 ```bash
 pnpm --filter @proxus/server run agent:tutor "list my uploaded materials"
-pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto usando los materiales disponibles"
+pnpm --filter @proxus/server run agent:tutor "¿de qué tratan mis materiales?"
 ```
 
 Usa PDFs públicos, sintéticos o propios. No uses apuntes privados, exámenes no autorizados, datos de estudiantes ni documentación propietaria en una PR.

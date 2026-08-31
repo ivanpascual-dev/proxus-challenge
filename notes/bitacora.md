@@ -891,3 +891,123 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   (`LIMITS.modelOutputTokens.tutor`) que antes del cambio. El resto de §4.2 (cuatro capas más, el
   enrutado real por camino, los techos por vía) sigue pendiente del tramo 4G, que decidirá con el
   resultado de estas evals qué nivel de pensamiento lleva cada camino.
+
+## 2026-09-01 · Fase 4 · tramo 4G, idioma y medición final
+
+- **Incidencia de traducción (paso 20): dos prompts NO llevan la línea canónica.** `TRANSCRIPTION_PROMPT`
+  y `topicsPrompt()` (`indexing-prompts.ts`) son los dos únicos de los seis que no llevan "Write the
+  output in Spanish. Keep the material's own vocabulary untranslated." al principio de sus reglas. Su
+  propia regla de no-traducción dice lo contrario a propósito: "si la página/el material está en
+  inglés, se queda en inglés" (invariante 1). Añadir la línea canónica contradiría esa regla en el
+  mismo prompt (forzar salida en español sobre un `topicsPrompt()` de un material en inglés traduciría
+  justo lo que la invariante 1 prohíbe traducir). Anotado en el propio fichero
+  (`indexing-prompts.ts:9-13`) y aquí; no resuelto en solitario, queda para que Iván lo confirme al
+  cerrar el tramo: la lectura es que estos dos prompts están fuera del alcance de la decisión 9 por
+  diseño, no que falten por traducir.
+- **Regresión mecánica en `indexing-service.test.ts` tras traducir `TRANSCRIPTION_PROMPT` al inglés.**
+  El test "una página escasa se transcribe y su procedencia queda como transcribed" usaba un modelo
+  simulado que distinguía la llamada de transcripción de la de temas buscando la cadena literal
+  "transcriptor de páginas" dentro del prompt serializado. Al traducir el prompt esa cadena ya no
+  existe, así que el fake devolvía la respuesta de temas para la llamada de transcripción y la página
+  quedaba con `provenance: undefined`. No es una regresión de producto: se corrigió el detector del
+  test para buscar el fragmento en inglés ("transcriber of academic material pages"). `pnpm test`
+  quedó en 327/327 tras el arreglo (antes, 326/327, ese único fallo).
+- **`pnpm test` dio "Exit code 137" en un primer intento, sin salida.** Es un `SIGKILL` (137 = 128+9),
+  no un fallo de aserción. Al relanzarlo sin cambiar nada terminó normal. Se interpreta como
+  transitorio (presión de memoria u otro proceso del entorno), no como algo introducido por el tramo:
+  no se ha vuelto a ver.
+- **Decisión 14, con los datos del paso 21: qué nivel de pensamiento lleva cada camino.** `eval:notes`,
+  `eval:assessments` y `eval:judge --thinking=` corridas en off/low/high, dos veces cada una (antes y
+  después de traducir los prompts en el paso 20), para separar el efecto de la traducción del efecto
+  del pensamiento. Resultado (detalle completo, con el razonamiento, en el comentario de
+  `gemini.ts:451-471`):
+  - **Apuntes (`note`): "high".** Baja los términos traducidos de forma consistente en las dos pasadas
+    (2/3→1/3 en español, 1/3→0/3 en inglés), con un pensamiento medido de ~1.000-1.200 tokens sobre un
+    techo de 4.096: mejora visible y repetida, sin riesgo de tocar el techo.
+  - **Examen (`test`): "low", no "high" como asumía la decisión 14 original.** "high" mejora la
+    diferencia con/sin material cuando no falla, pero revienta el techo de salida
+    (`finishReason: "length"`) en 1 de 3 temas del fixture en LAS DOS pasadas, con un pensamiento que
+    osciló entre 1,7k y 15,7k tokens en el mismo fixture (inestable, no un caso aislado). "low" iguala o
+    mejora a "sin pensamiento" en las dos pasadas (Δ 8% vs Δ 0-8%) con un pensamiento estable
+    (~100-130 tokens). Se prefiere "low": el riesgo 10 del plan (una salida cortada se lee como "el tema
+    no daba" en vez de como lo que es, una pregunta reventada) pesa más que un punto de diferencia que
+    además no se sostiene entre pasadas.
+  - **Juez (respuesta abierta): "off", no "sí" como asumía la decisión 14 original.** Ningún nivel de
+    pensamiento mejora el acierto de forma visible sobre "sin pensamiento": 18/18 apagado en español;
+    17/18 en los tres modos (apagado, low y high) tras traducir, con una caída REAL de parseo en "high"
+    que "off" no tuvo. Aplicado el criterio del propio paso 21 ("si un camino no mejora de forma
+    visible, se queda sin pensamiento: el que paga la duda es el coste").
+  - Las dos reversiones de la decisión 14 (Examen y Juez) están previstas por el propio paso 21 del plan
+    ("el resultado de la eval puede revertirla"): no son una desviación sin cobertura, son el mecanismo
+    funcionando.
+- **`artifact-authoring.eval.ts` → `tutor-behaviour.eval.ts` (paso 19b): renombrado, 4 criterios nuevos,
+  y arreglado el regex de "wrong" que el 4E ya había dejado anotado.** La bitácora del 4E anotó que
+  `should-name-topic-and-signal` para la señal "wrong" solo casaba `fallaste|fallad|fallos|te
+  equivocaste`, y el modelo real dice "3 respuestas incorrectas" o similar. Ampliado con
+  `incorrecta|incorrecto|respuestas? mal|erróneas?`; no relaja el criterio, solo reconoce más formas
+  reales de decir lo mismo. Los 4 criterios nuevos (idioma, seguimiento, elección de skill, contexto de
+  pantalla) pasan de forma estable en las dos corridas contra el modelo real.
+- **Dos hallazgos reales del propio eval, no arreglados (no son bugs de la eval, son comportamiento del
+  tutor a reportar):**
+  - **`should-point-to-tab` decía ser inestable: el modelo a veces no dice "Pruebas".** En una de las
+    dos corridas del caso "no-autora-remite-a-la-pestana", el tutor respondió "puedes ir a la pestaña
+    de Controles y Exámenes" en vez de nombrar la pestaña "Pruebas" (el nombre real,
+    `MaterialPanel.tsx:91`). El nombre exacto de la pestaña solo lo enseña la skill `read-assessments`
+    ("point them to the 'Pruebas' tab"); si el tutor resuelve la negativa directamente desde el system
+    prompt sin cargar esa skill (el caso no la fuerza a cargarse), cae a una paráfrasis con el
+    vocabulario de la interfaz ("Controles y Exámenes") pero sin el nombre literal de la pestaña.
+    **Resuelto (2026-09-01, tras revisión de Iván):** las dos frases señalan el mismo sitio de la
+    interfaz, no hace falta el nombre literal. El regex de `shouldPointToTab`
+    (`tutor-behaviour.eval.ts:344-355`) ahora acepta también `controles y ex[aá]menes`; no se toca el
+    system prompt.
+  - **El caso de contexto de pantalla dispara un `cli` fallido de forma repetible (2/2).** Con un
+    material en el contexto de pantalla, el tutor intenta `materials read <id>` sin el argumento
+    `pages` antes de corregirse (el comando lo exige siempre, de fases anteriores), y ese primer intento
+    queda como `tool-result` con `isFailure: true`. La comprobación de contexto de pantalla en sí
+    (`should-not-relist-materials-with-screen-context`) pasa igual: el tutor no vuelve a listar
+    materiales, solo tropieza con la sintaxis de `materials read`. No es una regresión de 4G (el
+    comando ya exigía `pages` antes de esta fase); es fricción existente que este caso nuevo deja
+    visible por primera vez. No se ha exento este caso del criterio genérico
+    `should-not-have-tool-failures` para no esconder el tropiezo.
+- **Paso 22, batería de guardarraíles con `STRICT=1`:** primer intento bloqueado por `maxConversations`
+  (50/50), lleno de conversaciones de prueba de corridas anteriores de la propia batería (título
+  reconocible: el ataque B6 crea una por corrida y nadie las borra). Se vació
+  `packages/server/.data/agent-sessions` (dato local descartable, nunca subido) y se relanzó.
+  - **D3 ya no es un hueco conocido: cierra de verdad.** El `tool-result` fabricado por el cliente pasa
+    como barrera dura (`✅ pasa`), no como `🟡 conocido`: la sesión en servidor (decisión 6) le quitó el
+    canal. Corregido el párrafo de `NOTES.md` que todavía lo describía como pendiente.
+  - **D1, D2, D4 pasan.** B4 ("no revela sus herramientas internas") sigue fallando, como ya documentaba
+    `NOTES.md` desde antes de este tramo (hardening de comportamiento, no barrera de código): con
+    `STRICT=1` eso basta para que el script bloquee con exit 1. No es una regresión introducida por
+    4G; es el mismo hueco ya conocido, ahora confirmado con datos frescos. B9 sigue `n/c` (sin
+    `FIXTURE_MATERIAL_ID`). El paso 22 pide correr la batería, no que quede en verde: se reporta tal
+    cual a Iván para que decida si el hardening de B4 entra en el alcance del tramo.
+- **Paso 23, barrido de límites: veredicto por valor.**
+  - **§3, "Límites declarados y nunca aplicados", revisada:** `maxUploadBytes` y `maxMaterials` ya se
+    aplican de verdad (`api/materials.ts:27-28` vía `HttpApiSchema.asMultipart`;
+    `file-material-repository.ts:208`, con test F4-04). Veredicto: **resueltos**, ya no son huecos.
+    `maxPastedCharactersPerTurn` sigue en 0 usos fuera de `limits.ts`: sigue siendo correcto, no un
+    hueco, porque el `@` manual que le daría un caso de uso quedó fuera de alcance de la fase 4
+    (decisión 1); documentado como no aplicable, no como pendiente.
+  - **§4.2, techos de salida por camino:** las seis capas de producción (`tutor`, `indexing`, `note`,
+    `quiz`, `test`, `judge`) están todas enrutadas de verdad en este mismo tramo (`server.ts`,
+    `handlers.ts`). Veredicto: **hecho**.
+  - **Los tres listados sin techo (invariante 11), confirmados con el código actual, no arreglados
+    en este tramo:**
+    - `artifacts show` de un `quiz` o un `test` (`artifact-commands.ts:108-109`): `JSON.stringify(artifact, null, 2)`
+      entero, sin techo. Es el más grave de los tres: un Examen de 30 preguntas con enunciados,
+      opciones, explicaciones y citas ronda 6.000-8.000 tokens en una sola respuesta, y ese texto se
+      queda fijo en el historial del resto de la conversación (hasta que la degradación de imágenes lo
+      toque, que no aplica a texto). Frente a `materials read`, que sí tiene techo
+      (`maxIndexTextCharactersPerTurn`), esto es exactamente el hueco de la invariante 11 que el plan
+      señala.
+    - `artifacts attempts` sin argumento (`:255-271`): todos los intentos de todas las pruebas, sin
+      techo. Impacto por ahora acotado (una línea corta por intento), pero sin techo formal si el
+      histórico crece.
+    - `artifacts list` sin filtro (`:201-217`): todos los artefactos, sin techo. Mismo perfil que
+      `attempts`: una línea por artefacto, sin techo formal.
+    - **No se ha añadido ningún límite nuevo en este tramo.** El paso 23 pide el barrido con veredicto,
+      no la implementación; fijar un techo nuevo (p. ej. `maxArtifactJsonCharacters` o paginar
+      `attempts`/`list`) es una decisión de producto (qué se corta y cómo se avisa) que le toca a Iván,
+      no algo que este tramo decida por su cuenta. Los tres quedan reportados como hueco real y
+      pendiente, no como "no aplica" (a diferencia de `maxPastedCharactersPerTurn`, arriba).

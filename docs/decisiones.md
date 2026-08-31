@@ -198,6 +198,15 @@ posibilidad de quitarlo**.
 usa contexto que la persona no pueda ver ni retirar, que es la invariante de "nada en silencio"
 aplicada a la interfaz.
 
+**Enmienda (fase 4, tramo 4A).** El `@` manual ("algo nombrado a propósito") queda fuera de alcance de
+la fase 4: no hay interfaz para adjuntar a mano un material, artefacto o bloque que no esté ya en
+pantalla. La decisión pasa de "se elige" a "se propone solo, lo ves y lo quitas": el contexto de
+pantalla (`ChatContextRef`, id y título del material, artefacto o bloque activo) se adjunta
+automáticamente al mensaje según lo que la interfaz ya tiene abierto (`ChatContextBar`), y la persona
+lo ve antes de enviar y puede quitarlo (invariante 9), pero no puede añadir algo que no esté delante.
+`maxPastedCharactersPerTurn` queda declarado y sin uso por esto mismo: su caso de uso era el texto
+pegado del `@` manual, que no existe hoy.
+
 ---
 
 ## ADR-007 · Los límites son explícitos, viven en el contrato compartido y el presupuesto es por turno
@@ -524,9 +533,11 @@ que exige la invariante 3 llevada a la interfaz: un material sin indexar se dice
   esta ADR lo dejó como algo independiente, pendiente de resolver. La fase 4 lo resuelve: ADR-024
   decide que borrar un material se lleva sus artefactos en cascada, así que ya no hay cita huérfana que
   pueda quedar.)
-- **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** El día que haya
-  subida de ficheros con id generado (fase 4), la primera mitad de este registro se revisa; la segunda,
-  la del archivado por huella, no cambia.
+- **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** Revisado
+  tras la subida de la fase 4 (`file-material-repository.ts`, `upload`): la subida sigue derivando el
+  id del nombre subido (`idFor`, el mismo `path.basename` sin la extensión `.pdf` que usaba `list()`
+  antes de esta fase), no genera un id propio. La primera mitad de este registro sigue vigente sin
+  cambios; la segunda, la del archivado por huella, tampoco cambia.
 
 ---
 
@@ -1145,3 +1156,67 @@ siendo una optimización compartida entre ficheros, no algo del usuario.
   borrar y algunos artefactos ya borrados: no hay transacción entre dos repositorios de ficheros
   distintos. Se acepta porque el caso es raro (el mismo fallo que impediría borrar el artefacto desde su
   propia pantalla) y el estado resultante es visible, no silencioso.
+
+---
+
+## ADR-025 · El techo de salida y el pensamiento del modelo se fijan por camino, con datos
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** Hasta la fase 4 el tutor tenía dos capas de Gemini: una para conversación
+(`GeminiLanguageModelLive`, temperatura baja) y una para JSON (`GeminiJsonLanguageModelLive`,
+temperatura 0), y las dos compartían el mismo techo de salida (`LIMITS.modelOutputTokens.tutor`,
+4.096) sin importar si detrás había un chat, una indexación, un apunte, un Control, un Examen o el
+juez de respuesta abierta. Gemini 3 añade además `thinkingConfig.thinkingLevel` (off/low/high): el
+modelo puede "pensar" antes de responder, y ese pensamiento gasta tokens del mismo techo de salida,
+no de uno aparte. Compartir capa entre caminos tan distintos (temperatura, formato, longitud esperada,
+coste de un error) era una simplificación que ya no se sostenía.
+
+**Opciones consideradas.**
+
+- **Seguir con dos capas compartidas, techo único.** Descartada: un Examen de 30 preguntas necesita un
+  techo muy por encima del de un apunte de un bloque, y fijar el techo más alto de todos como techo
+  único paga ese coste en cada camino, incluidos los baratos.
+- **Configurar el modelo ad hoc en cada punto de llamada.** Descartada: sin una capa nombrada por
+  camino, la temperatura, el formato y el techo de cada sitio se deciden por copiar y pegar el punto de
+  llamada más parecido, y no hay un solo lugar que diga qué lleva cada uno ni por qué.
+- **Fijar el nivel de pensamiento de cada camino por impresión, sin medir.** Es lo que asumía la
+  decisión 14 original (apuntes y juez con pensamiento, indexación y Control sin él, Examen a decidir).
+  Descartada como método: el tramo 4G la puso a prueba con las evals reales
+  (`eval:notes`, `eval:assessments`, `eval:judge --thinking=`) y dos de las tres suposiciones no se
+  sostuvieron (ver más abajo).
+
+**Decisión.** Seis capas de producción, una por camino, cada una una función pura de
+`GeminiGenerationConfig` (temperatura, formato, techo de salida y, donde aplica,
+`thinkingConfig`): `tutor`, `indexing`, `note`, `quiz` (Control), `test` (Examen) y `judge`
+(`gemini.ts`). Cada techo de salida (`LIMITS.modelOutputTokens.<camino>`, `packages/shared`) es el
+doble del caso peor calculado de ese camino, pensamiento incluido donde lo lleva, sin pasar del límite
+del modelo (65.536): es el fusible contra una salida desbocada, no un control de coste, porque se paga
+por lo generado, no por el techo. El nivel de pensamiento de cada camino se decidió corriendo las tres
+evals de medida dos veces cada una (antes y después de traducir los prompts al inglés, tramo 4G, paso
+21), off/low/high, y quedándose con lo que los datos mostraban, no con la suposición inicial:
+
+| Camino | Pensamiento | Por qué |
+| --- | --- | --- |
+| Apuntes (`note`) | `high` | Baja los términos traducidos de forma consistente en las dos pasadas, con un pensamiento medido de ~1.000-1.200 tokens sobre un techo de 4.096: mejora visible y repetida, sin riesgo de tocar el techo. |
+| Examen (`test`) | `low` (la decisión 14 original asumía `high`) | `high` revienta el techo de salida (`finishReason: "length"`) en 1 de 3 temas del fixture en las dos pasadas, con un pensamiento que osciló entre 1,7k y 15,7k tokens en el mismo fixture: inestable e impredecible. `low` iguala o mejora a "sin pensamiento" con un pensamiento estable (~100-130 tokens). |
+| Juez (respuesta abierta) | `off` (la decisión 14 original asumía "sí") | Ningún nivel mejora el acierto de forma visible sobre "sin pensamiento" (18/18 apagado en español; 17/18 en los tres modos tras traducir), y `high` tuvo una caída real de parseo que "off" no tuvo. |
+| Control (`quiz`) | sin pensamiento | Camino de más volumen y de práctica, no de examen real; no se midió con las evals de este tramo (decisión 14 original). |
+| Indexación | sin pensamiento | 261 páginas de una tirada del corpus local; transcribir una página no se beneficia de razonar sobre ella (decisión 14 original). |
+| Tutor (chat) | sin pensamiento | Fuera del alcance de las evals de este tramo; sigue con la configuración de conversación de antes de la fase 4. |
+
+**Consecuencias.**
+
+- El criterio que decide el pensamiento de un camino es "si no mejora de forma visible en la eval, se
+  queda sin pensamiento": el que paga la duda es el coste (tiempo y tokens), no la calidad. Dos de las
+  tres suposiciones de la decisión 14 original se revirtieron con datos; es el mecanismo funcionando,
+  no una desviación sin cobertura.
+- El coste y la latencia por llamada varían mucho entre caminos a propósito: un apunte con `high` cuesta
+  más por bloque que un Examen con `low` por pregunta. No hay una única cifra de "coste del tutor".
+- Si Gemini cambia cómo reparte tokens de pensamiento, o si el fixture de una eval deja de representar
+  el caso real, la tabla se vuelve a medir con las mismas evals; no hace falta rediseñar el mecanismo,
+  solo volver a correr `eval:notes`, `eval:assessments --thinking=` y `eval:judge --thinking=` y
+  actualizar la fila que cambió.
+- Detalle completo de la medición (las dos pasadas, antes y después de traducir), en
+  `notes/bitacora.md` (2026-09-01) y en el comentario de `gemini.ts:451-471`.
