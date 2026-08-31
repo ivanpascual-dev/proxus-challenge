@@ -24,6 +24,28 @@ pnpm --filter @proxus/server run eval:tutor:artifact-authoring
 pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta sobre variables cualitativas"
 ```
 
+### Evals de generación (fase 4, tramo 4F)
+
+Herramientas de **medida**, no checks: llaman al modelo de verdad, imprimen un informe y salen 0. Su
+resultado se anota a mano en `notes/bitacora.md` y en `NOTES.md`. Fixture versionado junto a cada una
+(`*.fixture.json`), autónomo: no depende de ningún PDF de `.data`.
+
+```bash
+pnpm --filter @proxus/server run eval:assessments   # generación de preguntas
+pnpm --filter @proxus/server run eval:notes          # generación de apuntes
+```
+
+Ambas aceptan `-- --thinking=off|low|high` para fijar un solo nivel de pensamiento; sin el flag
+recorren los tres (decisión 14, es lo que decide el paso 21 del tramo 4G).
+
+- **`eval:assessments`**: por cada tema del fixture genera preguntas de opción única y contesta cada
+  una dos veces, con y sin el fragmento citado. El informe da acierto con material, sin material y **la
+  diferencia**. La cifra absoluta no significa nada (azar 25 % más lo que el modelo ya sabe); solo
+  cuenta la diferencia.
+- **`eval:notes`**: genera un bloque de apunte por tema y lo mide con código determinista (sin juez):
+  cifras que aparecen en el apunte y no en el fuente, términos del material que salen traducidos
+  (invariante 1), preámbulos y encabezados que el prompt prohíbe, y el ratio de longitud.
+
 ## QA manual recomendado
 
 1. Arranca app completa:

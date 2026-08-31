@@ -10,6 +10,8 @@
     "agent:tutor": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor.ts",
     "dev": "node --env-file=../../.env --import tsx src/index.ts",
     "eval:judge": "node --env-file=../../.env --import tsx src/domain/artifacts/open-answer-judge.eval.ts",
+    "eval:assessments": "node --env-file=../../.env --import tsx src/domain/artifacts/assessment-generation.eval.ts",
+    "eval:notes": "node --env-file=../../.env --import tsx src/domain/artifacts/note-generation.eval.ts",
     "eval:tutor:artifact-authoring": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/artifact-authoring.eval.ts",
     "index:materials": "node --env-file=../../.env --import tsx src/scripts/index-materials.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
