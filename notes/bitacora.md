@@ -732,3 +732,38 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     movió porque necesita el perfil de estudio y `plan()`, que hoy no corren en `precheck`. Documentado
     en `docs/api.md`.
 - **280 tests en verde, los tres checks limpios**, tras todos los arreglos anteriores.
+
+## 2026-08-31 · Fase 4 · tramo 4A, línea base de tokens
+
+- **`scripts/measure-tokens.mjs` (nuevo, `pnpm measure:tokens`).** Reconstruye, paso a paso, las
+  llamadas que `session.ts` habría mandado a Gemini para un turno ya grabado en
+  `packages/server/.data/agent-sessions/`, y llama a la API real para leer `usageMetadata`. Es una
+  sonda aparte a propósito: hasta este tramo `gemini.ts` no decodificaba ese campo, así que el único
+  sitio de donde podían salir números reales era la API misma. Duplica (documentado en el propio
+  fichero, con aviso de que hay que actualizarlo en el tramo 4E) el prompt de sistema, las skills y
+  las dos declaraciones de herramientas tal cual están hoy.
+- **Línea base medida contra `verifier-f105b-1787938697.json`** (el caso flagship de la §1 del plan,
+  5 llamadas de agente en un turno): **38.881 tokens de entrada, 20.346 cacheados (52,3%), 331 de
+  salida**, 14,82 MB de peticiones sumadas. Detalle por paso:
+
+  | Paso | Entrada | Cacheados | Salida | Petición |
+  | --- | --- | --- | --- | --- |
+  | 0 (solo el user) | 456 | - | 20 | ~0 MB |
+  | 1 (+ load_skill) | 684 | - | 15 | ~0 MB |
+  | 2 (+ materials list) | 843 | - | 58 | ~0 MB |
+  | 3 (+ materials view, 12 páginas) | 14.033 | 8.120 | 28 | 5,66 MB |
+  | 4 (+ materials view, 8 páginas) | 22.865 | 12.226 | 210 | 9,15 MB |
+
+- **Hallazgo que responde al riesgo 4 del plan ("no está medido si la caché cubre las imágenes"): sí
+  las cubre.** Del paso 3 al 4 los tokens cacheados suben de 8.120 a 12.226 (+4.106) mientras el
+  prefijo compartido entre ambas llamadas incluye las 12 páginas de imagen del paso 3; si la caché
+  solo cubriera texto, ese salto no tendría de dónde salir. Dato a favor de que la palanca 1
+  (degradar imágenes a su descripción tras el turno) y la palanca 2 (caché implícita) son
+  complementarias como dice el plan, no redundantes.
+- **Discrepancia con la cifra de la §1 del plan (22,85 MB "en un turno"), anotada y no perseguida.**
+  Esta medición (reproducible, con guion versionado) da 14,82 MB de bytes de petición sumados para el
+  mismo turno, no 22,85 MB. La cifra del plan parece de una medición anterior, informal, hecha a mano;
+  la nueva sustituye a la vieja como referencia porque es la que se puede volver a correr igual. No se
+  ha investigado la diferencia porque no cambia ninguna decisión: el orden de magnitud (imágenes
+  reenviadas en cada llamada posterior del mismo turno) es el mismo, que es lo único de lo que
+  dependían las decisiones 1, 10 y 11.
