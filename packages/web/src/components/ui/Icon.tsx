@@ -33,7 +33,10 @@ export type IconName =
   | "lock"
   | "refresh"
   | "edit"
-  | "star";
+  | "star"
+  | "lightbulb"
+  | "target"
+  | "scale";
 
 interface IconProps {
   readonly name: IconName;
@@ -190,6 +193,28 @@ const iconPaths = ({ name }: { readonly name: IconName }) => {
       );
     case "star":
       return <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />;
+    case "lightbulb":
+      return (
+        <>
+          <path d="M9 18h6M10 21h4" />
+          <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.9 1 1 1.7l.1 1.5h5l.1-1.5c.1-.7.5-1.3 1-1.7A6 6 0 0 0 12 3Z" />
+        </>
+      );
+    case "target":
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" />
+          <circle cx="12" cy="12" r="1" />
+        </>
+      );
+    case "scale":
+      return (
+        <>
+          <path d="M12 4v16M7 20h10M4 8h16l-3 3H7L4 8Z" />
+          <path d="M4 8 1.5 14a3 3 0 0 0 5 0L4 8ZM20 8l-2.5 6a3 3 0 0 0 5 0L20 8Z" />
+        </>
+      );
   }
 };
 
