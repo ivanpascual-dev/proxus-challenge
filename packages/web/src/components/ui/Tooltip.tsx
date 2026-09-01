@@ -1,8 +1,15 @@
-import { cloneElement, isValidElement, useId, useState, type ReactElement } from "react";
+import { cloneElement, isValidElement, useId, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import { createPortal } from "react-dom";
+import { placeTooltip, type TooltipPlacement } from "../../domain/ui/tooltip-placement.ts";
 
 // Aparece con hover y con foco, nunca contiene acciones (fase 5, §4.2): es texto, no otro control.
 // Envuelve un único hijo focusable y le inyecta `aria-describedby` hacia el propio tooltip, así un
 // lector de pantalla lo anuncia también al llegar por teclado, no solo al pasar el ratón por encima.
+//
+// Plan de correcciones §4.2.7 / C5-12: la burbuja se monta en un portal a `document.body` con
+// `position: fixed`, así ningún `overflow-hidden` de un ancestro la recorta. `placeTooltip` la centra,
+// la vuelca arriba o abajo y la mantiene dentro del viewport; se recalcula en `resize` y en `scroll`
+// (con captura, porque puede moverse un ancestro con scroll propio) mientras está visible.
 
 interface TooltipProps {
   readonly label: string;
@@ -11,24 +18,73 @@ interface TooltipProps {
 
 export function Tooltip({ label, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
+  const [placement, setPlacement] = useState<TooltipPlacement | null>(null);
   const id = useId();
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
 
   const child = isValidElement<{ readonly "aria-describedby"?: string }>(children)
     ? cloneElement(children, { "aria-describedby": id })
     : children;
 
+  useLayoutEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const measure = () => {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const bubble = bubbleRef.current?.getBoundingClientRect();
+      if (trigger === undefined || bubble === undefined) {
+        return;
+      }
+      setPlacement(placeTooltip(
+        { top: trigger.top, left: trigger.left, width: trigger.width, height: trigger.height },
+        { width: bubble.width, height: bubble.height },
+        { width: window.innerWidth, height: window.innerHeight }
+      ));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [visible, label]);
+
+  const hide = () => {
+    setVisible(false);
+    setPlacement(null);
+  };
+
   return (
     <span
-      className="relative inline-flex"
+      ref={triggerRef}
+      className="inline-flex"
       onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      onMouseLeave={hide}
       onFocus={() => setVisible(true)}
-      onBlur={() => setVisible(false)}
+      onBlur={hide}
     >
       {child}
-      <span id={id} role="tooltip" hidden={!visible} className="-translate-x-1/2 pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 whitespace-nowrap bg-heading px-2 py-1 text-canvas text-xs">
-        {label}
-      </span>
+      {visible && createPortal(
+        <div
+          ref={bubbleRef}
+          id={id}
+          role="tooltip"
+          className="pointer-events-none fixed z-50 bg-heading px-2 py-1 text-canvas text-xs"
+          style={{
+            top: placement?.top ?? 0,
+            left: placement?.left ?? 0,
+            maxWidth: "min(320px, calc(100vw - 16px))",
+            // Antes de la primera medición se monta oculto para no dar un salto desde la esquina 0,0.
+            visibility: placement === null ? "hidden" : "visible"
+          }}
+        >
+          {label}
+        </div>,
+        document.body
+      )}
     </span>
   );
 }
