@@ -604,9 +604,184 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
   ENTONCES EL sistema DEBERÁ rechazar el turno siguiente antes de llamar al modelo, nombrando el techo
   y sugiriendo empezar una conversación nueva.
 
-### Fase 5 · Pulido y prueba
+### Fase 5 · El escritorio de estudio
 
-_Pendiente._
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/fase5-el-escritorio-de-estudio.md`](../notes/plans/fase5-el-escritorio-de-estudio.md).
+Cada criterio lleva su prioridad de entrega (P0 a P3, definidas en ese plan) junto al identificador. Un
+criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesión que lo cubre.
+
+#### Escritorio y layout
+
+- **F5-01 · P0.** MIENTRAS no haya material seleccionado, sea el estado inicial o tras cerrar el
+  material abierto, EL sistema DEBERÁ mostrar el sidebar fijo de 224px y Sym ocupando el resto del
+  espacio de trabajo, sin reservar espacio a un material vacío.
+- **F5-02 · P0.** CUANDO la persona seleccione un material, EL sistema DEBERÁ mostrar el split
+  Material/Sym con Material al 58% y Sym al 42% del espacio restante tras el sidebar.
+- **F5-03 · P0.** MIENTRAS la persona arrastre el separador Material/Sym, EL sistema DEBERÁ mantener
+  cada panel en al menos 420px y NO DEBERÁ colapsar ninguno a cero; cerrar el material DEBERÁ ser una
+  acción explícita, distinta de arrastrar el separador a un extremo.
+- **F5-04 · P0.** CUANDO la persona cambie la proporción del split, EL sistema DEBERÁ recordar solo esa
+  proporción en almacenamiento local y aplicarla la próxima vez que haya material seleccionado, sin
+  persistir contexto, perfil ni contenido educativo.
+- **F5-05 · P3.** CUANDO el viewport esté entre 768px y 1179px, EL sistema DEBERÁ mostrar una sola
+  superficie (Material o Sym) a la vez, con un control en cabecera para alternar entre ellas.
+- **F5-06 · P3.** CUANDO el viewport sea menor de 768px, EL sistema DEBERÁ presentar el sidebar como un
+  drawer modal con foco atrapado, que se cierra con Escape o al seleccionar un material.
+
+#### Sidebar, subida y avisos globales
+
+- **F5-07 · P0.** EL sidebar DEBERÁ listar únicamente materiales y controles globales (subida, avisos de
+  estado, selector de tema), y NO DEBERÁ mostrar apuntes, controles ni exámenes en su listado.
+- **F5-08 · P0.** CUANDO la persona elija o suelte varios ficheros en la subida, EL sistema DEBERÁ
+  comprobar cada uno sin escribir en disco, permitir retirar cualquiera antes de confirmar y NO DEBERÁ
+  habilitar la subida mientras quede alguno en comprobación o rechazado; cerrar el diálogo de subida NO
+  DEBERÁ interrumpir una cadena de subida, indexado o apuntes ya iniciada, y reabrirlo DEBERÁ mostrar la
+  misma cola con su progreso.
+- **F5-09 · P0.** EL sistema DEBERÁ mostrar los avisos de artefacto ilegible como aviso global fuera del
+  sidebar de materiales, y NO DEBERÁ mostrar en él la razón cruda del fallo.
+
+#### Chat de Sym
+
+- **F5-10 · P0.** CUANDO la persona pulse Enter sin Shift en el composer y no esté componiendo con IME,
+  EL sistema DEBERÁ enviar el mensaje; Shift+Enter DEBERÁ insertar un salto de línea sin enviar.
+- **F5-11 · P0.** MIENTRAS la persona escriba en el composer, EL sistema DEBERÁ ajustar su altura
+  automáticamente hasta seis líneas y, a partir de ahí, DEBERÁ usar scroll interno propio, sin permitir
+  redimensionado manual.
+- **F5-12 · P0.** EL sistema DEBERÁ renderizar la respuesta de Sym en Markdown, y SOLO las tablas y los
+  bloques de código DEBERÁN tener scroll horizontal propio; el texto normal NO DEBERÁ crear scroll
+  anidado.
+- **F5-13 · P0.** EL mensaje del alumno DEBERÁ mostrarse en una superficie tenue de ancho máximo 72% sin
+  etiqueta de autor, y la respuesta de Sym DEBERÁ mostrarse sobre el lienzo sin tarjeta, con ancho
+  máximo de 760px.
+
+#### Actividad del agente
+
+- **F5-14 · P0.** EL sistema DEBERÁ agrupar la actividad de herramientas por turno y presentarla,
+  cerrada, como un resumen humano (verbo, contador, estado), y NO DEBERÁ mostrar JSON crudo en ese
+  nivel.
+- **F5-15 · P0.** CUANDO la persona despliegue un turno, EL sistema DEBERÁ listar sus llamadas y
+  resultados en el orden persistido, emparejando cada `tool-call` con el siguiente `tool-result`
+  pendiente, y DEBERÁ mostrar `No hay resultado disponible` cuando la secuencia esté incompleta, sin
+  inventar un resultado.
+- **F5-16 · P0.** SI una herramienta falla dentro de un turno, ENTONCES EL sistema DEBERÁ conservar ese
+  estado de fallo al recargar la conversación, y NO DEBERÁ pintarlo como éxito.
+
+#### Contexto adjunto
+
+- **F5-17 · P3.** CUANDO la persona adjunte contexto desde una acción de la interfaz (tema, página,
+  bloque, prueba), EL sistema DEBERÁ mostrarlo como chip visible y retirable antes de enviar, y NO
+  DEBERÁ enviarlo al servidor hasta que la persona envíe el mensaje.
+- **F5-18 · P3.** SI la persona retira un chip de contexto antes de enviar, ENTONCES EL sistema NO
+  DEBERÁ incluir esa referencia en la petición.
+
+#### PDF y citas
+
+- **F5-19 · P1.** CUANDO la persona abra un material, EL sistema DEBERÁ mostrar una tira de miniaturas
+  que cargue cada una solo al entrar en su viewport, con la página activa resaltada y sincronizada con
+  el lector.
+- **F5-20 · P1.** CUANDO la persona pulse una cita de apunte o de corrección, EL sistema DEBERÁ cambiar
+  a PDF, navegar a la primera página citada y resaltarla; SI la cita no tiene ancla, ENTONCES DEBERÁ
+  mostrar el motivo y NO DEBERÁ navegar.
+- **F5-21 · P1.** EL sistema NO DEBERÁ generar una petición de página o miniatura por cada página del
+  material al abrirlo: solo por las próximas al viewport.
+
+#### Mapa mental
+
+- **F5-22 · P2.** MIENTRAS la persona arrastre el fondo del mapa, EL sistema DEBERÁ desplazar el lienzo
+  (pan), y la rueda con ctrl o gesto de zoom DEBERÁ aplicar zoom anclado al cursor, sin scroll de
+  documento para recorrer el grafo.
+- **F5-23 · P2.** CUANDO la persona active un nodo con Enter o Espacio, EL sistema DEBERÁ abrir
+  `TopicActionsPopover`, y Escape DEBERÁ cerrarlo devolviendo el foco al nodo.
+- **F5-24 · P2.** CUANDO la persona pulse doble clic en el fondo o el control de centrar, EL sistema
+  DEBERÁ ajustar la vista para encuadrar el grafo completo con margen, dentro del rango de zoom
+  permitido.
+
+#### Apuntes
+
+- **F5-25 · P1.** EL sistema DEBERÁ mantener montado como mucho un editor TipTap a la vez en Apuntes,
+  correspondiente al bloque seleccionado.
+- **F5-26 · P1.** CUANDO la persona cambie de bloque seleccionado sin guardar, EL sistema DEBERÁ
+  conservar el borrador global sin llamar a la API de guardado, y DEBERÁ indicar `Cambios sin guardar`.
+- **F5-27 · P1.** CUANDO la persona abra el bloque de apuntes desde un tema del mapa, EL sistema DEBERÁ
+  seleccionar el bloque con mayor solape de páginas con ese tema mediante `findBlockForTopic`; SI no
+  existe ningún bloque con solape, ENTONCES DEBERÁ abrir Apuntes y mostrar un aviso explícito de que no
+  hay bloque vinculado.
+
+#### Pruebas
+
+- **F5-28 · P1.** EL sistema DEBERÁ presentar Controles, Exámenes de prueba y Exámenes reales como tres
+  grupos separados con contador y estado vacío propio, conservando la etiqueta de origen `De repaso`
+  dentro de su grupo.
+- **F5-29 · P1.** MIENTRAS la persona esté en la lista de Pruebas, Sym DEBERÁ conocer solo que está en
+  la pestaña `Pruebas`; CUANDO abra el solver o el historial de un Control o Examen de prueba concreto,
+  EL sistema DEBERÁ nombrar a Sym el artefacto exacto y si lo está resolviendo o viendo su historial.
+- **F5-30 · P1.** CUANDO la persona empiece un Examen real, EL sistema DEBERÁ sustituir el escritorio
+  completo (sidebar, cabecera, chat, citas y controles del AppShell), y DEBERÁ restaurarlo al terminar o
+  cancelar.
+
+#### Progreso de estudio
+
+- **F5-31 · P2.** MIENTRAS el perfil de un material no tenga señales, el panel de progreso DEBERÁ
+  explicar qué acciones empiezan a poblarlo, sin mostrar un perfil vacío como si tuviera datos.
+- **F5-32 · P2.** EL panel de progreso DEBERÁ mostrar aciertos, fallos, sin evaluar, en blanco, pistas y
+  énfasis como señales separadas, y NO DEBERÁ combinarlas en un porcentaje ni en una nota agregada.
+- **F5-33 · P2.** EL sistema DEBERÁ calcular la siguiente acción de estudio siguiendo el orden fallos >
+  pistas > énfasis > práctica nueva, mostrando solo el motivo de la señal que decidió la rama, sin sumar
+  señales.
+- **F5-34 · P0.** SI la carga del perfil o de una página falla, ENTONCES EL sistema DEBERÁ decir
+  explícitamente que no hay datos o que la operación falló, y NO DEBERÁ mostrar cero, un porcentaje
+  neutro ni una pantalla vacía de éxito.
+
+#### Accesibilidad y rendimiento
+
+- **F5-35 · P2.** EL sistema DEBERÁ permitir recorrer toda la interfaz principal solo con teclado (Tab,
+  Shift+Tab, flechas, Enter, Espacio, Escape), con foco visible de 2px y roles/nombres accesibles
+  correctos, y DEBERÁ mantener contraste AA al 200% de zoom en ambos temas.
+- **F5-36 · P2.** EL sistema NO DEBERÁ re-renderizar PDF ni el editor de Apuntes al escribir en el chat,
+  NO DEBERÁ recalcular el layout del mapa en cada `pointermove`, y DEBERÁ mantener como mucho un editor
+  TipTap montado.
+
+#### Comunicación y diagnóstico
+
+- **F5-37 · P0.** SI ocurre un error de dominio, de red o un fallo desconocido en cualquier superficie,
+  ENTONCES EL sistema DEBERÁ mostrar qué ocurrió, qué queda afectado y qué puede hacer la persona, y NO
+  DEBERÁ mostrar `_tag`, `SchemaError`, estado HTTP, stack, ruta local, JSON, id interno, nombre de
+  proveedor ni texto crudo de una excepción.
+- **F5-38 · P0.** CUANDO ocurra un fallo inesperado, EL sistema DEBERÁ conservar la causa técnica, la
+  operación y la superficie en consola o log de servidor, DEBERÁ redactar claves y cuerpos binarios
+  antes de registrarla, y NO DEBERÁ repetirla en pantalla.
+- **F5-39 · P0.** EL historial de conversaciones DEBERÁ abrirse desde Sym sin alterar el sidebar de
+  materiales; la burbuja del alumno DEBERÁ mostrar únicamente lo que escribió, y el contexto interno
+  DEBERÁ reaparecer como chips humanos, nunca como el bloque `SCREEN CONTEXT`, delimitadores ni
+  identificadores; esto DEBERÁ cumplirse igual al recargar una conversación antigua que durante el
+  streaming de una nueva.
+
+#### Contexto estructurado ampliado
+
+- **F5-40 · P3.** CUANDO la persona adjunte una página desde PDF, EL sistema DEBERÁ mostrar el chip
+  antes de enviar y permitir retirarlo sin que viaje al servidor; SI adjunta otra página del mismo
+  material, ENTONCES DEBERÁ reemplazar la página anterior, y el servidor DEBERÁ validar que la página
+  esté dentro del rango del material.
+- **F5-41 · P3.** CUANDO una llamada a lectura o vista de material del turno se complete con éxito, EL
+  sistema DEBERÁ presentar sus páginas como `Fuentes consultadas`, deduplicadas por material y página,
+  tanto durante el streaming como al recargar; una llamada fallida NO DEBERÁ crear fuente, y ninguna
+  mención textual de página en la respuesta DEBERÁ convertirse por sí sola en cita.
+
+#### Detalle técnico e identidad
+
+- **F5-42 · P0.** CUANDO la persona despliegue el detalle técnico de una llamada de herramienta, EL
+  sistema DEBERÁ mostrarlo abreviado por un techo de caracteres declarado en
+  `packages/shared/src/limits.ts`, y NO DEBERÁ mostrar claves, tokens, system prompt, contenido base64
+  ni consumo de tokens.
+- **F5-43 · P0.** EL sistema DEBERÁ mostrar `Symma` como marca del producto y `Sym` con el descriptor
+  `Tutor académico` como identidad del agente en toda la interfaz visible, y NO DEBERÁ mostrar
+  `Proxus Tutor`, `Asistente académico`, `Nexo`, `Compañero de estudio` ni `Sesión efímera`.
+- **F5-44 · P3.** CUANDO la persona pregunte quién es Sym o dónde está, EL sistema DEBERÁ responder que
+  es Sym, el tutor académico dentro de Symma, y DEBERÁ nombrar únicamente la ubicación presente en el
+  contexto adjunto (material, página, bloque, pestaña Pruebas, o el Control/Examen de prueba abierto con
+  su vista); NO DEBERÁ inventar un intento o una pregunta concreta, y NO DEBERÁ afirmar ubicación alguna
+  si la persona retira el chip correspondiente; durante un Examen real NO DEBERÁ existir chat.
 
 ---
 
