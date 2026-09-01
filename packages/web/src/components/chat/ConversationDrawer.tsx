@@ -14,7 +14,8 @@ import { ActionButton } from "../ui/ActionButton.tsx";
 interface ConversationDrawerProps {
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly activeId: string;
+  // `undefined` mientras el chat es un borrador local sin conversación creada (C5-08).
+  readonly activeId: string | undefined;
   readonly onSelect: (conversationId: string) => void;
   readonly onCreateNew: () => void;
   readonly onDelete: (conversationId: string, title: string) => void;

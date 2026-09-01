@@ -17,13 +17,13 @@ export function ChatMessage({ turn }: { readonly turn: TurnView }) {
       <AgentActivity calls={turn.calls} status={turn.status} errorMessage={turn.errorMessage} />
 
       {turn.assistantText !== null && (
-        <div className="max-w-[760px] text-[0.95rem] text-heading leading-7">
+        <div className="max-w-[820px] text-[0.95rem] text-heading leading-7">
           <Streamdown>{turn.assistantText}</Streamdown>
         </div>
       )}
 
       {turn.status === "failure" && turn.assistantText === null && (
-        <p className="flex max-w-[760px] items-center gap-2 text-danger-ink text-sm">
+        <p className="flex max-w-[820px] items-center gap-2 text-danger-ink text-sm">
           <Icon name="warning" size={16} className="shrink-0" />
           {turn.errorMessage ?? "No hemos podido completar esta acción. Tus datos anteriores siguen guardados. Vuelve a intentarlo."}
         </p>

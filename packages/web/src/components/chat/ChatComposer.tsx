@@ -12,12 +12,15 @@ interface ChatComposerProps {
   readonly onChange: (value: string) => void;
   readonly onSubmit: (value: string) => void;
   readonly disabled: boolean;
+  // `disabled` solo impide enviar (p. ej. mientras un turno responde). `blocked` impide además
+  // escribir: se usa cuando ya no se puede empezar la conversación (límite de `maxConversations`).
+  readonly blocked?: boolean;
 }
 
-export function ChatComposer({ value, onChange, onSubmit, disabled }: ChatComposerProps) {
+export function ChatComposer({ value, onChange, onSubmit, disabled, blocked = false }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overLimit = value.length > LIMITS.maxMessageCharacters;
-  const canSubmit = !disabled && value.trim().length > 0 && !overLimit;
+  const canSubmit = !disabled && !blocked && value.trim().length > 0 && !overLimit;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -53,9 +56,10 @@ export function ChatComposer({ value, onChange, onSubmit, disabled }: ChatCompos
               submit();
             }
           }}
-          placeholder="Pregúntale algo a Sym…"
+          disabled={blocked}
+          placeholder={blocked ? "Borra una conversación del historial para empezar otra" : "Pregúntale algo a Sym…"}
           rows={1}
-          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-sm border bg-surface px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 ${
+          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-sm border bg-surface px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
             overLimit ? "border-danger focus:ring-danger" : "border-border-strong focus:ring-brand"
           }`}
           aria-invalid={overLimit}
