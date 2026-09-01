@@ -690,7 +690,9 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
 
 - **F5-22 · P2.** MIENTRAS la persona arrastre el fondo del mapa, EL sistema DEBERÁ desplazar el lienzo
   (pan), y la rueda con ctrl o gesto de zoom DEBERÁ aplicar zoom anclado al cursor, sin scroll de
-  documento para recorrer el grafo.
+  documento para recorrer el grafo; CUANDO el mapa tenga el foco y la persona pulse Ctrl+`+`,
+  Ctrl+`-` o Ctrl+`0`, ENTONCES EL sistema DEBERÁ ampliar, reducir o encuadrar el mapa y DEBERÁ impedir
+  el zoom global del navegador, que seguirá disponible cuando el foco esté fuera del mapa.
 - **F5-23 · P2.** CUANDO la persona active un nodo con Enter o Espacio, EL sistema DEBERÁ abrir
   `TopicActionsPopover`, y Escape DEBERÁ cerrarlo devolviendo el foco al nodo.
 - **F5-24 · P2.** CUANDO la persona pulse doble clic en el fondo o el control de centrar, EL sistema

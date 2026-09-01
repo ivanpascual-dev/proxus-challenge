@@ -1115,3 +1115,21 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   quedó sin el espaciado entre el icono y el texto. No rompía el build ni el typecheck (una clase de
   Tailwind desconocida no es error, solo no aplica nada), así que solo se veía mirando la pantalla o
   leyendo el diff con atención. Corregido a `gap-2.5` antes de commitear.
+
+## 2026-09-01 · Fase 5 · tramo P2 y unificación de acciones
+
+- **Desviación:** el plan de P2 describía cuatro acciones al pulsar un tema, pero el rediseño de P1 ya
+  había retirado la acción directa de PDF y `Preguntar a Sym` no puede cumplir todavía la invariante
+  de contexto visible y retirable hasta P3. Iván confirmó conservar solo `Ir a apuntes` y `Crear
+  Control`; el menú se ancla al nodo y usa iconos del sistema local sin recuadro propio.
+- **Decisión sobre la marcha:** con el foco dentro del mapa, Ctrl+`+`, Ctrl+`-` y Ctrl+`0` quedan
+  reservados para ampliar, reducir y centrar el mapa, cancelando el zoom global del navegador. Fuera
+  del mapa el navegador conserva su comportamiento normal.
+- **Decisión sobre la marcha:** a petición de Iván, el patrón visual de `Siguiente paso` y `Ver
+  progreso` se extendió a las acciones etiquetadas del resto de la aplicación mediante un componente
+  común. Pestañas, filas y miniaturas seleccionables, herramientas compactas del editor y controles
+  icon-only siguen sus patrones propios para no confundir selección con acción.
+- **Causa raíz:** `densidad-fixture.test.ts` es el único fallo de la suite dentro del sandbox porque
+  Node recibe `EPERM` al ejecutar `spawnSync("pdftotext")`, incluso cuando el proceso devuelve estado
+  0 y texto correcto. El mismo test ejecutado fuera del sandbox pasa sus cuatro páginas; no es un fallo
+  del fixture ni del clasificador.

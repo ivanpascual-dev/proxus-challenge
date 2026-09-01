@@ -24,7 +24,16 @@ export type IconName =
   | "zoom-out"
   | "fit-width"
   | "plus"
-  | "link";
+  | "link"
+  | "notes"
+  | "save"
+  | "sparkles"
+  | "play"
+  | "book-open"
+  | "lock"
+  | "refresh"
+  | "edit"
+  | "star";
 
 interface IconProps {
   readonly name: IconName;
@@ -128,6 +137,59 @@ const iconPaths = ({ name }: { readonly name: IconName }) => {
       return <path d="M12 5v14M5 12h14" />;
     case "link":
       return <path d="M9 15l6-6M8 12a4 4 0 0 1 0-5.5l2-2a4 4 0 0 1 5.5 5.5l-1 1M16 12a4 4 0 0 1 0 5.5l-2 2a4 4 0 0 1-5.5-5.5l1-1" />;
+    case "notes":
+      return (
+        <>
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v5h5M9 12h6M9 16h6" />
+        </>
+      );
+    case "save":
+      return (
+        <>
+          <path d="M5 3h12l2 2v16H5z" />
+          <path d="M8 3v6h8V3M8 21v-7h8v7" />
+        </>
+      );
+    case "sparkles":
+      return (
+        <>
+          <path d="m12 3 1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3L12 3Z" />
+          <path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5 13l.8 2.2L8 16l-2.2.8L5 19l-.8-2.2L2 16l2.2-.8L5 13Z" />
+        </>
+      );
+    case "play":
+      return <path d="m8 5 11 7-11 7V5Z" />;
+    case "book-open":
+      return (
+        <>
+          <path d="M3 5.5A4.5 4.5 0 0 1 7.5 4H11v16H7.5A4.5 4.5 0 0 0 3 21.5z" />
+          <path d="M21 5.5A4.5 4.5 0 0 0 16.5 4H13v16h3.5a4.5 4.5 0 0 1 4.5 1.5z" />
+        </>
+      );
+    case "lock":
+      return (
+        <>
+          <rect x="5" y="10" width="14" height="11" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
+        </>
+      );
+    case "refresh":
+      return (
+        <>
+          <path d="M20 7v5h-5M4 17v-5h5" />
+          <path d="M6.1 8A7 7 0 0 1 18.5 6.5L20 12M4 12l1.5 5.5A7 7 0 0 0 17.9 16" />
+        </>
+      );
+    case "edit":
+      return (
+        <>
+          <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" />
+          <path d="m14 7 3 3" />
+        </>
+      );
+    case "star":
+      return <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />;
   }
 };
 

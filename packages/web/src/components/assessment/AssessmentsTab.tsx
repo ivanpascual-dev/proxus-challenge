@@ -10,14 +10,16 @@ import { AssessmentGroupTabs, type AssessmentGroup } from "./AssessmentGroupTabs
 import { AssessmentList } from "./AssessmentList.tsx";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
-import { StudyProfilePanel } from "./StudyProfilePanel.tsx";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
+import type { IconName } from "../ui/Icon.tsx";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
 // como prop; la pestaña la convierte en la tarjeta de generación con su selector de preguntas.
 export interface PendingControl {
   readonly topicId: string;
   readonly topicLabel: string;
+  readonly origin?: "material" | "review";
 }
 
 type View =
@@ -27,7 +29,12 @@ type View =
 
 type GenTarget =
   | { readonly kind: "test" }
-  | { readonly kind: "quiz"; readonly topicId: string; readonly topicLabel: string };
+  | {
+      readonly kind: "quiz";
+      readonly topicId: string;
+      readonly topicLabel: string;
+      readonly initialOrigin: "material" | "review";
+    };
 
 const EMPTY_MESSAGE: Record<AssessmentGroup, string> = {
   controls: "Todavía no hay ningún Control. Genera uno desde un tema del mapa mental.",
@@ -60,7 +67,12 @@ export function AssessmentsTab({
 
   useEffect(() => {
     if (pendingControl !== null) {
-      setGenTarget({ kind: "quiz", topicId: pendingControl.topicId, topicLabel: pendingControl.topicLabel });
+      setGenTarget({
+        kind: "quiz",
+        topicId: pendingControl.topicId,
+        topicLabel: pendingControl.topicLabel,
+        initialOrigin: pendingControl.origin ?? "material",
+      });
       setView({ kind: "list" });
       onPendingControlConsumed();
     }
@@ -94,8 +106,6 @@ export function AssessmentsTab({
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <StudyProfilePanel materialId={materialId} />
-
       {genTarget !== null && (
         <GenerateCard
           materialId={materialId}
@@ -129,14 +139,16 @@ export function AssessmentsTab({
                     realExams: grouped.realExams.length
                   }}
                 />
-                <button
-                  type="button"
-                  className="mb-2 font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                <ActionButton
+                  icon="plus"
+                  variant="brand"
+                  size="compact"
+                  className="mb-2"
                   onClick={() => setGenTarget({ kind: "test" })}
                   disabled={genTarget !== null}
                 >
-                  + Examen del material
-                </button>
+                  Examen del material
+                </ActionButton>
               </div>
               <AssessmentList
                 entries={grouped[activeGroup]}
@@ -172,7 +184,9 @@ function GenerateCard({
   const [mode, setMode] = useState<"practice" | "exam">("practice");
   // De dónde salen las preguntas: "material" (nuevas) o "review" (concentradas en lo que llevas peor
   // de este alcance). El repaso solo se ofrece si el perfil tiene algo que repasar (F3-32).
-  const [origin, setOrigin] = useState<"material" | "review">("material");
+  const [origin, setOrigin] = useState<"material" | "review">(
+    target.kind === "quiz" ? target.initialOrigin : "material",
+  );
   const profile = AsyncResult.getOrElse(
     useAtomValue(studyProfileQuery(materialId)),
     () => ({ materialId, topics: [], updatedAt: null }) as StudyProfile
@@ -231,13 +245,14 @@ function GenerateCard({
           </p>
         </div>
         {!running && !done && (
-          <button
-            type="button"
-            className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98]"
+          <ActionButton
+            icon="close"
+            variant="neutral"
+            size="compact"
             onClick={onClose}
           >
             Cancelar
-          </button>
+          </ActionButton>
         )}
       </div>
 
@@ -249,10 +264,10 @@ function GenerateCard({
               ? (
                   <>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <ModeChip active={origin === "material"} onClick={() => setOrigin("material")}>
+                      <ModeChip icon="sparkles" active={origin === "material"} onClick={() => setOrigin("material")}>
                         Nuevas
                       </ModeChip>
-                      <ModeChip active={origin === "review"} onClick={() => setOrigin("review")}>
+                      <ModeChip icon="refresh" active={origin === "review"} onClick={() => setOrigin("review")}>
                         De repaso
                       </ModeChip>
                     </div>
@@ -274,10 +289,10 @@ function GenerateCard({
             <div className="text-sm">
               <span className="block text-muted">Modo</span>
               <div className="mt-1 flex flex-wrap gap-2">
-                <ModeChip active={mode === "practice"} onClick={() => setMode("practice")}>
+                <ModeChip icon="book-open" active={mode === "practice"} onClick={() => setMode("practice")}>
                   De prueba
                 </ModeChip>
-                <ModeChip active={mode === "exam"} onClick={() => setMode("exam")}>
+                <ModeChip icon="lock" active={mode === "exam"} onClick={() => setMode("exam")}>
                   Real
                 </ModeChip>
               </div>
@@ -300,13 +315,13 @@ function GenerateCard({
                 className="mt-1 w-24 border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
               />
             </label>
-            <button
-              type="button"
-              className="font-semibold text-brand transition hover:underline active:scale-[0.98]"
+            <ActionButton
+              icon="sparkles"
+              variant="primary"
               onClick={() => void run()}
             >
               Generar
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
@@ -319,38 +334,40 @@ function GenerateCard({
       {error !== undefined && <p className="mt-3 text-danger-ink">La generación falló: {error}</p>}
       {running && <p className="mt-3 text-muted text-sm">Generando…</p>}
       {done && (
-        <button
-          type="button"
-          className="mt-3 font-semibold text-brand transition hover:underline active:scale-[0.98]"
+        <ActionButton
+          icon="arrow-right"
+          variant="brand"
+          className="mt-3"
           onClick={onGenerated}
         >
           Ver la prueba en la lista
-        </button>
+        </ActionButton>
       )}
     </div>
   );
 }
 
 function ModeChip({
+  icon,
   active,
   onClick,
   children
 }: {
+  readonly icon: IconName;
   readonly active: boolean;
   readonly onClick: () => void;
   readonly children: string;
 }) {
   return (
-    <button
-      type="button"
+    <ActionButton
+      icon={icon}
       onClick={onClick}
       aria-pressed={active}
-      className={` px-4 py-1.5 text-sm ${
-        active ? "border border-brand bg-brand-soft text-heading" : "border border-border text-muted hover:text-heading"
-      }`}
+      variant={active ? "selected" : "neutral"}
+      size="compact"
     >
       {children}
-    </button>
+    </ActionButton>
   );
 }
 

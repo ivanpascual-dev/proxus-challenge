@@ -1,17 +1,26 @@
+import type { ReactNode } from "react";
 import { Icon } from "../ui/Icon.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
-// Cabecera de 64px (fase 5, §4.5): título, páginas, estado y cerrar. `Siguiente paso` y `Ver
-// progreso` llegan cuando existan `NextStudyAction` (P2) y el panel de progreso como diálogo propio
-// (P1, §4.9): añadirlos ahora sería comportamiento nuevo sin la lógica que lo sostiene.
+// Cabecera de 64px (fase 5, §4.5): título, páginas, estado, siguiente paso, progreso y cerrar.
 interface MaterialHeaderProps {
   readonly title: string;
   readonly pageCount: number;
   readonly indexed: boolean;
   readonly onClose: () => void;
+  readonly nextStudyAction: ReactNode;
+  readonly onOpenProgress: () => void;
 }
 
-export function MaterialHeader({ title, pageCount, indexed, onClose }: MaterialHeaderProps) {
+export function MaterialHeader({
+  title,
+  pageCount,
+  indexed,
+  onClose,
+  nextStudyAction,
+  onOpenProgress,
+}: MaterialHeaderProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-border border-b px-4">
       <div className="min-w-0">
@@ -25,7 +34,17 @@ export function MaterialHeader({ title, pageCount, indexed, onClose }: MaterialH
           {pageCount} {pageCount === 1 ? "página" : "páginas"} · {indexed ? "indexado" : "sin indexar"}
         </p>
       </div>
-      <IconButton icon="close" label="Cerrar material" onClick={onClose} />
+      <div className="flex shrink-0 items-center gap-1">
+        {nextStudyAction}
+        <ActionButton
+          icon="progress"
+          size="compact"
+          onClick={onOpenProgress}
+        >
+          Ver progreso
+        </ActionButton>
+        <IconButton icon="close" label="Cerrar material" onClick={onClose} />
+      </div>
     </header>
   );
 }

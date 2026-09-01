@@ -26,9 +26,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   No hace falta indexarlo para verlo.
 - **Indexado desde la web.** Un material sin indexar muestra un botón para indexarlo con el progreso
   página a página, y dice explícitamente que aún no lo está en vez de enseñar un índice vacío.
-- **Mapa mental de temas.** Un material indexado se abre en dos pestañas, el PDF y un mapa mental de sus
-  temas en dos niveles. Al pulsar un tema se salta a su página. Un botón "Colores por grupo" tiñe cada
-  área y deja sus subtemas del mismo color más claro.
+- **Mapa mental de temas.** Un material indexado incluye un mapa mental de sus temas en dos niveles.
+  Se puede arrastrar, ampliar, reducir y volver a centrar; con el foco dentro, Ctrl con `+`, `-` o `0`
+  actúa sobre el mapa en vez de cambiar el zoom del navegador. Al pulsar un tema aparece junto al nodo
+  un menú para abrir sus apuntes o crear un Control, con navegación completa por teclado. Un selector
+  opcional tiñe cada área y deja sus subtemas del mismo color más claro.
 - **Marca de procedencia en el visor.** Las páginas que transcribió el modelo, porque no tenían texto
   extraíble, llevan una marca ámbar en la esquina. Las que fallaron al indexarse, una banda roja.
 - **Materiales de ejemplo.** `pnpm run seed:demo` copia unos PDFs de prueba para poder usar la
@@ -110,10 +112,13 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   entró ("porque fallaste este tema", "porque abriste una pista", "porque lo marcaste como
   importante"). Si no hay nada que repasar, el interruptor no se ofrece y en su lugar se explica
   cuándo se activará. En el Examen real el motivo de cada pregunta no se muestra.
-- **Tu progreso en el material.** La pestaña "Pruebas" tiene un bloque desplegable, plegado por
-  defecto, que muestra tema a tema lo que llevas de este material: aciertos, fallos, respuestas sin
-  evaluar o en blanco, pistas abiertas y la marca de "importante", cada señal por separado y sin
-  sumarlas. Es solo lectura y se pone al día al entregar o discrepar un intento.
+- **Tu progreso en el material.** La cabecera del material abre un panel lateral que muestra tema a
+  tema aciertos, fallos, respuestas sin evaluar o en blanco, pistas abiertas y la marca de
+  "importante", cada señal por separado y sin sumarlas. Es solo lectura y se pone al día al entregar
+  o discrepar un intento.
+- **Siguiente paso recomendado.** La cabecera del material propone una acción concreta a partir de
+  señales verificables del material y del perfil, explica el motivo exacto y permite ejecutarla sin
+  convertir aciertos, fallos, pistas o marcas de importante en una puntuación mezclada.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del

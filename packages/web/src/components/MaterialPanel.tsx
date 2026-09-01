@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
-import type { ChatContextRef, MaterialIndex } from "@proxus/shared";
-import { useEffect, useMemo, useState } from "react";
+import type { ChatContextRef } from "@proxus/shared";
+import { useEffect, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import {
   artifactQuery,
@@ -17,20 +17,21 @@ import {
   type PendingControl,
 } from "./assessment/AssessmentsTab.tsx";
 import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
-import {
-  LABEL_FONT_PX,
-  LABEL_FONT_WEIGHT,
-  layoutMindMap,
-  type MeasureText,
-  type MindMapEdge,
-  type MindMapNode,
-} from "../domain/materials/mindmap-layout.ts";
 import { streamReindexMaterial } from "../domain/materials/stream.ts";
+import {
+  nextStudyAction,
+  type NextStudyAction as StudyAction,
+} from "../domain/profile/next-study-action.ts";
+import { studyProfileQuery } from "../domain/profile/atoms.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
+import { NextStudyAction } from "./assessment/NextStudyAction.tsx";
+import { StudyProfilePanel } from "./assessment/StudyProfilePanel.tsx";
 import { MaterialHeader } from "./material/MaterialHeader.tsx";
 import { MaterialTabs, type Tab } from "./material/MaterialTabs.tsx";
+import { MindMapWorkspace } from "./material/mindmap/MindMapWorkspace.tsx";
 import { PdfWorkspace } from "./material/pdf/PdfWorkspace.tsx";
 import type { PageMarker } from "./material/pdf/PdfPage.tsx";
+import { ActionButton } from "./ui/ActionButton.tsx";
 
 interface MaterialPanelProps {
   readonly materialId: string;
@@ -55,6 +56,11 @@ interface MaterialPanelProps {
   readonly onCitationConsumed: () => void;
 }
 
+type NoteAvailability =
+  | { readonly kind: "loading" }
+  | { readonly kind: "error" }
+  | { readonly kind: "ready"; readonly hasNote: boolean };
+
 export function MaterialPanel({
   materialId,
   indexState,
@@ -76,6 +82,7 @@ export function MaterialPanel({
   const [pendingNoteTopicPages, setPendingNoteTopicPages] = useState<
     readonly number[] | null
   >(null);
+  const [progressOpen, setProgressOpen] = useState(false);
   const [activeAssessmentArtifact, setActiveAssessmentArtifact] = useState<
     { readonly id: string; readonly title: string } | undefined
   >();
@@ -87,6 +94,17 @@ export function MaterialPanel({
     (artifact) =>
       artifact.kind === "note" && artifact.materialId === materialId,
   );
+  const noteAvailability: NoteAvailability = AsyncResult.matchWithError(artifacts, {
+    onInitial: () => ({ kind: "loading" }),
+    onError: () => ({ kind: "error" }),
+    onDefect: () => ({ kind: "error" }),
+    onSuccess: ({ value }) => ({
+      kind: "ready",
+      hasNote: value.artifacts.some(
+        (artifact) => artifact.kind === "note" && artifact.materialId === materialId,
+      ),
+    }),
+  });
 
   useEffect(() => {
     const refs: ChatContextRef[] = [{ type: "material", materialId, title }];
@@ -131,8 +149,41 @@ export function MaterialPanel({
   }, [citationTarget, materialId]);
 
   const generateControlForTopic = (topicId: string, topicLabel: string) => {
-    setPendingControl({ topicId, topicLabel });
+    setPendingControl({ topicId, topicLabel, origin: "material" });
     setTab("assessments");
+  };
+
+  const activateStudyAction = (action: StudyAction) => {
+    switch (action.kind) {
+      case "finish-setup":
+        if (action.target === "notes") {
+          setTab("notes");
+        } else {
+          requestAnimationFrame(() => document.getElementById("index-material-action")?.focus());
+        }
+        return;
+      case "first-control":
+        setPendingControl({
+          topicId: action.topicId,
+          topicLabel: action.topicLabel,
+          origin: "material",
+        });
+        setTab("assessments");
+        return;
+      case "review":
+        setPendingControl({
+          topicId: action.topicId,
+          topicLabel: action.topicLabel,
+          origin: "review",
+        });
+        setTab("assessments");
+        return;
+      case "new-practice":
+        setTab("assessments");
+        return;
+      case "no-data":
+        return;
+    }
   };
 
   // Tema -> apunte (decisión 18, §4.1): el mapa manda las páginas del tema, `NoteWorkspace` resuelve
@@ -149,6 +200,34 @@ export function MaterialPanel({
         pageCount={pageCount}
         indexed={indexed}
         onClose={onClose}
+        nextStudyAction={indexed
+          ? (
+              <IndexedNextStudyAction
+                materialId={materialId}
+                noteAvailability={noteAvailability}
+                onActivate={activateStudyAction}
+              />
+            )
+          : (
+              <NextStudyAction
+                state={{
+                  kind: "ready",
+                  action: { kind: "finish-setup", target: "index" },
+                }}
+                onActivate={activateStudyAction}
+              />
+            )}
+        onOpenProgress={() => setProgressOpen(true)}
+      />
+
+      <StudyProfilePanel
+        materialId={materialId}
+        open={progressOpen}
+        onClose={() => setProgressOpen(false)}
+        onCreateReview={(topicId, topicLabel) => {
+          setPendingControl({ topicId, topicLabel, origin: "review" });
+          setTab("assessments");
+        }}
       />
 
       {!indexed && (
@@ -184,7 +263,7 @@ export function MaterialPanel({
         <div
           className={`min-h-0 flex-1 p-4 ${tab === "mindmap" ? "flex flex-col" : "hidden"}`}
         >
-          <MindMapTab
+          <MindMapWorkspace
             materialId={materialId}
             title={title}
             onGenerateControl={generateControlForTopic}
@@ -222,6 +301,69 @@ export function MaterialPanel({
       )}
     </main>
   );
+}
+
+function IndexedNextStudyAction({
+  materialId,
+  noteAvailability,
+  onActivate,
+}: {
+  readonly materialId: string;
+  readonly noteAvailability: NoteAvailability;
+  readonly onActivate: (action: StudyAction) => void;
+}) {
+  const index = useAtomValue(materialIndexQuery(materialId));
+  const profile = useAtomValue(studyProfileQuery(materialId));
+
+  if (noteAvailability.kind === "loading") {
+    return <NextStudyAction state={{ kind: "loading" }} onActivate={onActivate} />;
+  }
+  if (noteAvailability.kind === "error") {
+    return (
+      <NextStudyAction
+        state={{
+          kind: "ready",
+          action: { kind: "no-data", reason: "No se pudieron comprobar los apuntes del material." },
+        }}
+        onActivate={onActivate}
+      />
+    );
+  }
+  const hasNote = noteAvailability.hasNote;
+
+  const state = AsyncResult.matchWithError(index, {
+    onInitial: () => ({ kind: "loading" } as const),
+    onError: () => ({
+      kind: "ready",
+      action: { kind: "no-data", reason: "No se pudo cargar el índice del material." } as StudyAction,
+    } as const),
+    onDefect: () => ({
+      kind: "ready",
+      action: { kind: "no-data", reason: "No se pudo cargar el índice del material." } as StudyAction,
+    } as const),
+    onSuccess: ({ value: materialIndex }) => AsyncResult.matchWithError(profile, {
+      onInitial: () => ({ kind: "loading" } as const),
+      onError: () => ({
+        kind: "ready",
+        action: { kind: "no-data", reason: "No se pudo cargar el progreso del material." } as StudyAction,
+      } as const),
+      onDefect: () => ({
+        kind: "ready",
+        action: { kind: "no-data", reason: "No se pudo cargar el progreso del material." } as StudyAction,
+      } as const),
+      onSuccess: ({ value: studyProfile }) => ({
+        kind: "ready",
+        action: nextStudyAction({
+          hasIndex: true,
+          hasNote,
+          topics: materialIndex.topics,
+          profile: studyProfile,
+        }),
+      } as const),
+    }),
+  });
+
+  return <NextStudyAction state={state} onActivate={onActivate} />;
 }
 
 // --- Visor del PDF -----------------------------------------------------------
@@ -266,295 +408,6 @@ function IndexedPdfWorkspace({
     />
   );
 }
-
-// --- Mapa mental -----------------------------------------------------------
-
-function MindMapTab({
-  materialId,
-  title,
-  onGenerateControl,
-  onGoToNotes,
-}: {
-  readonly materialId: string;
-  readonly title: string;
-  readonly onGenerateControl: (topicId: string, topicLabel: string) => void;
-  readonly onGoToNotes: (topicPages: readonly number[]) => void;
-}) {
-  const index = useAtomValue(materialIndexQuery(materialId));
-
-  return AsyncResult.matchWithError(index, {
-    onInitial: () => <p className="text-muted">Cargando el mapa…</p>,
-    onError: (error) => {
-      const notice = describeFailure(
-        error,
-        { area: "materials", action: "index" },
-        "MaterialPanel",
-      );
-      return (
-        <p className="text-danger-ink">
-          {notice.title} {notice.description}
-        </p>
-      );
-    },
-    onDefect: (defect) => (
-      <p className="text-danger-ink">
-        No se pudo cargar el índice: {DEFECT_MESSAGE}
-      </p>
-    ),
-    onSuccess: ({ value }) =>
-      value.topics.length === 0 ? (
-        <p className="text-muted">
-          El modelo no detectó temas en este material.
-        </p>
-      ) : (
-        <MindMap
-          index={value}
-          title={title}
-          onGenerateControl={onGenerateControl}
-          onGoToNotes={onGoToNotes}
-        />
-      ),
-  });
-}
-
-// Medidor de texto real, para dimensionar las cajas de forma que quepa toda la etiqueta. Un canvas
-// fuera de pantalla reutilizado; si no hay DOM (no debería en el navegador), cae a una estimación.
-let measureContext: CanvasRenderingContext2D | null | undefined;
-const measureText: MeasureText = (text, fontPx, fontWeight) => {
-  if (measureContext === undefined) {
-    measureContext = document.createElement("canvas").getContext("2d");
-  }
-  if (measureContext === null) {
-    return text.length * fontPx * 0.58;
-  }
-  measureContext.font = `${fontWeight} ${fontPx}px "Montserrat", ui-sans-serif, system-ui, sans-serif`;
-  return measureContext.measureText(text).width;
-};
-
-// Un tono por grupo de primer nivel. El subtema usa el mismo tono, más claro (menos mezcla de color).
-const GROUP_HUES = [262, 330, 25, 150, 200, 45];
-const hueOf = (groupIndex: number): number =>
-  GROUP_HUES[groupIndex % GROUP_HUES.length] ?? 262;
-
-const nodeFill = (node: MindMapNode, colorByGroup: boolean): string => {
-  if (node.kind === "material") {
-    return "var(--color-brand-soft)";
-  }
-  if (!colorByGroup || node.groupIndex === null) {
-    return node.kind === "topic"
-      ? "var(--color-surface)"
-      : "var(--color-surface-muted)";
-  }
-  const mix = node.kind === "topic" ? 26 : 12;
-  return `color-mix(in srgb, hsl(${hueOf(node.groupIndex)} 70% 55%) ${mix}%, var(--color-surface))`;
-};
-
-const nodeStroke = (node: MindMapNode, colorByGroup: boolean): string => {
-  if (colorByGroup && node.groupIndex !== null && node.kind !== "material") {
-    return `color-mix(in srgb, hsl(${hueOf(node.groupIndex)} 70% 50%) 60%, var(--color-border))`;
-  }
-  return "var(--color-border)";
-};
-
-function MindMap({
-  index,
-  title,
-  onGenerateControl,
-  onGoToNotes,
-}: {
-  readonly index: MaterialIndex;
-  readonly title: string;
-  readonly onGenerateControl: (topicId: string, topicLabel: string) => void;
-  readonly onGoToNotes: (topicPages: readonly number[]) => void;
-}) {
-  const [colorByGroup, setColorByGroup] = useState(false);
-  const [openNodeId, setOpenNodeId] = useState<string | null>(null);
-  const model = useMemo(
-    () => layoutMindMap(index.topics, title, measureText),
-    [index.topics, title],
-  );
-  const openNode = model.nodes.find((node) => node.id === openNodeId) ?? null;
-
-  return (
-    <div className="relative min-h-0 flex-1 overflow-auto border-border border bg-canvas p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted text-sm">
-          Pulsa un tema para crear un Control o ir a sus apuntes.
-        </p>
-        <button
-          type="button"
-          onClick={() => setColorByGroup((value) => !value)}
-          aria-pressed={colorByGroup}
-          className={`border px-3 py-1 text-xs ${
-            colorByGroup
-              ? "border-brand bg-brand-soft text-heading"
-              : "border-border text-muted hover:text-heading"
-          }`}
-        >
-          {colorByGroup ? "Colores por grupo: sí" : "Colores por grupo"}
-        </button>
-      </div>
-      <svg
-        viewBox={`0 0 ${model.width} ${model.height}`}
-        width={model.width}
-        height={model.height}
-        role="img"
-        aria-label={`Mapa mental de ${title}`}
-      >
-        {model.edges.map((edge, i) => (
-          <path
-            key={i}
-            d={edgePath(edge)}
-            fill="none"
-            stroke="var(--color-border-strong)"
-            strokeWidth={1.5}
-          />
-        ))}
-        {model.nodes.map((node) => (
-          <MindMapNodeView
-            key={node.id}
-            node={node}
-            colorByGroup={colorByGroup}
-            open={node.id === openNodeId}
-            onToggle={() =>
-              setOpenNodeId((current) => (current === node.id ? null : node.id))
-            }
-          />
-        ))}
-      </svg>
-      {openNode !== null && (
-        <TopicActionsMenu
-          node={openNode}
-          onClose={() => setOpenNodeId(null)}
-          onGenerateControl={() => {
-            onGenerateControl(openNode.id, openNode.label);
-            setOpenNodeId(null);
-          }}
-          onGoToNotes={() => {
-            onGoToNotes(openNode.pages);
-            setOpenNodeId(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Popup de acciones de un tema (fase 5, §4.7, adelantado en P1 a pedido de Iván: sin pan/zoom en
-// cursor, que es P2). Un único desplegable con las dos acciones que hoy tiene el mapa: no navega al
-// PDF, esa opción se quitó.
-function TopicActionsMenu({
-  node,
-  onClose,
-  onGenerateControl,
-  onGoToNotes,
-}: {
-  readonly node: MindMapNode;
-  readonly onClose: () => void;
-  readonly onGenerateControl: () => void;
-  readonly onGoToNotes: () => void;
-}) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <>
-      <div className="fixed inset-0 z-10" onClick={onClose} />
-      <div
-        role="menu"
-        aria-label={`Acciones de "${node.label}"`}
-        className="absolute z-20 flex min-w-40 flex-col border border-border bg-surface py-1 shadow-lg"
-        style={{ left: node.x, top: node.y + node.height / 2 + 4 }}
-      >
-        <button
-          type="button"
-          role="menuitem"
-          className="px-4 py-2 text-left text-body text-sm hover:bg-surface-muted"
-          onClick={onGenerateControl}
-        >
-          Crear Control
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          className="px-4 py-2 text-left text-body text-sm hover:bg-surface-muted"
-          onClick={onGoToNotes}
-        >
-          Ir a apuntes
-        </button>
-      </div>
-    </>
-  );
-}
-
-function MindMapNodeView({
-  node,
-  colorByGroup,
-  open,
-  onToggle,
-}: {
-  readonly node: MindMapNode;
-  readonly colorByGroup: boolean;
-  readonly open: boolean;
-  readonly onToggle: () => void;
-}) {
-  const firstBaseline = 11 + LABEL_FONT_PX;
-  const canOpen = node.kind !== "material";
-
-  return (
-    <g transform={`translate(${node.x} ${node.y - node.height / 2})`}>
-      <title>
-        {node.label}
-        {node.pagesText === "" ? "" : ` · ${node.pagesText}`}
-      </title>
-      <rect
-        width={node.width}
-        height={node.height}
-        fill={nodeFill(node, colorByGroup)}
-        stroke={open ? "var(--color-brand)" : nodeStroke(node, colorByGroup)}
-        strokeWidth={open ? 2 : 1}
-        onClick={canOpen ? onToggle : undefined}
-        style={{ cursor: canOpen ? "pointer" : "default" }}
-      />
-      {node.lines.map((line, i) => (
-        <text
-          key={i}
-          x={14}
-          y={firstBaseline + i * 17}
-          fill="var(--color-heading)"
-          fontSize={LABEL_FONT_PX}
-          fontWeight={LABEL_FONT_WEIGHT}
-          pointerEvents="none"
-        >
-          {line}
-        </text>
-      ))}
-      {node.pagesText !== "" && (
-        <text
-          x={14}
-          y={firstBaseline + (node.lines.length - 1) * 17 + 15}
-          fill="var(--color-muted)"
-          fontSize={11}
-          pointerEvents="none"
-        >
-          {node.pagesText}
-        </text>
-      )}
-    </g>
-  );
-}
-
-const edgePath = ({ fromX, fromY, toX, toY }: MindMapEdge): string => {
-  const midX = (fromX + toX) / 2;
-  return `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
-};
 
 // --- Banner de indexación --------------------------------------------------
 
@@ -605,14 +458,15 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
             mental.
           </p>
         </div>
-        <button
-          className="font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
+        <ActionButton
+          id="index-material-action"
+          icon="sparkles"
+          variant="brand"
           onClick={() => void run()}
           disabled={running}
         >
           {running ? "Indexando…" : "Indexar"}
-        </button>
+        </ActionButton>
       </div>
 
       {lines.length > 0 && (
@@ -728,14 +582,15 @@ function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
           Se arma un bloque por cada tema del índice del material, con la prosa
           redactada a partir de sus páginas. Puedes editarlos después.
         </p>
-        <button
-          type="button"
-          className="mt-4 font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        <ActionButton
+          icon="sparkles"
+          variant="primary"
+          className="mt-4"
           onClick={() => void run()}
           disabled={running}
         >
           {running ? "Creando apuntes…" : "Crear apuntes"}
-        </button>
+        </ActionButton>
         {running && (
           <p className="mt-3 text-muted text-sm">
             {progress ?? "Leyendo el índice del material…"}

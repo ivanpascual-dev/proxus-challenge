@@ -11,9 +11,17 @@ interface DialogProps {
   readonly title: string;
   readonly children: ReactNode;
   readonly widthClassName?: string;
+  readonly placement?: "center" | "right";
 }
 
-export function Dialog({ open, onClose, title, children, widthClassName = "max-w-lg" }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+  widthClassName = "max-w-lg",
+  placement = "center",
+}: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<Element | null>(null);
 
@@ -51,7 +59,11 @@ export function Dialog({ open, onClose, title, children, widthClassName = "max-w
         onClose();
       }}
       onClose={onClose}
-      className={`fixed inset-0 m-auto h-fit w-full ${widthClassName} border border-border bg-surface p-0 text-body backdrop:bg-heading/40`}
+      className={`fixed w-full ${widthClassName} border border-border bg-surface p-0 text-body backdrop:bg-heading/40 ${
+        placement === "right"
+          ? "inset-y-0 right-0 ml-auto h-full max-h-none"
+          : "inset-0 m-auto h-fit"
+      }`}
     >
       {open && children}
     </dialog>
