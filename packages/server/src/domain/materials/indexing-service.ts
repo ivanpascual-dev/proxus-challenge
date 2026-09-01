@@ -5,6 +5,7 @@ import { PdfService } from "./pdf-service.ts";
 import { classifyPage, countDenseCharacters, type PageProvenance } from "./page-classifier.ts";
 import { parseTopics, parseTranscription } from "./model-json.ts";
 import { normalizeTopicHierarchy } from "./topic-hierarchy.ts";
+import { pruneUnsupportedTopics } from "./topic-support.ts";
 import { TRANSCRIPTION_PROMPT, topicsPrompt } from "./indexing-prompts.ts";
 
 export class IndexingError extends Data.TaggedError("IndexingError")<{
@@ -133,7 +134,11 @@ export const IndexingServiceLive = Layer.effect(
 
       yield* emit({ page: null, pageCount: input.pageCount, message: "generando los temas del material" });
 
-      const topics = yield* generateTopics(indexedPages, input.pageCount);
+      const rawTopics = yield* generateTopics(indexedPages, input.pageCount);
+      // Red de seguridad determinista (C5-04): un tema sin respaldo de texto suficiente no es una
+      // unidad de estudio, aunque el modelo lo haya propuesto pese a la regla del prompt. Sus páginas
+      // quedan con `topicIds: []` porque `pagesWithTopics` (abajo) recalcula sobre los supervivientes.
+      const topics = pruneUnsupportedTopics(rawTopics, indexedPages, LIMITS.minTopicSourceCharacters);
 
       const indexedAt = yield* Effect.sync(() => new Date().toISOString());
 

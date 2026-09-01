@@ -34,16 +34,16 @@ Return ONLY a JSON object with this exact shape, no text before or after:
 {"topics": [{"id": "kebab-case", "label": "...", "pages": [1, 2, 5], "parent": null}]}
 
 Rules:
-- A topic is a unit of study of the material, not a stray word. Between 3 and ${LIMITS.maxTopicsPerMaterial} topics in total.
+- A topic is a unit worth studying, not every page, heading or stray word. Return between 0 and ${LIMITS.maxTopicsPerMaterial} topics in total.
 - \`label\` uses the material's own vocabulary and does not translate it. If the material says \`set\`,
   the topic is called \`set\`, never "conjunto".
-- \`pages\` are the pages where that topic is actually covered, not where it is mentioned in passing.
-- Every page with content must appear in at least one topic. If a page does not fit any, create the
-  topic it belongs to.
-- Organize the topics into a hierarchy of at most two levels: a few general topics (the material's
-  areas) and, hanging from them, their specific subtopics. \`parent\` is the \`id\` of another topic in
-  this same list, or null if the topic is top-level.
-- Between 2 and 6 top-level topics.
-- A subtopic covers an aspect of its parent topic, not something different. If in doubt, make it a
-  top-level topic.
+- \`pages\` are the pages where that topic is actually taught, not where it is mentioned in passing.
+- A page may belong to no topic. Do not create a topic for a cover, separator, administrative table of
+  contents, isolated fragment, bibliography with no study content, closing page or any page that does
+  not form a useful unit of study.
+- If there are topics, organize them into a hierarchy of at most two levels: general areas and their
+  specific subtopics. \`parent\` is the \`id\` of another topic in this same list, or null if the topic is
+  top-level.
+- If there are topics, use between 1 and 6 top-level topics. A subtopic covers an aspect of its parent,
+  not something different. If in doubt, make it a top-level topic.
 - Do not invent topics or relationships that do not appear in the received text.`;

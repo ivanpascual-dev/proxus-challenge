@@ -2,6 +2,7 @@ import { Context, Data, Effect, Layer, Option } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
 import { LIMITS, type MaterialIndex, type MaterialTopic } from "@proxus/shared";
 import { MaterialRepository } from "../materials/material.ts";
+import { pruneUnsupportedTopics } from "../materials/topic-support.ts";
 import {
   ArtifactRepository,
   MaterialAlreadyHasNote,
@@ -47,8 +48,6 @@ export const NoteGenerationService = Context.Service<NoteGenerationService>(
 const leafTopics = (topics: readonly MaterialTopic[]): readonly MaterialTopic[] =>
   topics.filter((topic) => !topics.some((other) => other.parentId === topic.id));
 
-const MIN_TEXT_FOR_MODEL = 60;
-
 export const make = (
   repository: ArtifactRepository,
   materials: MaterialRepository
@@ -68,11 +67,6 @@ export const make = (
     sourceText: string
   ): Effect.Effect<string, NoteGenerationError, LanguageModel.LanguageModel> => Effect.gen(function* () {
     const heading = `## ${topic.label}`;
-
-    if (sourceText.trim().length < MIN_TEXT_FOR_MODEL) {
-      // Invariante 3: no se disfraza con un bloque vacío. Se dice que este tema quedó pobre y por qué.
-      return `${heading}\n\n_El material no tiene apenas texto indexado para este tema (páginas ${topic.pages.join(", ")}). Vuelve a indexar el material para unos apuntes completos._`;
-    }
 
     const response = yield* LanguageModel.generateText({
       prompt: [
@@ -132,10 +126,14 @@ export const make = (
           Effect.andThen(new NoteGenerationError({ reason: "no se pudo leer el índice del material" }))))
     );
 
-    const topics = leafTopics(index.topics).slice(0, LIMITS.maxBlocksPerNote);
+    // Mismo filtro que el índice (C5-04): un tema hoja sin respaldo de texto suficiente no es una
+    // unidad de estudio, así que no genera bloque. Retirado `MIN_TEXT_FOR_MODEL`: el único domicilio
+    // del umbral es `LIMITS.minTopicSourceCharacters`.
+    const supportedLeaves = pruneUnsupportedTopics(leafTopics(index.topics), index.pages, LIMITS.minTopicSourceCharacters);
+    const topics = supportedLeaves.slice(0, LIMITS.maxBlocksPerNote);
     if (topics.length === 0) {
       return yield* new NoteGenerationError({
-        reason: `el material ${materialId} no tiene temas en su índice: no hay nada de lo que hacer apuntes`
+        reason: "el material no contiene unidades de estudio suficientes para generar apuntes"
       });
     }
 

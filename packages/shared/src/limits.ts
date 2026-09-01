@@ -95,6 +95,10 @@ export const LIMITS = {
   maxTopicsPerMaterial: 40,
   maxTopicsPerPage: 3,
   maxIndexedCharactersPerPage: 8_000,
+  // Caracteres no blancos mínimos entre las páginas de un tema para que merezca existir como unidad
+  // de estudio (correcciones de cierre de fase 5, C5-04): red de seguridad determinista contra
+  // portadas, separadores y cierres que el modelo etiqueta como tema pese a la regla del prompt.
+  minTopicSourceCharacters: 60,
 
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
