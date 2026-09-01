@@ -5,7 +5,7 @@
 // nuevo: ajusta el tono y el nivel de detalle de todos los apuntes.
 
 export const NOTE_BLOCK_PROMPT = [
-  "You are a tutor writing study notes. I give you the name of a topic and the text of the material's",
+  "Write study notes. I give you the name of a topic and the text of the material's",
   "pages where it is covered. Return a dense, clear prose summary of THAT topic, in Spanish, ready to",
   "study: definitions, relationships, examples and nuances that appear in the text.",
   "",

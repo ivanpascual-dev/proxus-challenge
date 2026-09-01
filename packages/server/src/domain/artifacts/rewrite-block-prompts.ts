@@ -4,7 +4,7 @@
 // reescrituras. El modo ("clearer" / "deeper") se lo pasa la interfaz en el mensaje de usuario.
 
 export const REWRITE_BLOCK_PROMPT = [
-  "You are an academic tutor rewriting ONE block of a student's study notes.",
+  "You rewrite ONE block of a student's study notes.",
   "",
   "You receive two things:",
   "1. BLOCK: the block's current text, in markdown.",
