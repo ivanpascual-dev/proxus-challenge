@@ -257,7 +257,7 @@ Cuatro familias:
 | | Pasos del agente | 12, **acotado en el servidor** (subió de 8 en la fase 2, decisión 22 del plan: holgura para el camino de generación, no más seguridad) |
 | Frecuencia | Mensajes | 20 / 10 min · 200 / día |
 | | Artefactos generados | 5 / 10 min · 40 / día |
-| | Peticiones simultáneas por cliente | 3 |
+| | Peticiones simultáneas por cliente | 3 (con la excepción de ADR-028: la preparación automática de un material recién subido no consume este cupo) |
 | Tamaño de salida | Preguntas por artefacto | 50 |
 | | Bloques por nota | 200 |
 | | Tokens de salida del modelo | 8.192 (`maxOutputTokens` en cada petición a Gemini) |
@@ -1113,7 +1113,8 @@ fabricar un límite superado donde no hay dato).
 
 ## ADR-024 · Borrar un material se lleva sus artefactos, en cascada y sin preguntar dos veces
 
-- **Estado:** aceptada
+- **Estado:** aceptada; la frase "el índice cacheado... no se toca" queda sustituida por ADR-027, que
+  sí lo borra cuando el material borrado era la última referencia a esa huella.
 - **Fecha:** 2026-08-31
 
 **Contexto.** El plan de la fase 4 no traía borrado de materiales; surgió al hablar con Iván de qué
@@ -1220,3 +1221,93 @@ evals de medida dos veces cada una (antes y después de traducir los prompts al 
   actualizar la fila que cambió.
 - Detalle completo de la medición (las dos pasadas, antes y después de traducir), en
   `notes/bitacora.md` (2026-09-01) y en el comentario de `gemini.ts:451-471`.
+
+---
+
+## ADR-027 · Borrar un material se lleva sus derivados por huella, solo cuando es la última referencia
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** ADR-024 dejó el índice cacheado por huella (ADR-011) fuera del borrado: "sigue siendo una
+optimización compartida entre ficheros, no algo del usuario". Al probar el cierre de la fase 5 aparecen
+dos huecos que esa frase no cubría. Uno, no hablaba de las páginas renderizadas
+(`.data/materials/pages/<sha>-<page>.png`, que no existían cuando se escribió) ni del perfil de estudio
+(`.data/profile/<materialId>.json`): ninguno de los dos se borra hoy, así que un material borrado deja
+huella en dos sitios más además del índice. Dos, Iván pidió explícitamente que borrar limpie estos
+derivados, lo que revierte la parte de ADR-024 que los declaraba intocables.
+
+**Opciones consideradas.**
+
+- **Mantener la frase de ADR-024 sin cambios.** Descartada porque es justo la instrucción que Iván
+  cambió: un material borrado debe dejar de ocupar sus derivados, no solo su PDF y sus artefactos.
+- **Borrar el índice y las páginas cacheadas en cuanto se borra CUALQUIER PDF con esa huella.**
+  Descartada: dos ficheros con nombre distinto y bytes idénticos comparten huella y por tanto índice
+  (ADR-011). Borrar uno de los dos dejaría al otro sin índice ni páginas, forzando un reindexado caro
+  de un material que la persona no tocó.
+- **Añadir un contador de referencias explícito por huella.** Descartada por peso: con
+  `maxMaterials = 5` calcular a mano, en el momento de borrar, cuántos PDF vivos comparten la huella es
+  una operación acotada y barata; mantener un contador aparte es un segundo estado que puede
+  desincronizarse del real.
+
+**Decisión.** El perfil de estudio se borra siempre por `materialId` (no se comparte entre materiales,
+así que no hay caso de última referencia que comprobar). El índice y las páginas cacheadas por huella
+de contenido se borran **solo cuando el PDF que se está borrando era la última referencia viva a esa
+huella**: `FileMaterialRepository.remove` calcula la huella antes de borrar el PDF, recorre los PDF
+restantes (barato con `maxMaterials` acotado) y, si ninguno más la comparte, borra el índice
+(`removeByHash`, nuevo método del puerto) y cada página cacheada cuyo nombre empiece por `<sha>-`. El
+PDF se borra el último de toda la cascada: si un paso anterior falla, el material sigue visible y se
+puede reintentar (no hay transacción entre los repositorios de ficheros implicados).
+
+**Consecuencias.**
+
+- La frase de ADR-024 que declaraba el índice intocable queda corregida: sigue siendo cierto que
+  **compartir** el índice entre dos nombres es gratis y correcto (ADR-011), pero deja de ser cierto que
+  borrar nunca lo toca. Ahora lo toca exactamente cuando ya no queda ningún fichero que lo necesite.
+- Editar un PDF y deshacer la edición (el caso que ADR-011 quería proteger, huérfanos que "vuelven a
+  servir") sigue intacto: esta decisión solo actúa en el borrado explícito de un material desde la
+  interfaz, no en el reemplazo de contenido.
+- Calcular huellas de los PDF restantes en cada borrado tiene un coste que crece con `maxMaterials`. Con
+  el techo actual (5) es insignificante; si el techo subiera mucho, este barrido habría que revisarlo.
+
+---
+
+## ADR-028 · La preparación automática de un material recién subido queda fuera del fusible de concurrencia
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** La fase 4 (decisión 4) ya concedía una gracia de alta a un material recién subido: su
+primera indexación y su primera generación de apuntes no cobran el cubo de frecuencia `artifacts`,
+porque subir ya se cobró contra `uploadsPerWindow`. Al probar una subida de cinco PDF a la vez, la
+gracia resultó incompleta: `NoteGenerationRoute` la aplicaba solo al cubo de frecuencia y seguía
+llamando siempre a `acquire`/`release`, el permiso de concurrencia de `maxConcurrentRequests = 3`. El
+cuarto y quinto material de un lote de cinco reciben 429 aunque tengan gracia, y su preparación queda
+incompleta.
+
+**Opciones consideradas.**
+
+- **Subir `maxConcurrentRequests`.** Descartada: es un fusible global que también protege el chat, la
+  reescritura de bloques y la generación manual de pruebas; subirlo para arreglar un caso de subida
+  relaja la protección en todos los caminos, no solo en el que falla.
+- **Serializar las cinco cadenas de preparación en el cliente.** Descartada por producto: es más lento
+  para quien sube sin que la concurrencia real fuera el problema, solo lo era la contabilidad del cupo.
+
+**Decisión.** La gracia de alta exime también del permiso de concurrencia, no solo del cubo de
+frecuencia: `NoteGenerationRoute` calcula `usesConcurrencyPermit = !hasGrace` y solo entonces llama a
+`check`, `acquire` y `release`, incluido el retorno temprano por apunte ya existente. La gracia se
+renueva al terminar el indexado si el material la tenía al empezar (para que un indexado largo no
+consuma la ventana antes de que el cliente lance los apuntes) y se revoca explícitamente al cerrar el
+stream de generación de apuntes, en éxito y en fallo, para que no quede viva más allá de su propósito.
+Chat, pruebas manuales y generación de apuntes sin gracia mantienen las dos barreras sin cambios.
+
+**Consecuencias.**
+
+- La fila "Peticiones simultáneas por cliente: 3" de la tabla del ADR-007 deja de ser absoluta: queda
+  con la excepción explícita de la preparación automática recién subida.
+- Cinco preparaciones automáticas pueden seguir agotando un límite del proveedor externo (Gemini) que
+  esta exención no toca: cada cadena sigue aislando y mostrando su propio fallo, sin detenerse unas a
+  otras ni presentarlo como éxito.
+- La gracia sigue acotada por `uploadGraceMs` como caducidad de seguridad y por `uploadsPerWindow` como
+  freno a fabricar gracia a fuerza de subir y borrar: esta decisión amplía lo que la gracia exime, no
+  cuánta gracia se puede tener.

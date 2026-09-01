@@ -1168,3 +1168,27 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
 - **Veredicto final de fase 5:** ⚠️ CIERRA CON DEUDA, la deuda es la de P0-P2 detectada por
   `@fiel-al-plan`. `notes/plans/correciones.md` abre su propio ciclo de fase a partir de aquí, con su
   propia verificación cuando toque.
+
+## 2026-09-01 · Correcciones de cierre de fase 5 · Sesión 1 (integridad y subida)
+
+- **Desviación, acordada con Iván:** el plan (§4.2.2) pedía "un test del camino de la ruta que lance
+  cinco generaciones con gracia y demuestre cero llamadas a `acquire`". No se escribió: `NoteGenerationRoute`
+  (`transport/http/server.ts`) incrusta `GeminiProseThinkingLanguageModelLive` en su propia definición
+  (`.pipe(Effect.provide(...))`), y esa capa lee `GOOGLE_GENERATIVE_AI_API_KEY` al construirse
+  (`gemini.ts:60`), no solo al llamar al modelo. `pnpm test` no carga `.env`
+  (`node --import tsx --test ...`, sin `--env-file`), así que un test de integración HTTP sobre esa
+  ruta tal cual dependería de que la clave ya estuviese exportada en el shell de quien ejecute los
+  tests, y fallaría en una máquina limpia. La cobertura automática de la gracia se queda en
+  `rate-limiter.test.ts` (conceder, renovar y revocar, y que revocar sin gracia no falla); el
+  comportamiento de extremo a extremo (cinco preparaciones automáticas sin 429, criterio C5-02) queda
+  para el recorrido manual, como el resto de procedimientos de UI del plan.
+- **Deuda parcial:** el recorrido manual de cierre de la sesión (C5-01, C5-02, C5-03, C5-15) implica
+  subir PDFs de verdad y dispara llamadas reales a Gemini con coste económico; queda para que Iván lo
+  pruebe con la aplicación real, como marca el ciclo de la fase.
+- **C5-02 verificado a mano:** Iván subió 5 PDFs de golpe contra un servidor con el código de esta
+  sesión ya cargado y las 5 generaciones de apuntes automáticas arrancaron sin ningún 429 por
+  `maxConcurrentRequests`. El primer intento sí dio el fallo (2 de 5 rechazadas con "Hay 3 peticiones
+  tuyas en curso"), pero el servidor de desarrollo llevaba corriendo desde antes de esta sesión
+  (`pnpm dev` sin `--watch`, arrancado a la 01:03) y no había recargado el código nuevo; tras reiniciar
+  el proceso, las 5 arrancaron. Queda como aviso para el resto del recorrido manual: reiniciar el
+  servidor de desarrollo antes de probar cambios de `packages/server`.

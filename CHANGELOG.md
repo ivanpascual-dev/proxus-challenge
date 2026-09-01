@@ -194,6 +194,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   nivel con el detalle técnico, con las claves, tokens y bloques largos ya filtrados. El historial de
   conversaciones deja de ser una columna fija y se abre desde un icono en la cabecera del chat.
 - **La pestaña del navegador dice "Symma"** en vez de "Proxus Tutor".
+- **Al llegar al máximo de 5 materiales desaparece la opción de subir.** Si aún queda una preparación
+  automática en marcha se ve un control de solo progreso; en cuanto termina, desaparece también.
+- **Añadir una nueva selección de ficheros que no cabe con los que ya están en cola se rechaza entera**,
+  explicando cuántos se recibieron, cuántos caben y el máximo de materiales. Los que ya estaban en cola
+  no se tocan.
 
 ### Corregido
 
@@ -223,6 +228,13 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   como "el tema no daba para tanto" o entregarse con el bloque incompleto sin decirlo.
 - **El chat conserva los saltos de línea que escribes.** Un mensaje escrito con Shift+Enter en varias
   líneas se guardaba bien, pero la burbuja del alumno lo enseñaba fundido en una sola línea.
+- **Subir varios PDF a la vez ya no falla en el cuarto o quinto material.** La preparación automática
+  (indexar y generar apuntes tras subir) competía por el mismo cupo de peticiones simultáneas que el
+  chat y las pruebas manuales; ahora queda fuera de ese cupo, como ya pasaba con el límite de
+  frecuencia.
+- **Borrar un material también borra su perfil de estudio**, y su índice y las páginas ya renderizadas
+  cuando ningún otro material conserva el mismo contenido. Antes solo se borraban el PDF y sus
+  artefactos.
 
 ### Eliminado
 

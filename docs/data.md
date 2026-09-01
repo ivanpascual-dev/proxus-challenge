@@ -18,11 +18,28 @@ packages/server/.data/
       *.pdf
     index/
       <sha256>.json
+    pages/
+      <sha256>-<page>.png
+  profile/
+    <materialId>.json
 ```
 
 El índice se archiva por huella del contenido (`sha256`), no por `materialId` (ADR-011): dos PDFs con
 el mismo contenido y distinto nombre comparten fichero de índice, y uno editado deja su índice viejo
 huérfano en disco a propósito (vuelve a servir si se deshace la edición).
+
+`materials/pages` cachea el render de cada página (`FileMaterialRepository.renderPage`), también por
+huella del contenido: `<sha256>-<page>.png`. Se comparte entre dos PDFs de bytes idénticos igual que el
+índice.
+
+`profile/<materialId>.json` es el perfil de estudio (ADR-002), por `materialId`, no por huella: no se
+comparte entre materiales.
+
+**Ciclo de vida al borrar un material (ADR-027).** El perfil se borra siempre, por `materialId`. El
+índice y las páginas cacheadas por huella se borran solo cuando el PDF borrado era la **última**
+referencia viva a esa huella: si otro PDF con nombre distinto conserva los mismos bytes, su índice y sus
+páginas se quedan. El PDF se borra el último de la cascada (intentos, artefactos, perfil, derivados por
+huella, PDF), para que un fallo a mitad deje el material recuperable en vez de a medio borrar.
 
 ## Materials
 
