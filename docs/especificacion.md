@@ -62,8 +62,9 @@ domicilio.
   la última página servida y el total pedido.
 - **F1-07.** CUANDO un cliente supere una ventana de frecuencia, EL sistema DEBERÁ responder 429
   indicando cuánto falta para poder reintentar.
-- **F1-08.** MIENTRAS un cliente tenga `maxConcurrentRequests` peticiones en vuelo, EL sistema DEBERÁ
-  rechazar la siguiente con 429 en vez de encolarla.
+- **F1-08.** MIENTRAS un cliente tenga `maxConcurrentRequests` peticiones ordinarias en vuelo, EL
+  sistema DEBERÁ rechazar la siguiente con 429 en vez de encolarla; la preparación automática de un
+  material recién subido queda fuera de este contador según C5-02.
 - **F1-09.** EL sistema DEBERÁ declarar en `packages/shared/src/limits.ts` todo techo que aplique, y la
   interfaz DEBERÁ leer de ahí el contador de caracteres del mensaje, sin repetir la cifra.
 
@@ -82,8 +83,9 @@ domicilio.
   modo que un contenido modificado NO DEBERÁ encontrar índice, y un mismo contenido renombrado o con
   otra fecha de modificación SÍ DEBERÁ encontrar el suyo sin reindexar.
 - **F1-15.** CUANDO termine de indexarse un material, EL sistema DEBERÁ producir su lista de temas, como
-  mucho `maxTopicsPerMaterial`, organizados en una jerarquía de como mucho dos niveles, asignar al menos
-  un tema a cada página con contenido, y NO DEBERÁ traducir el vocabulario del material al nombrarlos.
+  mucho `maxTopicsPerMaterial`, organizados en una jerarquía de como mucho dos niveles, y NO DEBERÁ
+  traducir el vocabulario del material al nombrarlos; las páginas que no formen una unidad de estudio
+  podrán quedar sin tema según C5-04.
 - **F1-16.** MIENTRAS un material no esté indexado, EL sistema DEBERÁ decirlo explícitamente en la
   interfaz y en la respuesta del comando, y NO DEBERÁ devolver un índice vacío como si lo estuviera.
 
@@ -286,10 +288,10 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 - **F3-08.** SI una pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema DEBERÁ
   descartarla y registrar el motivo en el log del servidor (diagnóstico para quien desarrolla, no cara
   al alumno), y NO DEBERÁ completarla adivinando ningún campo.
-- **F3-09.** El reparto es todo o nada (F3-10): CUANDO una prueba termine de generarse con éxito, las
-  preguntas guardadas DEBERÁN ser exactamente las pedidas. SI un tema no da para completar su parte del
-  reparto tras los reintentos (`maxGenerationRetriesPerTopic`), ENTONCES la generación entera DEBERÁ
-  fallar nombrando el tema y cuántas de las pedidas no se pudieron sacar.
+- **F3-09.** CUANDO una prueba termine de generarse, las preguntas guardadas DEBERÁN ser todas las
+  preguntas válidas que sostenga el material hasta el número pedido. SI el material declara que no da
+  para completar el reparto, ENTONCES el sistema DEBERÁ guardar una prueba parcial según C5-05; un fallo
+  de formato, red o truncado seguirá fallando según C5-06.
 - **F3-10.** SI no sobrevive ninguna pregunta, ENTONCES EL sistema DEBERÁ fallar la generación con su
   motivo, y NO DEBERÁ guardar una prueba sin preguntas.
 
@@ -431,17 +433,18 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   EL sistema DEBERÁ marcar esa pregunta como sin evaluar con motivo de discrepancia, DEBERÁ retirar su
   aportación al perfil, y NO DEBERÁ contarla como acertada ni cambiar la nota mostrada del intento.
 
-#### La prueba sale completa o no sale
+#### La prueba no inventa para completar
 
-- **F3-44.** CUANDO el alumno pida una prueba de N preguntas, EL sistema DEBERÁ entregarla con
-  exactamente N preguntas, o DEBERÁ fallar la generación con su motivo sin guardar nada; NO DEBERÁ
-  entregar nunca una prueba con menos preguntas de las pedidas.
+- **F3-44.** CUANDO el alumno pida una prueba de N preguntas, EL sistema DEBERÁ intentar generar N y,
+  SI el contenido solo permite M preguntas válidas con `0 < M < N`, ENTONCES DEBERÁ guardar esas M e
+  indicar de forma persistente N y M según C5-05; NO DEBERÁ inventar preguntas para alcanzar N.
 - **F3-45.** SI alguna pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema
   DEBERÁ volver a pedir solo las que faltan hasta `maxGenerationRetriesPerTopic` veces antes de fallar,
   y NO DEBERÁ completar ninguna adivinando ningún campo.
 - **F3-46.** SI el modelo responde que el material no da para las preguntas pedidas, ENTONCES EL sistema
-  DEBERÁ fallar nombrando cuántas sí daba el tema, NO DEBERÁ reintentar, y NO DEBERÁ generar preguntas
-  que el material no sostenga.
+  DEBERÁ conservar las preguntas válidas que sí devolvió, dejar de pedir las que faltan de ese tema y
+  NO DEBERÁ generar preguntas que el material no sostenga; SI no sobrevive ninguna pregunta en toda la
+  prueba, ENTONCES la generación DEBERÁ fallar sin guardar.
 - **F3-47.** TODA pregunta de opción única y de varias respuestas correctas DEBERÁ tener exactamente
   cuatro opciones, y sus identificadores los DEBERÁ asignar el código por posición: EL sistema NO DEBERÁ
   aceptar del modelo ningún identificador de opción, de criterio ni de pregunta.
@@ -614,8 +617,9 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
 #### Escritorio y layout
 
 - **F5-01 · P0.** MIENTRAS no haya material seleccionado, sea el estado inicial o tras cerrar el
-  material abierto, EL sistema DEBERÁ mostrar el sidebar fijo de 224px y Sym ocupando el resto del
-  espacio de trabajo, sin reservar espacio a un material vacío.
+  material abierto, EL sistema DEBERÁ mostrar Sym ocupando todo el espacio restante tras el sidebar,
+  sin reservar espacio a un material vacío; el sidebar medirá 224px expandido y podrá contraerse según
+  C5-13.
 - **F5-02 · P0.** CUANDO la persona seleccione un material, EL sistema DEBERÁ mostrar el split
   Material/Sym con Material al 58% y Sym al 42% del espacio restante tras el sidebar.
 - **F5-03 · P0.** MIENTRAS la persona arrastre el separador Material/Sym, EL sistema DEBERÁ mantener
@@ -785,6 +789,67 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
   su vista); NO DEBERÁ inventar un intento o una pregunta concreta, y NO DEBERÁ afirmar ubicación alguna
   si la persona retira el chip correspondiente; durante un Examen real NO DEBERÁ existir chat.
 
+### Correcciones de cierre de fase 5
+
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/correciones.md`](../notes/plans/correciones.md). Este corte es independiente del P3
+opcional y corrige comportamientos encontrados al probar P0 a P2.
+
+#### Datos derivados y generación
+
+- **C5-01.** CUANDO la persona borre un material, EL sistema DEBERÁ borrar también su perfil de estudio
+  y, SI ningún otro PDF conserva la misma huella de contenido, su índice y todas sus páginas renderizadas;
+  SI otro PDF conserva esa huella, ENTONCES DEBERÁ mantener las cachés compartidas.
+- **C5-02.** CUANDO se suban cinco PDF válidos en un lote, EL sistema DEBERÁ completar para cada uno la
+  secuencia subida, indexado y apuntes sin aplicar `maxConcurrentRequests` a esas preparaciones
+  automáticas; EL sistema DEBERÁ mantener ese fusible para el chat y las acciones que no procedan de la
+  gracia de una subida.
+- **C5-03.** CUANDO se añada un segundo lote a la zona de subida, EL sistema DEBERÁ validar el conjunto
+  acumulado contra `maxFilesPerUpload`, las plazas restantes de `maxMaterials` y los nombres duplicados;
+  SI se supera un techo, ENTONCES DEBERÁ rechazar la incorporación completa nombrando el límite, sin
+  recortar la selección en silencio.
+- **C5-04.** SI una portada, separador, página final o fragmento aislado no alcanza
+  `minTopicSourceCharacters` caracteres no blancos ni constituye una unidad de estudio, ENTONCES EL
+  sistema DEBERÁ dejar esas páginas sin tema y NO DEBERÁ crear un bloque de apuntes de relleno para
+  ellas.
+- **C5-05.** CUANDO una prueba pida N preguntas y el material declare de forma válida que solo sostiene
+  M, con `0 < M < N`, EL sistema DEBERÁ guardar M, conservar N como cantidad solicitada y mostrar
+  `Se pidieron N preguntas; el contenido permitió M.` al terminar, en la lista y al abrir la prueba.
+- **C5-06.** SI faltan preguntas por salida truncada, respuesta indecodificable, error de red o tipo de
+  pregunta incorrecto sin una declaración válida de contenido insuficiente, ENTONCES EL sistema DEBERÁ
+  aplicar los reintentos existentes y, al agotarlos, fallar sin guardar una prueba parcial.
+
+#### Chat y conversaciones
+
+- **C5-07.** EL historial de conversaciones DEBERÁ listar primero las conversaciones con turnos,
+  ordenadas por `updatedAt` descendente, con desempate estable por `createdAt` e id; las conversaciones
+  vacías heredadas DEBERÁN aparecer después.
+- **C5-08.** MIENTRAS no se haya enviado el primer mensaje, EL sistema NO DEBERÁ crear ni guardar una
+  conversación; pulsar `Nueva conversación` o borrar la activa DEBERÁ abrir un borrador local.
+- **C5-09.** CUANDO ya existan `maxConversations` conversaciones, EL sistema DEBERÁ mantener visible y
+  operable el historial para abrir o borrar existentes; SI falla la creación al enviar el primer
+  mensaje, ENTONCES DEBERÁ conservar el texto escrito en el borrador.
+- **C5-10.** CUANDO se muestre una respuesta nueva de Sym, EL sistema DEBERÁ revelarla de forma
+  progresiva durante como mucho 1,5 segundos; SI la persona prefiere movimiento reducido o la respuesta
+  procede del historial, ENTONCES DEBERÁ mostrarla completa de inmediato.
+- **C5-11.** EL estado vacío del chat DEBERÁ describir a Sym como tutor que trabaja con materiales,
+  apuntes y progreso, y sus tres sugerencias DEBERÁN corresponder a capacidades reales del agente, sin
+  ofrecer crear Controles ni Exámenes desde el chat.
+
+#### Interfaz contenida en el viewport
+
+- **C5-12.** CUANDO se abra un tooltip junto a cualquier borde del viewport o dentro de un contenedor
+  con `overflow`, EL sistema DEBERÁ mantenerlo completamente visible, sin crear scroll de página, y
+  DEBERÁ conservar la asociación accesible con su control por hover y foco.
+- **C5-13.** CUANDO la persona contraiga el sidebar global, EL sistema DEBERÁ pasar de 224px a un rail de
+  56px, mantener accesibles selección de material, estado de subida y tema mediante iconos con nombre,
+  y recordar solo esa preferencia en almacenamiento local.
+- **C5-14.** CUANDO la persona contraiga el índice de bloques de Apuntes, EL sistema DEBERÁ pasar de
+  240px a un rail de 48px sin desmontar el editor, perder la selección ni descartar cambios sin guardar.
+- **C5-15.** MIENTRAS haya `maxMaterials` materiales, EL control `Subir material` y la entrada de
+  ficheros NO DEBERÁN estar visibles ni disponibles; una cadena ya iniciada PODRÁ mantener un control
+  de progreso sin capacidad de añadir ficheros.
+
 ---
 
 ## Fuera de alcance
@@ -796,4 +861,3 @@ decisiones tomadas:
 - Frameworks nuevos.
 - Cambios cosméticos como aportación principal.
 - Herramientas nuevas del agente (ver `docs/decisiones.md`, ADR-004).
-- Lo listado en [`extensibilidad.md`](extensibilidad.md), cada cosa con su razón.
