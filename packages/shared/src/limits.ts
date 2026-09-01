@@ -23,7 +23,9 @@ export const LIMITS = {
   maxConversations: 50,
   maxConversationTitleCharacters: 80,
   followUpQuestions: 3,
-  maxFollowUpQuestionCharacters: 120,
+  // Medido sobre la conversación real de cierre de fase 4: preguntas específicas y útiles llegaron
+  // a 125 y 165 caracteres. 120 las descartaba aunque el prompt nunca había comunicado ese techo.
+  maxFollowUpQuestionCharacters: 200,
 
   // Coste por turno
   maxPagesPerTurn: 20,
@@ -97,7 +99,7 @@ export const LIMITS = {
   // lo generado, no por el techo (fase 4, sección 4.2). Cada valor es el doble del caso peor calculado
   // de ese camino, pensamiento incluido donde lo lleve, sin pasar del límite del modelo (65.536).
   modelOutputTokens: {
-    tutor: 4_096, // respuesta larga (~1.500) + bloque de seguimiento (~120)
+    tutor: 4_096, // respuesta larga (~1.500) + bloque de seguimiento (~200)
     indexing: 4_096, // maxIndexedCharactersPerPage (8.000 caracteres) ≈ 2.500
     note: 4_096, // medido: 842 de salida + 1.602 de pensamiento = 2.444
     quiz: 8_192, // 8 preguntas × ~200 = 1.600

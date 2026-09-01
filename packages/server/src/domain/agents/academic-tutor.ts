@@ -101,9 +101,9 @@ End every reply with this block, and write nothing after it:
 3. <question>
 <<<END FOLLOW-UP>>>
 
-Exactly three questions, in Spanish, each one something the student could ask you next about what
-you just explained. Specific to this conversation, never generic. If you have nothing worth asking,
-omit the whole block: never pad it.`,
+Exactly three questions, in Spanish, each at most ${LIMITS.maxFollowUpQuestionCharacters} characters
+and something the student could ask you next about what you just explained. Specific to this
+conversation, never generic. If you have nothing worth asking, omit the whole block: never pad it.`,
   skills: AcademicTutorSkills,
   commands: [
     makeMaterialCommands(materialRepository, budgetRef),

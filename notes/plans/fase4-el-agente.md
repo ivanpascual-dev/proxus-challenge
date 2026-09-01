@@ -448,7 +448,7 @@ tokenCount }]`, `serviceTier`, y `cachedContentTokenCount` más `cacheTokensDeta
 
    | Camino     | Caso peor calculado                                                | Techo      |
    | ---------- | ------------------------------------------------------------------ | ---------- |
-   | Tutor      | Respuesta larga (~1.500) más el bloque de seguimiento (~120)       | 4.096      |
+   | Tutor      | Respuesta larga (~1.500) más el bloque de seguimiento (~200)       | 4.096      |
    | Indexación | `maxIndexedCharactersPerPage` (8.000 caracteres) ≈ 2.500           | 4.096      |
    | Apuntes    | Medido: 842 de salida más 1.602 de pensamiento = 2.444             | 4.096      |
    | Control    | 8 preguntas × ~200 = 1.600                                         | 8.192      |
@@ -557,7 +557,8 @@ del typecheck son el mapa de lo que queda por tocar.
   - `maxConversations: 50`
   - `maxConversationTitleCharacters: 80`
   - `followUpQuestions: 3`
-  - `maxFollowUpQuestionCharacters: 120`
+  - `maxFollowUpQuestionCharacters: 200` (medido sobre preguntas reales de 125 y 165 caracteres y
+    comunicado literalmente en el system prompt)
   - `uploadGraceMs: 10 * 60 * 1000` (la gracia de alta)
   - **`maxModelOutputTokens` deja de ser un número suelto** y pasa a ser `modelOutputTokens: { tutor,
 indexing, note, quiz, test, judge }`, con los valores calculados en la sección 4.2. El valor viejo
