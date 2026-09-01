@@ -155,7 +155,7 @@ export function UploadManager() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="relative flex w-full items-center justify-center gap-2 rounded-full border border-border-strong bg-surface px-4 py-2 font-medium text-heading text-sm hover:border-brand"
+        className="relative flex w-full items-center justify-center gap-2 rounded-sm border border-border-strong bg-surface px-4 py-2 font-medium text-heading text-sm transition hover:border-brand active:scale-[0.98]"
       >
         <Icon name="upload" size={16} />
         Subir material
@@ -168,13 +168,13 @@ export function UploadManager() {
         <div className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-heading text-lg">Subir material</h2>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="grid size-8 place-items-center rounded-[8px] text-muted hover:bg-surface-muted hover:text-heading">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="grid size-8 place-items-center rounded-sm text-muted transition hover:bg-surface-muted hover:text-heading active:scale-90">
               <Icon name="close" size={18} />
             </button>
           </div>
 
           <div
-            className={`rounded-[10px] border-2 border-dashed p-4 text-center transition ${
+            className={`border-2 border-dashed p-4 text-center transition ${
               dragging ? "border-brand bg-brand-soft" : "border-border bg-canvas/70"
             }`}
             onDragOver={(event) => {

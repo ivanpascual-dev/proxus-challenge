@@ -1105,3 +1105,13 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   preguntas a recuperar sin el cierre. Merece recordarse como patrón: cuando un bug real deja rastro en
   `.data/`, esa sesión (con el contenido sensible sustituido por un placeholder) es mejor fixture que
   uno inventado a mano, porque reproduce la forma exacta que rompió algo.
+
+## 2026-09-01 · Fase 5 · commit del rediseño P0/P1
+
+- **Causa raíz:** `StatusNotice.tsx` traía, en el diff sin commitear, la clase
+  `gap-2.5-[10px]` en vez de `gap-2.5` con `rounded-[10px]` retirado. Al quitar las esquinas
+  redondeadas en esta pasada de rediseño, un `rounded-[10px]` se borró mal y dejó pegado el
+  `-[10px]` al final de `gap-2.5`: Tailwind no reconoce esa clase, así que el aviso de estado se
+  quedó sin el espaciado entre el icono y el texto. No rompía el build ni el typecheck (una clase de
+  Tailwind desconocida no es error, solo no aplica nada), así que solo se veía mirando la pantalla o
+  leyendo el diff con atención. Corregido a `gap-2.5` antes de commitear.

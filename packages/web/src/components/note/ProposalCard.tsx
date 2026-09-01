@@ -57,13 +57,13 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
   const canAccept = !stale && !blocked && busy === null;
 
   return (
-    <section className="grid gap-3 rounded-3xl border border-brand/40 bg-brand/5 p-5">
+    <section className="grid gap-3 border border-brand/40 bg-brand/5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-bold text-brand text-xs uppercase tracking-widest">
           Propuesta del tutor · {operationLabel[operation.type]}
         </p>
         {stale && (
-          <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
+          <span className=" bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
             el bloque ha cambiado
           </span>
         )}
@@ -72,7 +72,7 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
       <p className="text-body text-sm">{proposal.rationale}</p>
 
       {operation.type === "insert" && (
-        <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm">
+        <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm">
           <Streamdown>{operation.block.markdown}</Streamdown>
         </div>
       )}
@@ -81,13 +81,13 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
         <div className="grid gap-2 md:grid-cols-2">
           <div>
             <p className="mb-1 text-muted text-xs">{stale ? "Lo que vio el tutor" : "Texto actual"}</p>
-            <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm">
+            <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm">
               <Streamdown>{stale ? operation.baseMarkdown : (targetBlock?.markdown ?? operation.baseMarkdown)}</Streamdown>
             </div>
           </div>
           <div>
             <p className="mb-1 text-muted text-xs">Propuesta</p>
-            <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm">
+            <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm">
               <Streamdown>{operation.markdown}</Streamdown>
             </div>
           </div>
@@ -97,20 +97,20 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
       {stale && operation.type === "replace" && (
         <div>
           <p className="mb-1 text-muted text-xs">Texto actual del bloque</p>
-          <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm">
+          <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm">
             <Streamdown>{targetBlock?.markdown ?? "(el bloque ya no está en el apunte)"}</Streamdown>
           </div>
         </div>
       )}
 
       {operation.type === "remove" && (
-        <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm line-through opacity-70">
+        <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm line-through opacity-70">
           <Streamdown>{targetBlock?.markdown ?? operation.baseMarkdown}</Streamdown>
         </div>
       )}
 
       {error !== undefined && (
-        <p className="rounded-xl border border-danger/40 bg-danger/15 p-2 text-danger-ink text-xs">{error}</p>
+        <p className=" border border-danger/40 bg-danger/15 p-2 text-danger-ink text-xs">{error}</p>
       )}
 
       {stale
@@ -128,7 +128,7 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
         {!stale && (
           <button
             type="button"
-            className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!canAccept}
             onClick={() => run("accept")}
           >
@@ -137,7 +137,7 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
         )}
         <button
           type="button"
-          className="rounded-full border border-border px-4 py-1.5 text-sm hover:border-brand disabled:opacity-50"
+          className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98] disabled:opacity-50"
           disabled={busy !== null}
           onClick={() => run("reject")}
         >

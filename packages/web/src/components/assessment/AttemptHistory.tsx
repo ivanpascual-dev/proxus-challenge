@@ -13,11 +13,13 @@ import { answersFromStored, AttemptSummary, type LocalAnswers, QuestionCard } fr
 export function AttemptHistory({
   artifactId,
   title,
-  onExit
+  onExit,
+  onOpenCitation
 }: {
   readonly artifactId: string;
   readonly title: string;
   readonly onExit: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const history = useAtomValue(attemptHistoryQuery(artifactId));
   const [openId, setOpenId] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function AttemptHistory({
         <button
           type="button"
           onClick={onExit}
-          className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+          className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
         >
           ← Volver a la lista
         </button>
@@ -47,7 +49,7 @@ export function AttemptHistory({
         onSuccess: ({ value }) => {
           if (value.length === 0) {
             return (
-              <p className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
+              <p className=" border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
                 Esta prueba no tiene intentos todavía.
               </p>
             );
@@ -56,7 +58,14 @@ export function AttemptHistory({
           const open = openId === null ? null : sorted.find((attempt) => attempt.id === openId) ?? null;
 
           if (open !== null) {
-            return <OpenAttempt attempt={open} artifactId={artifactId} onBack={() => setOpenId(null)} />;
+            return (
+              <OpenAttempt
+                attempt={open}
+                artifactId={artifactId}
+                onBack={() => setOpenId(null)}
+                onOpenCitation={onOpenCitation}
+              />
+            );
           }
 
           return (
@@ -86,7 +95,7 @@ function AttemptRow({
   readonly onOpen: (() => void) | undefined;
 }) {
   return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
+    <li className="border-border border-b py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="mb-1 text-muted text-xs uppercase tracking-widest">
@@ -100,7 +109,7 @@ function AttemptRow({
         {onOpen !== undefined && (
           <button
             type="button"
-            className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+            className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
             onClick={onOpen}
           >
             {attempt.status === "graded" ? "Ver correcciones" : "Ver detalle"}
@@ -115,7 +124,7 @@ function statusLine(attempt: ArtifactAttempt): string {
   if (attempt.status === "graded") {
     const time = formatSeconds(attempt.elapsedSeconds);
     const penalty = attempt.penalty > 0 ? ` · penalización ${round2(attempt.penalty)}` : "";
-    return `Nota ${attempt.displayedScore} / 10 · ${time}${penalty}`;
+    return `Nota ${round2(attempt.displayedScore)} / 10 · ${time}${penalty}`;
   }
   if (attempt.status === "abandoned") {
     return attempt.reason === "cancelled" ? "Cancelado por ti" : "Caducado al agotarse el tiempo";
@@ -128,11 +137,13 @@ function statusLine(attempt: ArtifactAttempt): string {
 function OpenAttempt({
   attempt,
   artifactId,
-  onBack
+  onBack,
+  onOpenCitation
 }: {
   readonly attempt: ArtifactAttempt;
   readonly artifactId: string;
   readonly onBack: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const solvable = useAtomValue(solvableAssessmentQuery(artifactId));
 
@@ -141,12 +152,12 @@ function OpenAttempt({
       <button
         type="button"
         onClick={onBack}
-        className="mb-4 rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+        className="mb-4 font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
       >
         ← Volver al historial
       </button>
 
-      <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
+      <header className="mb-5 border-border border-b pb-4">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">
           {attempt.mode === "practice" ? "Práctica" : "Examen"} · {formatDate(attempt.startedAt)}
         </p>
@@ -162,7 +173,7 @@ function OpenAttempt({
           return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
         },
         onDefect: () => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => <GradedDetail attempt={attempt} assessment={value} />
+        onSuccess: ({ value }) => <GradedDetail attempt={attempt} assessment={value} onOpenCitation={onOpenCitation} />
       })}
     </article>
   );
@@ -170,10 +181,12 @@ function OpenAttempt({
 
 function GradedDetail({
   attempt,
-  assessment
+  assessment,
+  onOpenCitation
 }: {
   readonly attempt: GradedAttempt;
   readonly assessment: SolvableAssessment;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const dispute = useAtomSet(disputeAction, { mode: "promise" });
   const answers: LocalAnswers = answersFromStored(attempt.answers);
@@ -191,6 +204,7 @@ function GradedDetail({
             locked
             correction={attempt.corrections.find((item) => item.questionId === question.id)}
             onDispute={() => void dispute({ attemptId: attempt.id, questionId: question.id }).catch(() => {})}
+            onOpenCitation={onOpenCitation}
           />
         ))}
       </div>
@@ -202,14 +216,14 @@ function GradedDetail({
 function AbandonedDetail({ attempt }: { readonly attempt: AbandonedAttempt }) {
   return (
     <div className="grid gap-4">
-      <p className="rounded-2xl border border-border bg-surface p-4 text-body">
+      <p className=" border border-border bg-surface p-4 text-body">
         {attempt.reason === "cancelled"
           ? "Cancelaste este intento antes de entregarlo."
           : "Se agotó el tiempo conectado antes de entregar."}{" "}
         Un intento cerrado sin entregar no se corrige y no mueve tu perfil.
       </p>
       {attempt.interruptions.length > 0 && (
-        <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className=" border border-border bg-surface p-4">
           <p className="mb-2 font-semibold text-heading text-sm">
             {interruptionLabel(attempt.interruptions.length)}
           </p>

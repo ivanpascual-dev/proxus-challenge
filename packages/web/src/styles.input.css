@@ -98,25 +98,27 @@
 /* Editor de bloque (TipTap). No hay plugin de tipografía, así que el ritmo vertical y los formatos
    del menú "/" se definen aquí, con los tokens del tema. */
 @layer components {
+  /* Fase 5: el texto del apunte es lo importante de la pantalla (§4.8, feedback de Iván), así que
+     lleva más cuerpo y más aire que el resto de la interfaz, no el tamaño de un dato secundario. */
   .tiptap-block {
     color: var(--color-body);
-    font-size: 0.95rem;
-    line-height: 1.65;
+    font-size: 1.0625rem;
+    line-height: 1.8;
     min-height: 2.5rem;
   }
 
   .tiptap-block > * + * {
-    margin-top: 0.6em;
+    margin-top: 0.9em;
   }
 
   .tiptap-block h2 {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--color-heading);
   }
 
   .tiptap-block h3 {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-heading);
   }

@@ -11,7 +11,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <div className="grid place-items-center gap-2 rounded-[10px] border border-border border-dashed p-8 text-center">
+    <div className="grid place-items-center gap-2 border border-border border-dashed p-8 text-center">
       <p className="font-semibold text-heading">{title}</p>
       {description !== undefined && <p className="max-w-sm text-muted text-sm">{description}</p>}
       {action !== undefined && <div className="mt-2">{action}</div>}

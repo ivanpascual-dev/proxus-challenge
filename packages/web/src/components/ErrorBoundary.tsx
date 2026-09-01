@@ -60,14 +60,14 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             onClick={this.reset}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand text-sm hover:bg-brand/90"
+            className="rounded-sm bg-brand px-5 py-2 font-semibold text-on-brand text-sm transition hover:bg-brand/90 active:scale-[0.98]"
           >
             Reintentar
           </button>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
+            className="rounded-sm border border-border-strong px-5 py-2 text-body text-sm transition hover:border-brand active:scale-[0.98]"
           >
             Recargar la página
           </button>

@@ -38,12 +38,12 @@ export function ContextBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-border border-t px-4 pt-3" aria-label="Contexto que ve Sym">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-border border-t px-4 py-3" aria-label="Contexto que ve Sym">
       <span className="text-muted text-xs">Sym ve:</span>
       {refs.map((ref) => (
         <span
           key={contextRefKey(ref)}
-          className="flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand-soft px-3 py-1 text-heading text-xs"
+          className="flex items-center gap-1.5 rounded-sm border border-brand/40 bg-brand-soft px-3 py-1 text-heading text-xs"
         >
           {contextRefLabel(ref)}
           <button

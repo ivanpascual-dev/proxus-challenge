@@ -101,46 +101,21 @@ export function PdfWorkspace({ materialId, pageCount, markerFor, scrollToPage, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToPage]);
 
-  const submitPageInput = () => {
+  // Enter es una navegación explícita: mueve el foco a la página, como al pulsar una miniatura.
+  // Perder el foco (Tab, clic fuera) también aplica el número escrito, pero SIN robar el foco: si no,
+  // Tab nunca sale de este campo porque el blur se dispara antes de que el navegador mueva el foco al
+  // siguiente control, y esta función lo devolvería a la página.
+  const submitPageInput = (options?: { readonly focus?: boolean }) => {
     const parsed = Number(pageInputValue);
     if (Number.isFinite(parsed)) {
-      goToPage(parsed, { focus: true });
+      goToPage(parsed, options);
     } else {
       setPageInputValue(String(activePage));
     }
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-canvas">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b px-3 py-2">
-        <label className="flex items-center gap-1.5 text-muted text-sm">
-          Página
-          <input
-            type="number"
-            min={1}
-            max={pageCount}
-            value={pageInputValue}
-            onChange={(event) => setPageInputValue(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitPageInput();
-              }
-            }}
-            onBlur={submitPageInput}
-            aria-label="Ir a la página"
-            className="w-14 rounded-lg border border-border-strong bg-canvas p-1 text-center text-heading outline-none focus:border-brand"
-          />
-          <span>/ {pageCount}</span>
-        </label>
-        <div className="flex items-center gap-1">
-          <IconButton icon="fit-width" label="Ajustar ancho" onClick={() => setZoom(DEFAULT_ZOOM)} />
-          <IconButton icon="zoom-out" label="Reducir zoom" onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP))} disabled={zoom <= MIN_ZOOM} />
-          <span className="w-10 text-center text-muted text-xs" aria-live="off">{zoom}%</span>
-          <IconButton icon="zoom-in" label="Aumentar zoom" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP))} disabled={zoom >= MAX_ZOOM} />
-        </div>
-      </header>
-
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-canvas">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <PdfThumbnailRail
           materialId={materialId}
@@ -162,6 +137,38 @@ export function PdfWorkspace({ materialId, pageCount, markerFor, scrollToPage, o
           </div>
         </div>
       </div>
+
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-t px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <IconButton icon="chevron-left" label="Página anterior" onClick={() => goToPage(activePage - 1, { focus: true })} disabled={activePage <= 1} />
+          <label className="flex items-center gap-1.5 text-muted text-sm">
+            <input
+              type="number"
+              min={1}
+              max={pageCount}
+              value={pageInputValue}
+              onChange={(event) => setPageInputValue(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitPageInput({ focus: true });
+                }
+              }}
+              onBlur={() => submitPageInput()}
+              aria-label="Ir a la página"
+              className="w-12 border border-border-strong bg-canvas p-1 text-center text-heading outline-none focus:border-brand"
+            />
+            <span>/ {pageCount}</span>
+          </label>
+          <IconButton icon="chevron-right" label="Página siguiente" onClick={() => goToPage(activePage + 1, { focus: true })} disabled={activePage >= pageCount} />
+        </div>
+        <IconButton icon="fit-width" label="Ajustar ancho" onClick={() => setZoom(DEFAULT_ZOOM)} />
+        <div className="flex items-center gap-1">
+          <IconButton icon="zoom-out" label="Reducir zoom" onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP))} disabled={zoom <= MIN_ZOOM} />
+          <span className="w-10 text-center text-muted text-xs" aria-live="off">{zoom}%</span>
+          <IconButton icon="zoom-in" label="Aumentar zoom" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP))} disabled={zoom >= MAX_ZOOM} />
+        </div>
+      </footer>
     </div>
   );
 }

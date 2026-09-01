@@ -51,7 +51,7 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
             {staged.map((item) => (
               <li
                 key={item.key}
-                className={`rounded-[10px] border p-3 text-sm ${
+                className={`border p-3 text-sm ${
                   item.status === "rejected"
                     ? "border-danger/40 bg-danger/10"
                     : item.status === "valid"
@@ -76,7 +76,7 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
             type="button"
             disabled={!canUpload}
             onClick={onUpload}
-            className="mt-3 w-full rounded-full border border-border-strong bg-surface px-5 py-2 text-heading hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 w-full rounded-sm border border-border-strong bg-surface px-5 py-2 text-heading transition hover:border-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           >
             {canUpload
               ? `Subir ${staged.length} fichero${staged.length === 1 ? "" : "s"}`

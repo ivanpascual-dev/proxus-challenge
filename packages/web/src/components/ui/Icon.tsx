@@ -22,7 +22,9 @@ export type IconName =
   | "search"
   | "zoom-in"
   | "zoom-out"
-  | "fit-width";
+  | "fit-width"
+  | "plus"
+  | "link";
 
 interface IconProps {
   readonly name: IconName;
@@ -122,6 +124,10 @@ const iconPaths = ({ name }: { readonly name: IconName }) => {
       );
     case "fit-width":
       return <path d="M3 8V6a2 2 0 0 1 2-2h2M21 8V6a2 2 0 0 0-2-2h-2M3 16v2a2 2 0 0 0 2 2h2M21 16v2a2 2 0 0 1-2 2h-2M7 12h10M7 12l2.5-2.5M7 12l2.5 2.5M17 12l-2.5-2.5M17 12l-2.5 2.5" />;
+    case "plus":
+      return <path d="M12 5v14M5 12h14" />;
+    case "link":
+      return <path d="M9 15l6-6M8 12a4 4 0 0 1 0-5.5l2-2a4 4 0 0 1 5.5 5.5l-1 1M16 12a4 4 0 0 1 0 5.5l-2 2a4 4 0 0 1-5.5-5.5l1-1" />;
   }
 };
 

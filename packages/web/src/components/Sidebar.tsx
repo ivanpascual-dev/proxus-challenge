@@ -75,7 +75,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
                         <button
                           type="button"
                           onClick={() => onSelectMaterial(material.id)}
-                          className={`w-full rounded-[8px] py-2 pr-8 pl-3 text-left transition ${
+                          className={`w-full rounded-sm py-2 pr-8 pl-3 text-left transition ${
                             selected ? "bg-brand-soft" : "hover:bg-surface-muted"
                           }`}
                           style={selected ? { boxShadow: "inset 2px 0 0 var(--color-brand)" } : undefined}
@@ -99,7 +99,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
                           />
                         </div>
                         {deleteError !== null && deleteError.materialId === material.id && (
-                          <p className="mt-1 rounded-lg border border-danger/40 bg-danger/10 p-2 text-danger-ink text-xs">
+                          <p className="mt-1 border border-danger/40 bg-danger/10 p-2 text-danger-ink text-xs">
                             {deleteError.message}
                           </p>
                         )}

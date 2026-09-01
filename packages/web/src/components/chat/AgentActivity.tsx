@@ -28,7 +28,7 @@ export function AgentActivity({ calls, status, errorMessage }: AgentActivityProp
   const stateColor = status === "failure" ? "text-danger-ink" : status === "running" ? "text-muted" : "text-success-ink";
 
   return (
-    <details className="w-fit max-w-full rounded-[10px] border border-border bg-surface-muted text-sm" open={status === "running" || undefined}>
+    <details className="w-fit max-w-full rounded-sm border border-border bg-surface-muted text-sm" open={status === "running" || undefined}>
       <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-muted hover:text-heading">
         <Icon name={stateIcon} size={16} className={stateColor} />
         <span>
@@ -54,7 +54,7 @@ function AgentActivityCall({ call }: { readonly call: ActivityCall }) {
   const result = call.hasResult ? formatActivityDetail(call.result) : null;
 
   return (
-    <details className="rounded-lg border border-border/60 bg-canvas px-2.5 py-1.5 text-xs">
+    <details className="rounded-sm border border-border/60 bg-canvas px-2.5 py-1.5 text-xs">
       <summary className="flex cursor-pointer select-none items-center gap-2 text-body">
         <Icon
           name={!call.hasResult ? "progress" : call.isFailure ? "warning" : "check"}
@@ -78,7 +78,7 @@ function ActivityDetailBlock({ title, detail }: { readonly title: string; readon
   return (
     <div>
       <p className="font-medium text-heading">{title}</p>
-      <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-muted p-2 text-[0.7rem]">{detail.text}</pre>
+      <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words bg-surface-muted p-2 text-[0.7rem]">{detail.text}</pre>
       {detail.truncated && <p className="mt-1 text-[0.7rem] italic">Detalle abreviado.</p>}
     </div>
   );

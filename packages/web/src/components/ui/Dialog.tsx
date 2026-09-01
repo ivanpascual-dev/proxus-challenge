@@ -51,7 +51,7 @@ export function Dialog({ open, onClose, title, children, widthClassName = "max-w
         onClose();
       }}
       onClose={onClose}
-      className={`fixed inset-0 m-auto h-fit w-full ${widthClassName} rounded-[10px] border border-border bg-surface p-0 text-body backdrop:bg-heading/40`}
+      className={`fixed inset-0 m-auto h-fit w-full ${widthClassName} border border-border bg-surface p-0 text-body backdrop:bg-heading/40`}
     >
       {open && children}
     </dialog>

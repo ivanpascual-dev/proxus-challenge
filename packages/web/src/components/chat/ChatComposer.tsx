@@ -55,7 +55,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled }: ChatCompos
           }}
           placeholder="Pregúntale algo a Sym…"
           rows={1}
-          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-2xl border bg-surface px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 ${
+          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-sm border bg-surface px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 ${
             overLimit ? "border-danger focus:ring-danger" : "border-border-strong focus:ring-brand"
           }`}
           aria-invalid={overLimit}
@@ -63,7 +63,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled }: ChatCompos
         <button
           type="submit"
           disabled={!canSubmit}
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-border-strong bg-surface text-heading hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+          className="grid size-10 shrink-0 place-items-center rounded-sm border border-border-strong bg-surface text-heading transition hover:border-brand active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           aria-label="Enviar mensaje"
         >
           <Icon name="arrow-right" size={18} />

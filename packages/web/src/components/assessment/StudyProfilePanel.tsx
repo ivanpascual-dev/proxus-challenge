@@ -18,7 +18,7 @@ export function StudyProfilePanel({ materialId }: { readonly materialId: string 
   const profile = useAtomValue(studyProfileQuery(materialId));
 
   return (
-    <details className="group mb-4 rounded-2xl border border-border bg-surface/50">
+    <details className="group mb-4 border border-border bg-surface/50">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-semibold text-heading text-sm marker:content-none">
         Tu progreso en este material
         <svg
@@ -83,12 +83,12 @@ function TopicRow({ topic }: { readonly topic: TopicStudyProfile }) {
 
   return (
     <li
-      className={`rounded-xl border border-border bg-canvas p-3 ${dim ? "opacity-60" : ""}`}
+      className={`border-border border-b py-2 ${dim ? "opacity-60" : ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold text-heading text-sm">{topic.topicLabel}</p>
         {topic.emphasis && (
-          <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-heading text-xs">
+          <span className=" bg-brand-soft px-2.5 py-0.5 text-heading text-xs">
             Marcado como importante
           </span>
         )}
@@ -124,7 +124,7 @@ function Signal({
   readonly tone: "success" | "danger" | "warning" | "brand" | "muted";
 }) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 font-semibold ${toneClass[tone]}`}>
+    <span className={` px-2.5 py-0.5 font-semibold ${toneClass[tone]}`}>
       {label}: {value}
     </span>
   );

@@ -41,20 +41,20 @@ export function PdfPage({ materialId, page, marker, highlighted }: PdfPageProps)
       ref={ref}
       data-page={page}
       tabIndex={-1}
-      className={`scroll-mt-3 rounded-lg outline-none transition-shadow duration-500 ${highlighted ? "ring-2 ring-brand ring-offset-2 ring-offset-canvas" : ""}`}
+      className={`scroll-mt-3 outline-none transition-shadow duration-500 ${highlighted ? "ring-2 ring-brand ring-offset-2 ring-offset-canvas" : ""}`}
     >
       <div className="relative">
         {show
           ? <PdfPageImage materialId={materialId} page={page} />
-          : <div className="grid h-[70vh] place-items-center rounded-lg border border-border bg-surface text-muted text-sm">Página {page}</div>}
+          : <div className="grid h-[70vh] place-items-center bg-surface text-muted text-sm shadow-md">Página {page}</div>}
         {marker?.kind === "transcribed" && (
-          <span className="absolute top-2 right-2 rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
+          <span className="absolute top-2 right-2 bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
             transcrito por el modelo
           </span>
         )}
       </div>
       {marker?.kind === "failed" && (
-        <figcaption className="mt-1 rounded-lg bg-danger/10 px-3 py-2 text-danger-ink text-sm">
+        <figcaption className="mt-1 bg-danger/10 px-3 py-2 text-danger-ink text-sm">
           Página {page}: no se pudo indexar. {marker.reason}
         </figcaption>
       )}
@@ -70,18 +70,18 @@ function PdfPageImage({ materialId, page }: { readonly materialId: string; reado
     onError: (error) => <PageError page={page} detail={describeFailure(error, { area: "materials", action: "page" }, "PdfPage").description ?? ""} />,
     onDefect: () => <PageError page={page} detail={DEFECT_MESSAGE} />,
     onSuccess: ({ value }) => (
-      <img src={value.data} alt={`Página ${page}`} className="w-full rounded-lg border border-border" loading="lazy" />
+      <img src={value.data} alt={`Página ${page}`} className="w-full shadow-md" loading="lazy" />
     )
   });
 }
 
 function PagePlaceholder({ children }: { readonly children: ReactNode }) {
-  return <div className="grid h-[70vh] place-items-center rounded-lg border border-border bg-surface text-muted text-sm">{children}</div>;
+  return <div className="grid h-[70vh] place-items-center bg-surface text-muted text-sm shadow-md">{children}</div>;
 }
 
 function PageError({ page, detail }: { readonly page: number; readonly detail: string }) {
   return (
-    <div className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-danger-ink text-sm">
+    <div className="border border-danger/40 bg-danger/10 p-4 text-danger-ink text-sm">
       No se pudo renderizar la página {page}. {detail}
     </div>
   );

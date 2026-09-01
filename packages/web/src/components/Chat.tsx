@@ -288,42 +288,46 @@ function ChatConversation({
         deletingId={deletingId}
       />
 
-      <section className="flex flex-1 flex-col gap-4 overflow-y-auto p-6" aria-live="polite">
-        {AsyncResult.matchWithError(detail, {
-          onInitial: () => turns === undefined ? <p className="m-auto text-muted">Cargando la conversación…</p> : null,
-          onError: (cause) => {
-            if (turns !== undefined) {
-              return null;
-            }
-            const notice = describeFailure(cause, { area: "chat", action: "load" }, "Chat");
-            return <p className="m-auto text-danger-ink">{notice.title} {notice.description}</p>;
-          },
-          onDefect: () => turns === undefined ? <p className="m-auto text-danger-ink">{DEFECT_MESSAGE}</p> : null,
-          onSuccess: () => null
-        })}
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+        <section className="flex flex-1 flex-col gap-4 overflow-y-auto p-6" aria-live="polite">
+          {AsyncResult.matchWithError(detail, {
+            onInitial: () => turns === undefined ? <p className="m-auto text-muted">Cargando la conversación…</p> : null,
+            onError: (cause) => {
+              if (turns !== undefined) {
+                return null;
+              }
+              const notice = describeFailure(cause, { area: "chat", action: "load" }, "Chat");
+              return <p className="m-auto text-danger-ink">{notice.title} {notice.description}</p>;
+            },
+            onDefect: () => turns === undefined ? <p className="m-auto text-danger-ink">{DEFECT_MESSAGE}</p> : null,
+            onSuccess: () => null
+          })}
 
-        {turns !== undefined && visibleTurns.length === 0 && liveTurn === null
-          ? <ChatEmptyState onSelect={(prompt) => void submit(prompt)} />
-          : (
-              <MessageList
-                turns={visibleTurns}
-                liveTurn={liveTurn}
-                onSelectFollowUp={(question) => void submit(question)}
-                sending={isSending}
-              />
-            )}
-      </section>
+          {turns !== undefined && visibleTurns.length === 0 && liveTurn === null
+            ? <ChatEmptyState onSelect={(prompt) => void submit(prompt)} />
+            : (
+                <div className="mt-auto flex w-full flex-col">
+                  <MessageList
+                    turns={visibleTurns}
+                    liveTurn={liveTurn}
+                    onSelectFollowUp={(question) => void submit(question)}
+                    sending={isSending}
+                  />
+                </div>
+              )}
+        </section>
 
-      {error === undefined ? null : <p className="m-0 px-4 pb-1 text-danger-ink text-sm">{error}</p>}
-      {historyWarning === undefined
-        ? null
-        : <p className="m-0 px-4 pb-1 text-muted text-sm">{historyWarning}</p>}
+        {error === undefined ? null : <p className="m-0 px-4 pb-1 text-danger-ink text-sm">{error}</p>}
+        {historyWarning === undefined
+          ? null
+          : <p className="m-0 px-4 pb-1 text-muted text-sm">{historyWarning}</p>}
 
-      <ContextBar
-        refs={activeContext}
-        onRemove={(ref) => setDismissedContextKeys((current) => new Set(current).add(contextRefKey(ref)))}
-      />
-      <ChatComposer value={input} onChange={setInput} onSubmit={(value) => void submit(value)} disabled={isSending} />
+        <ContextBar
+          refs={activeContext}
+          onRemove={(ref) => setDismissedContextKeys((current) => new Set(current).add(contextRefKey(ref)))}
+        />
+        <ChatComposer value={input} onChange={setInput} onSubmit={(value) => void submit(value)} disabled={isSending} />
+      </div>
     </div>
   );
 }

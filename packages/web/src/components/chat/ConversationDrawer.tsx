@@ -70,18 +70,18 @@ export function ConversationDrawer({
       ref={panelRef}
       role="dialog"
       aria-label="Historial de conversaciones"
-      className="absolute top-14 right-0 z-10 flex max-h-[70vh] w-80 flex-col gap-2 rounded-[10px] border border-border bg-surface p-3 shadow-lg"
+      className="absolute top-14 right-0 z-10 flex max-h-[70vh] w-80 flex-col gap-2 border border-border bg-surface p-3 shadow-lg"
     >
       <button
         type="button"
         onClick={onCreateNew}
         disabled={creating}
-        className="w-full rounded-full border border-border-strong px-4 py-2 text-body text-sm hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-sm border border-border-strong px-4 py-2 text-body text-sm transition hover:border-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
       >
         {creating ? "Creando…" : "+ Nueva conversación"}
       </button>
 
-      <label className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-muted text-sm">
+      <label className="flex items-center gap-2 rounded-sm border border-border px-3 py-1.5 text-muted text-sm">
         <Icon name="search" size={16} />
         <input
           type="text"
@@ -120,7 +120,7 @@ export function ConversationDrawer({
                     <button
                       type="button"
                       onClick={() => onSelect(conversation.id)}
-                      className={`w-full truncate rounded-lg py-2 pr-8 pl-2.5 text-left text-sm transition ${
+                      className={`w-full truncate rounded-sm py-2 pr-8 pl-2.5 text-left text-sm transition ${
                         activeId === conversation.id ? "bg-brand-soft text-heading" : "text-body hover:bg-surface-muted"
                       }`}
                     >

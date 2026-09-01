@@ -31,12 +31,27 @@ const NO_ACTIVE_EXAM: ActiveAttemptResponse = {
   remainingSeconds: null
 };
 
+// Dónde tiene que aterrizar una cita (fase 5, decisión 26): material, página, consumida una vez.
+interface CitationTarget {
+  readonly materialId: string;
+  readonly page: number;
+}
+
 export function App() {
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [enteredExam, setEnteredExam] = useState<EnteredExam | null>(null);
   // Contexto de pantalla (fase 4, decisión 5): lo reporta `MaterialPanel` (material más artefacto de
   // su pestaña activa); vacío cuando no hay panel de material abierto.
   const [screenContext, setScreenContext] = useState<readonly ChatContextRef[]>([]);
+  // Una cita común (apunte, corrección) siempre abre el material correcto, cambia a PDF y navega a
+  // la primera página (decisión 26, §4.10). "Material distinto cambia selección antes de abrir PDF":
+  // se cambia el material seleccionado y `MaterialPanel` consume el objetivo cuando coincide con el
+  // suyo, tanto si ya estaba abierto como si acaba de montarse por el cambio.
+  const [citationTarget, setCitationTarget] = useState<CitationTarget | null>(null);
+  const openCitation = (materialId: string, page: number) => {
+    setSelectedMaterialId(materialId);
+    setCitationTarget({ materialId, page });
+  };
   const materials = useAtomValue(materialsQuery);
   const refreshActiveExam = useAtomRefresh(activeAttemptQuery);
   const activeExam = AsyncResult.getOrElse(useAtomValue(activeAttemptQuery), () => NO_ACTIVE_EXAM);
@@ -115,6 +130,9 @@ export function App() {
               onStartExam={(artifactId, title) =>
                 setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
               onContextChange={setScreenContext}
+              onOpenCitation={openCitation}
+              citationTarget={citationTarget}
+              onCitationConsumed={() => setCitationTarget(null)}
             />
           </ErrorBoundary>
         )}

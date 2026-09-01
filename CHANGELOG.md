@@ -127,9 +127,23 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Borrar un material.** Cada material de la barra lateral tiene un botón para borrarlo. Antes de
   hacerlo se avisa de que también se pierden su apunte, sus controles y sus exámenes con sus intentos,
   y de que no se puede deshacer.
+- **Tira de miniaturas en el visor de PDF.** La pestaña PDF tiene una columna izquierda con una
+  miniatura por página; la que se está leyendo se resalta sola, sin clic, según lo que se ve en el
+  lector. Un campo "Página" salta directo a cualquier página, "Ajustar ancho" y un zoom del 75% al
+  150% cambian el tamaño sin volver a pedir la imagen. Ninguna miniatura ni página se pide hasta que
+  está a punto de entrar en pantalla.
+- **Pulsar una cita de un apunte o de una corrección abre el material en la pestaña PDF** y salta
+  directo a la página citada, con un resalte breve. Si la cita no tiene página anclada, lo dice y no
+  navega.
 
 ### Cambiado
 
+- **Rediseño visual del escritorio de estudio.** Sidebar, chat, apuntes y pruebas comparten un
+  lenguaje más plano, con menos esquinas redondeadas y más contraste en la interacción. Los apuntes
+  se leen en dos paneles: un índice de bloques a la izquierda y un bloque a la vez a la derecha, con
+  el título, "Guardar", "Borrar" y el estado de guardado agrupados en una sola cabecera. El texto del
+  bloque se lee con más tamaño y más aire entre líneas. La pestaña Pruebas separa Controles, Exámenes
+  de prueba y Exámenes reales en tres grupos con su propio contador.
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
 - **Toda la interfaz habla español.** El chat (cabecera, sugerencias de inicio, botones, mensajes), la

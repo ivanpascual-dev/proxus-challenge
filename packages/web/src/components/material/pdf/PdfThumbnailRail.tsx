@@ -72,11 +72,11 @@ function PdfThumbnail({
       onClick={onSelect}
       aria-current={active ? "true" : undefined}
       aria-label={`Ir a la página ${page}`}
-      className={`flex w-full flex-col items-center gap-1 rounded-lg border p-1 ${
+      className={`flex w-full flex-col items-center gap-1 border p-1 ${
         active ? "border-brand bg-brand-soft" : "border-border hover:border-border-strong"
       }`}
     >
-      <span className="grid aspect-[3/4] w-full place-items-center overflow-hidden rounded bg-canvas">
+      <span className="grid aspect-[3/4] w-full place-items-center overflow-hidden bg-canvas">
         {visible && <PdfThumbnailImage materialId={materialId} page={page} />}
       </span>
       <span className="text-[0.7rem] text-muted">{page}</span>

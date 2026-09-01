@@ -36,7 +36,7 @@ export function MaterialCitation({ materialId, pages, transcribed = false, unanc
       <button
         type="button"
         onClick={() => onOpen(materialId, pages[0]!)}
-        className="inline-flex items-center gap-1 rounded-full border border-border-strong/60 px-2 py-0.5 text-brand text-xs hover:border-brand hover:bg-brand-soft"
+        className="inline-flex items-center gap-1 border border-border-strong/60 px-2 py-0.5 text-brand text-xs hover:border-brand hover:bg-brand-soft"
       >
         <Icon name="chevron-right" size={16} />
         {text}

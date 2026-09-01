@@ -19,7 +19,7 @@ export function IconButton({ icon, label, size = 16, pressed, className = "", ..
         type="button"
         aria-label={label}
         aria-pressed={pressed}
-        className={`grid size-8 place-items-center rounded-[8px] text-muted transition hover:bg-surface-muted hover:text-heading focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${pressed === true ? "bg-brand-soft text-brand" : ""} ${className}`}
+        className={`grid size-8 place-items-center rounded-sm text-muted transition hover:bg-surface-muted hover:text-heading active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${pressed === true ? "bg-brand-soft text-brand" : ""} ${className}`}
         {...rest}
       >
         <Icon name={icon} size={size} />

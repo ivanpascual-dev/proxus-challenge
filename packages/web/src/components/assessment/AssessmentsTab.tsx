@@ -1,10 +1,13 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import { LIMITS, type AssessmentListEntry, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
+import { LIMITS, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
 import { useEffect, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
 import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
+import { groupAssessments } from "../../domain/assessments/group-assessments.ts";
+import { AssessmentGroupTabs, type AssessmentGroup } from "./AssessmentGroupTabs.tsx";
+import { AssessmentList } from "./AssessmentList.tsx";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
 import { StudyProfilePanel } from "./StudyProfilePanel.tsx";
@@ -26,21 +29,19 @@ type GenTarget =
   | { readonly kind: "test" }
   | { readonly kind: "quiz"; readonly topicId: string; readonly topicLabel: string };
 
-// Cómo se resuelve una prueba, a partir de su tipo y su modo. Un Control y un Examen de prueba se
-// resuelven en el mismo sitio (a libro abierto); un Examen real toma la aplicación entera.
-function rowKindLabel(entry: AssessmentListEntry): string {
-  if (entry.kind === "quiz") {
-    return "Control";
-  }
-  return entry.mode === "exam" ? "Examen real" : "Examen de prueba";
-}
+const EMPTY_MESSAGE: Record<AssessmentGroup, string> = {
+  controls: "Todavía no hay ningún Control. Genera uno desde un tema del mapa mental.",
+  practiceExams: "Todavía no hay ningún Examen de prueba. Genera uno con el botón de arriba.",
+  realExams: "Todavía no hay ningún Examen real. Genera uno de prueba y elige el modo «Real»."
+};
 
 export function AssessmentsTab({
   materialId,
   pendingControl,
   onPendingControlConsumed,
   onStartExam,
-  onActiveArtifactChange
+  onActiveArtifactChange,
+  onOpenCitation
 }: {
   readonly materialId: string;
   readonly pendingControl: PendingControl | null;
@@ -49,11 +50,13 @@ export function AssessmentsTab({
   // Contexto de pantalla (fase 4, decisión 5): la prueba abierta en detalle, para el chip del tutor.
   // `undefined` mientras se está en la lista, sin ninguna prueba concreta abierta.
   readonly onActiveArtifactChange?: (artifact: { readonly id: string; readonly title: string } | undefined) => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const assessments = useAtomValue(materialAssessmentsQuery(materialId));
   const refresh = useAtomRefresh(materialAssessmentsQuery(materialId));
   const [view, setView] = useState<View>({ kind: "list" });
   const [genTarget, setGenTarget] = useState<GenTarget | null>(null);
+  const [activeGroup, setActiveGroup] = useState<AssessmentGroup>("controls");
 
   useEffect(() => {
     if (pendingControl !== null) {
@@ -73,6 +76,7 @@ export function AssessmentsTab({
         artifactId={view.id}
         title={view.title}
         onExit={() => setView({ kind: "list" })}
+        onOpenCitation={onOpenCitation}
       />
     );
   }
@@ -83,24 +87,13 @@ export function AssessmentsTab({
         artifactId={view.id}
         title={view.title}
         onExit={() => setView({ kind: "list" })}
+        onOpenCitation={onOpenCitation}
       />
     );
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted text-sm">Controles (un tema) y Exámenes (el material entero).</p>
-        <button
-          type="button"
-          className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90 disabled:opacity-50"
-          onClick={() => setGenTarget({ kind: "test" })}
-          disabled={genTarget !== null}
-        >
-          Examen del material
-        </button>
-      </div>
-
       <StudyProfilePanel materialId={materialId} />
 
       {genTarget !== null && (
@@ -122,106 +115,42 @@ export function AssessmentsTab({
           return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
         },
         onDefect: (defect) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => value.assessments.length === 0
-          ? (
-              <p className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
-                Este material no tiene ninguna prueba todavía. Genera un Examen aquí arriba, o un Control
-                desde un tema del mapa mental.
-              </p>
-            )
-          : (
-              <ul className="grid gap-3">
-                {value.assessments.map((entry) => (
-                  <AssessmentRow
-                    key={entry.id}
-                    entry={entry}
-                    onOpen={() => setView({ kind: "solve", id: entry.id, title: entry.title })}
-                    onStartExam={() => onStartExam(entry.id, entry.title)}
-                    onHistory={() => setView({ kind: "history", id: entry.id, title: entry.title })}
-                  />
-                ))}
-              </ul>
-            )
+        onSuccess: ({ value }) => {
+          const grouped = groupAssessments(value.assessments);
+          return (
+            <>
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <AssessmentGroupTabs
+                  active={activeGroup}
+                  onChange={setActiveGroup}
+                  counts={{
+                    controls: grouped.controls.length,
+                    practiceExams: grouped.practiceExams.length,
+                    realExams: grouped.realExams.length
+                  }}
+                />
+                <button
+                  type="button"
+                  className="mb-2 font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  onClick={() => setGenTarget({ kind: "test" })}
+                  disabled={genTarget !== null}
+                >
+                  + Examen del material
+                </button>
+              </div>
+              <AssessmentList
+                entries={grouped[activeGroup]}
+                emptyMessage={EMPTY_MESSAGE[activeGroup]}
+                onOpen={(entry) => setView({ kind: "solve", id: entry.id, title: entry.title })}
+                onStartExam={(entry) => onStartExam(entry.id, entry.title)}
+                onHistory={(entry) => setView({ kind: "history", id: entry.id, title: entry.title })}
+              />
+            </>
+          );
+        }
       })}
     </div>
   );
-}
-
-function AssessmentRow({
-  entry,
-  onOpen,
-  onStartExam,
-  onHistory
-}: {
-  readonly entry: AssessmentListEntry;
-  readonly onOpen: () => void;
-  readonly onStartExam: () => void;
-  readonly onHistory: () => void;
-}) {
-  const isRealExam = entry.kind === "test" && entry.mode === "exam";
-
-  return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mb-1 text-muted text-xs uppercase tracking-widest">
-            {rowKindLabel(entry)}
-            {entry.origin === "review" && " · de repaso"}
-          </p>
-          <h3 className="font-semibold text-heading">{entry.title}</h3>
-          <p className="mt-1 text-muted text-sm">
-            {entry.scope.topicLabel} · {entry.questionCount} {entry.questionCount === 1 ? "pregunta" : "preguntas"}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {entry.lastAttempt !== null && (
-            <button
-              type="button"
-              className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-              onClick={onHistory}
-            >
-              Ver intentos
-            </button>
-          )}
-          {isRealExam
-            ? (
-                <button
-                  type="button"
-                  className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
-                  onClick={onStartExam}
-                >
-                  Empezar el examen
-                </button>
-              )
-            : (
-                <button
-                  type="button"
-                  className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-                  onClick={onOpen}
-                >
-                  {entry.kind === "quiz" ? "Practicar" : "Abrir"}
-                </button>
-              )}
-        </div>
-      </div>
-      <p className="mt-2 text-muted text-sm">
-        {entry.lastAttempt === null
-          ? "Sin intentos."
-          : `Último intento: ${lastAttemptLabel(entry.lastAttempt)}`}
-      </p>
-    </li>
-  );
-}
-
-function lastAttemptLabel(last: NonNullable<AssessmentListEntry["lastAttempt"]>): string {
-  const mode = last.mode === "practice" ? "práctica" : "examen";
-  if (last.status === "in-progress") {
-    return `${mode}, en curso`;
-  }
-  if (last.status === "abandoned") {
-    return `${mode}, abandonado`;
-  }
-  return `${mode}, nota ${last.displayedScore ?? "sin evaluar"} / 10`;
 }
 
 // --- Tarjeta de generación ---------------------------------------------------------------------
@@ -289,7 +218,7 @@ function GenerateCard({
   };
 
   return (
-    <div className="mb-4 rounded-2xl border border-dashed border-border bg-surface/50 p-4">
+    <div className="mb-4 border border-dashed border-border bg-surface/50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold text-heading">
@@ -304,7 +233,7 @@ function GenerateCard({
         {!running && !done && (
           <button
             type="button"
-            className="rounded-full border border-border-strong px-3 py-1.5 text-body text-sm hover:border-brand"
+            className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98]"
             onClick={onClose}
           >
             Cancelar
@@ -368,12 +297,12 @@ function GenerateCard({
                 max={range.max}
                 value={count}
                 onChange={(event) => setCount(clamp(Number(event.currentTarget.value), range.min, range.max))}
-                className="mt-1 w-24 rounded-xl border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
+                className="mt-1 w-24 border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
               />
             </label>
             <button
               type="button"
-              className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
+              className="font-semibold text-brand transition hover:underline active:scale-[0.98]"
               onClick={() => void run()}
             >
               Generar
@@ -383,7 +312,7 @@ function GenerateCard({
       )}
 
       {lines.length > 0 && (
-        <ul className="mt-3 max-h-40 overflow-y-auto rounded-xl border border-border bg-canvas p-3 text-muted text-sm">
+        <ul className="mt-3 max-h-40 overflow-y-auto border border-border bg-canvas p-3 text-muted text-sm">
           {lines.map((line, index) => <li key={index}>{line}</li>)}
         </ul>
       )}
@@ -392,7 +321,7 @@ function GenerateCard({
       {done && (
         <button
           type="button"
-          className="mt-3 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
+          className="mt-3 font-semibold text-brand transition hover:underline active:scale-[0.98]"
           onClick={onGenerated}
         >
           Ver la prueba en la lista
@@ -416,7 +345,7 @@ function ModeChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-4 py-1.5 text-sm ${
+      className={` px-4 py-1.5 text-sm ${
         active ? "border border-brand bg-brand-soft text-heading" : "border border-border text-muted hover:text-heading"
       }`}
     >

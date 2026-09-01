@@ -55,7 +55,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
 
   if (items.length === 0) {
     return (
-      <div className="w-64 rounded-2xl border border-border bg-surface p-3 text-muted text-sm shadow-lg">
+      <div className="w-64 border border-border bg-surface p-3 text-muted text-sm shadow-lg">
         Sin resultados.
       </div>
     );
@@ -64,13 +64,13 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
   return (
     <div
       ref={listRef}
-      className="max-h-72 w-64 overflow-y-auto rounded-2xl border border-border bg-surface p-1.5 shadow-lg"
+      className="max-h-72 w-64 overflow-y-auto border border-border bg-surface p-1.5 shadow-lg"
     >
       {items.map((item, index) => (
         <button
           key={item.title}
           type="button"
-          className={`flex w-full flex-col rounded-xl px-3 py-2 text-left ${
+          className={`flex w-full flex-col px-3 py-2 text-left ${
             index === selected ? "bg-brand/10 text-brand" : "text-body hover:bg-surface-muted"
           }`}
           onMouseEnter={() => setSelected(index)}

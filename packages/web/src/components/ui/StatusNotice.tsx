@@ -22,7 +22,7 @@ interface StatusNoticeProps {
 export function StatusNotice({ tone, title, description, action }: StatusNoticeProps) {
   const { icon, classes } = TONE_STYLE[tone];
   return (
-    <div className={`flex items-start gap-2.5 rounded-[10px] border p-3 text-sm ${classes}`}>
+    <div className={`flex items-start gap-2.5 border p-3 text-sm ${classes}`}>
       <Icon name={icon} size={18} className="mt-0.5 shrink-0" />
       <div className="min-w-0">
         <p className="font-medium">{title}</p>

@@ -351,7 +351,7 @@ function ExamBody({
             />
           ))}
           {error !== undefined && (
-            <p className="rounded-2xl border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
+            <p className=" border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
           )}
         </div>
       </div>
@@ -371,7 +371,7 @@ function ExamBody({
                     type="button"
                     onClick={() => void onCancel()}
                     disabled={busy || phase === "grading"}
-                    className="rounded-full border border-border-strong px-4 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
+                    className=" border border-border-strong px-4 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
                   >
                     Cancelar el examen
                   </button>
@@ -385,7 +385,7 @@ function ExamBody({
                       type="button"
                       onClick={() => void doSubmit()}
                       disabled={busy || phase === "grading"}
-                      className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {phase === "grading" ? "Corrigiendo…" : "Entregar"}
                     </button>
@@ -434,14 +434,14 @@ function ExamBriefing({
           <li>· Mientras dure, el resto de la aplicación (material, apuntes, tutor) queda cerrado.</li>
         </ul>
         {error !== undefined && (
-          <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={onStart}
             disabled={busy}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Empezando…" : "Empezar el examen"}
           </button>
@@ -449,7 +449,7 @@ function ExamBriefing({
             type="button"
             onClick={onExit}
             disabled={busy}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand disabled:opacity-50"
+            className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-brand disabled:opacity-50"
           >
             Ahora no
           </button>
@@ -472,7 +472,7 @@ function ExitButton({ onExit, label }: { readonly onExit: () => void; readonly l
     <button
       type="button"
       onClick={onExit}
-      className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
+      className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
     >
       {label}
     </button>

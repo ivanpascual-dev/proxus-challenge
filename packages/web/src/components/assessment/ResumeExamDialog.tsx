@@ -47,7 +47,7 @@ export function ResumeExamDialog({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-canvas p-6 text-heading">
-      <div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6">
+      <div className="w-full max-w-md border border-border bg-surface p-6">
         <p className="font-bold text-brand text-xs uppercase tracking-widest">Examen a medias</p>
         <h2 className="mt-2 font-bold text-heading text-xl">
           Tienes un examen a medias{title === null ? "" : `: ${title}`}
@@ -59,7 +59,7 @@ export function ResumeExamDialog({
         </p>
 
         {error !== undefined && (
-          <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
         )}
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -67,7 +67,7 @@ export function ResumeExamDialog({
             type="button"
             onClick={onResume}
             disabled={busy}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:opacity-50"
+            className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:opacity-50"
           >
             Volver al examen
           </button>
@@ -75,7 +75,7 @@ export function ResumeExamDialog({
             type="button"
             onClick={() => void onCancel()}
             disabled={busy}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
+            className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
           >
             {busy ? "Cancelando…" : "Cancelarlo"}
           </button>

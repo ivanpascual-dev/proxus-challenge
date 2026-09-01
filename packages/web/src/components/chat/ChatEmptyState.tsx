@@ -18,7 +18,7 @@ export function ChatEmptyState({ onSelect }: { readonly onSelect: (prompt: strin
             key={prompt}
             type="button"
             onClick={() => onSelect(prompt)}
-            className="rounded-[10px] border border-border-strong bg-surface p-3.5 text-left text-body text-sm hover:border-brand"
+            className="rounded-sm border border-border-strong bg-surface p-3.5 text-left text-body text-sm transition hover:border-brand active:scale-[0.98]"
           >
             {prompt}
           </button>

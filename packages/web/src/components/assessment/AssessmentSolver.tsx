@@ -29,11 +29,13 @@ import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 export function AssessmentSolver({
   artifactId,
   title,
-  onExit
+  onExit,
+  onOpenCitation
 }: {
   readonly artifactId: string;
   readonly title: string;
   readonly onExit: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const solvable = useAtomValue(solvableAssessmentQuery(artifactId));
 
@@ -43,7 +45,7 @@ export function AssessmentSolver({
         <button
           type="button"
           onClick={onExit}
-          className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+          className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
         >
           ← Volver a la lista
         </button>
@@ -55,7 +57,7 @@ export function AssessmentSolver({
           return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
         },
         onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar la prueba: {DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} />
+        onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} onOpenCitation={onOpenCitation} />
       })}
     </div>
   );
@@ -63,7 +65,15 @@ export function AssessmentSolver({
 
 // --- La sesión de práctica -----------------------------------------------------------------------
 
-function PracticeRun({ assessment, title }: { readonly assessment: SolvableAssessment; readonly title: string }) {
+function PracticeRun({
+  assessment,
+  title,
+  onOpenCitation
+}: {
+  readonly assessment: SolvableAssessment;
+  readonly title: string;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
+}) {
   const [attempt, setAttempt] = useState<InProgressAttempt | GradedAttempt | null>(null);
   const [answers, setAnswers] = useState<LocalAnswers>(emptyAnswers);
   const [hints, setHints] = useState<Record<string, string>>({});
@@ -163,7 +173,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
 
   return (
     <article className="mx-auto max-w-3xl pb-8">
-      <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
+      <header className="mb-5 border-border border-b pb-4">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">
           {assessment.kind === "quiz" ? "Control" : "Examen"} · práctica
         </p>
@@ -176,7 +186,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
 
       {attempt === null
         ? (
-            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-10 text-center">
+            <div className="grid place-items-center border border-dashed border-border bg-surface/40 p-10 text-center">
               <div>
                 <h3 className="font-bold text-heading text-lg">
                   {assessment.questions.length} {assessment.questions.length === 1 ? "pregunta" : "preguntas"}
@@ -187,7 +197,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
                 </p>
                 <button
                   type="button"
-                  className="mt-4 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-4 font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void onStart()}
                   disabled={starting}
                 >
@@ -211,19 +221,20 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
                   onRevealHint={() => void onRevealHint(question.id)}
                   correction={graded?.corrections.find((item) => item.questionId === question.id)}
                   onDispute={() => void onDispute(question.id)}
+                  onOpenCitation={onOpenCitation}
                 />
               ))}
             </div>
           )}
 
       {error !== undefined && (
-        <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
+        <p className="mt-4 border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
       )}
 
       {graded !== null && <AttemptSummary attempt={graded} />}
 
       {attempt !== null && graded === null && (
-        <footer className="sticky bottom-0 mt-6 rounded-3xl border border-border bg-canvas/95 p-4 backdrop-blur">
+        <footer className="sticky bottom-0 mt-6 border-border border-t bg-canvas/95 p-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted text-sm">
               {unanswered === 0
@@ -232,7 +243,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
             </p>
             <button
               type="button"
-              className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void onSubmit()}
               disabled={submitting}
             >

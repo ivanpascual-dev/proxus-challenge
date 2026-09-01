@@ -19,7 +19,7 @@ export function FollowUpQuestions({
         <button
           key={question}
           type="button"
-          className="w-fit max-w-full rounded-2xl border border-border-strong bg-surface px-4 py-2 text-left text-body text-sm hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-fit max-w-full rounded-sm border border-border-strong bg-surface px-4 py-2 text-left text-body text-sm transition hover:border-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           onClick={() => onSelect(question)}
           disabled={disabled}
         >
