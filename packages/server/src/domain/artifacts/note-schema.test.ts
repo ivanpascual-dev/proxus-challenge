@@ -185,8 +185,7 @@ const attemptJson = JSON.stringify({
   rawScore: 4,
   maxScore: 4,
   penalty: 0,
-  displayedScore: 10,
-  summary: "4/4"
+  displayedScore: 10
 });
 
 test("una prueba y un intento guardados se decodifican igual con shared y con el servidor", () => {

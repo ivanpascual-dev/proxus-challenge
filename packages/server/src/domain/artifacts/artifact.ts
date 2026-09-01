@@ -432,8 +432,7 @@ export const GradedAttempt = Schema.Struct({
   rawScore: Schema.Number,
   maxScore: Schema.Number,
   penalty: Schema.Number,
-  displayedScore: Schema.Number,
-  summary: Schema.String
+  displayedScore: Schema.Number
 });
 export type GradedAttempt = typeof GradedAttempt.Type;
 
