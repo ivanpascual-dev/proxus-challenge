@@ -46,9 +46,14 @@ export const LIMITS = {
   // materiales hay vivos a la vez.
   uploadsPerWindow: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
-  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` en su primer indexado y su
-  // primera generación de apuntes, porque subir ya se cobró contra `uploadsPerWindow` (fase 4, decisión 4).
-  uploadGraceMs: 10 * 60 * 1000,
+  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` ni el permiso de
+  // concurrencia en su primer indexado y su primera generación de apuntes, porque subir ya se cobró
+  // contra `uploadsPerWindow` (fase 4, decisión 4; correcciones de cierre de fase 5, ADR-028).
+  // La ventana se concede UNA vez, en la subida, y nunca se renueva (ADR-028, enmienda): tiene que
+  // cubrir subir + indexar los cinco en paralelo + arrancar el último apunte. La generación de
+  // apuntes la revoca al terminar, así que en el flujo normal muere antes; este número es el techo
+  // de seguridad si algo se cuelga.
+  uploadGraceMs: 20 * 60 * 1000,
 
   // Pruebas (fase 3)
   // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.

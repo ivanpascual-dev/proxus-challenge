@@ -1298,10 +1298,20 @@ incompleta.
 **Decisión.** La gracia de alta exime también del permiso de concurrencia, no solo del cubo de
 frecuencia: `NoteGenerationRoute` calcula `usesConcurrencyPermit = !hasGrace` y solo entonces llama a
 `check`, `acquire` y `release`, incluido el retorno temprano por apunte ya existente. La gracia se
-renueva al terminar el indexado si el material la tenía al empezar (para que un indexado largo no
-consuma la ventana antes de que el cliente lance los apuntes) y se revoca explícitamente al cerrar el
-stream de generación de apuntes, en éxito y en fallo, para que no quede viva más allá de su propósito.
+concede una sola vez, en el POST de subida, y se revoca explícitamente al cerrar el stream de
+generación de apuntes, en éxito y en fallo, para que no quede viva más allá de su propósito.
 Chat, pruebas manuales y generación de apuntes sin gracia mantienen las dos barreras sin cambios.
+
+**Enmienda (2026-09-02, tras la auditoría de guardarraíles).** La versión inicial renovaba la gracia
+al cerrar el stream de indexado, para que un indexado largo no consumiera la ventana antes de los
+apuntes. La auditoría lo marcó como fallo ALTO: `grantUploadGrace` fija la caducidad en
+`now() + uploadGraceMs` sin tope acumulado, así que un cliente que reindexara en bucle dentro de la
+ventana mantenía la gracia viva para siempre y se saltaba el cubo `messages` sin límite. Es el
+antipatrón "la seguridad la impone el código, no la conducta del cliente". La renovación se retira:
+la ventana se concede una vez en la subida y `uploadGraceMs` sube de 10 a 20 minutos para que cubra,
+sin renovar, subir + indexar los cinco en paralelo + arrancar el último apunte (la comprobación de
+gracia se evalúa una vez al entrar en la ruta de apuntes, así que basta con llegar a tiempo de
+empezar). En el flujo normal la gracia muere antes, cuando la generación de apuntes la revoca.
 
 **Consecuencias.**
 
@@ -1310,9 +1320,11 @@ Chat, pruebas manuales y generación de apuntes sin gracia mantienen las dos bar
 - Cinco preparaciones automáticas pueden seguir agotando un límite del proveedor externo (Gemini) que
   esta exención no toca: cada cadena sigue aislando y mostrando su propio fallo, sin detenerse unas a
   otras ni presentarlo como éxito.
-- La gracia sigue acotada por `uploadGraceMs` como caducidad de seguridad y por `uploadsPerWindow` como
-  freno a fabricar gracia a fuerza de subir y borrar: esta decisión amplía lo que la gracia exime, no
-  cuánta gracia se puede tener.
+- La gracia sigue acotada por `uploadGraceMs` como caducidad de seguridad (20 min, tras la enmienda,
+  y ya sin renovación) y por `uploadsPerWindow` como freno a fabricar gracia a fuerza de subir y
+  borrar: esta decisión amplía lo que la gracia exime, no cuánta gracia se puede tener.
+- Queda como deuda registrada, no urgente: que el reindexado sin gracia tome también permiso de
+  concurrencia (`acquire`), como el resto de operaciones caras. Hoy solo cobra el cubo `messages`.
 
 ---
 

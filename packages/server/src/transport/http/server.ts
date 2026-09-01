@@ -199,10 +199,11 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
 
     const body = events.pipe(
       Stream.provideService(LanguageModel.LanguageModel, languageModel),
-      Stream.map(encodeIndexNdjson),
-      // Renueva la gracia al cerrar el stream (ADR-028): un indexado largo no debe consumir la
-      // ventana antes de que el cliente lance, justo después, la generación de apuntes.
-      Stream.ensuring(hasGrace ? rateLimiter.grantUploadGrace(id) : Effect.void)
+      Stream.map(encodeIndexNdjson)
+      // La gracia NO se renueva aquí (ADR-028, enmienda tras la auditoría de guardarraíles): renovarla
+      // sin tope la hacía inmortal mientras un cliente siguiera reindexando, y eso saltaba el cubo
+      // `messages` indefinidamente. Ahora la ventana se concede una sola vez en la subida y se
+      // dimensiona (`uploadGraceMs`) para cubrir indexado y arranque de apuntes sin renovar.
     );
 
     return HttpServerResponse.stream(body, {
