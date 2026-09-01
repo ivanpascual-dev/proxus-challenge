@@ -167,6 +167,7 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   herramienta; abierta, cada paso tiene una etiqueta humana ("Leyendo el material") y un segundo
   nivel con el detalle técnico, con las claves, tokens y bloques largos ya filtrados. El historial de
   conversaciones deja de ser una columna fija y se abre desde un icono en la cabecera del chat.
+- **La pestaña del navegador dice "Symma"** en vez de "Proxus Tutor".
 
 ### Corregido
 
