@@ -19,6 +19,7 @@ import {
   AgentSession,
   renderScreenContext,
   SessionRepository,
+  toPresentationMessages,
   type AgentSessionRunResult,
   type SessionNotFound,
   type SessionRepositoryError
@@ -134,13 +135,26 @@ export const TutorChatServiceLive = Layer.effect(
       const screenContext = renderScreenContext(input.context);
       const turnInput = screenContext === undefined ? input.input : `${input.input}\n\n${screenContext}`;
 
+      // §5.1: lo que ve el navegador en directo (streaming) nunca es el mensaje `user` concatenado.
+      // El primer mensaje que produce un turno es siempre ese `user` (harness/session.ts lo añade sin
+      // condición, una vez); se sustituye su contenido por `input.input` antes de emitirlo, sin tocar
+      // lo que `appendTurn` persiste para el historial que el modelo sigue usando como contexto.
+      let leadingUserMessageMasked = false;
+      const maskedOnMessage: typeof onMessage = (message) => {
+        if (!leadingUserMessageMasked && message.role === "user") {
+          leadingUserMessageMasked = true;
+          return onMessage({ role: "user", content: input.input });
+        }
+        return onMessage(message);
+      };
+
       const result = yield* session.runTurn(
         {
           input: turnInput,
           messages: stored.messages,
           maxSteps: input.maxSteps ?? LIMITS.maxAgentSteps
         },
-        onMessage
+        maskedOnMessage
       ).pipe(
         Effect.provide(harness.layer),
         Effect.mapError(toInternalError)
@@ -149,7 +163,14 @@ export const TutorChatServiceLive = Layer.effect(
       yield* sessionRepository.appendTurn({
         sessionId: input.conversationId,
         messages: result.newMessages,
-        turn: { startedAt, steps: result.steps },
+        turn: {
+          startedAt,
+          steps: result.steps,
+          input: input.input,
+          context: input.context,
+          messageCount: result.newMessages.length,
+          followUpQuestions: result.followUpQuestions
+        },
         title: stored.title.length === 0 ? deriveConversationTitle(input.input) : undefined
       }).pipe(Effect.mapError(mapSessionError));
 
@@ -230,7 +251,9 @@ export const TutorChatServiceLive = Layer.effect(
         Effect.map((session): Conversation => ({
           id: session.id,
           title: session.title,
-          messages: session.messages,
+          // §5.1: lo que recarga el navegador es la copia de presentación, no el historial que el
+          // modelo usó como contexto. `session.messages` (usado en `runTurn`) no se toca aquí.
+          messages: toPresentationMessages(session.messages, session.turns),
           turns: session.turns,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt

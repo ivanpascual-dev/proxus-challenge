@@ -1,11 +1,14 @@
-import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+import { ChatContextRef } from "@proxus/shared";
 import { degradeHistory } from "../../domain/agents/harness/message-degrade.ts";
+import { migrateStoredTurns } from "../../domain/agents/harness/session-migration.ts";
 import {
   SessionAlreadyExists,
   SessionNotFound,
   SessionRepository,
   SessionRepositorySerializationError,
   SessionRepositoryStorageError,
+  SessionTurnMismatch,
   type AppendMessagesInput,
   type AppendTurnInput,
   type MakeSessionInput,
@@ -68,9 +71,17 @@ const StoredStepSchema = Schema.Struct({
   error: Schema.optional(StoredStepErrorSchema)
 });
 
+// Fase 5, §5.1: `input`, `context`, `messageCount` y `followUpQuestions` son opcionales en el disco a
+// propósito, para que un fichero escrito antes de este campo siga decodificando. `readSessionFile` los
+// completa con `migrateStoredTurns` antes de devolver la sesión; lo que escribe `appendTurn` siempre
+// los trae puestos, así que un turno nuevo no depende de esa migración para verse bien.
 const StoredTurnSchema = Schema.Struct({
   startedAt: Schema.String,
-  steps: Schema.Array(StoredStepSchema)
+  steps: Schema.Array(StoredStepSchema),
+  input: Schema.optional(Schema.String),
+  context: Schema.optional(Schema.Array(ChatContextRef)),
+  messageCount: Schema.optional(Schema.Number),
+  followUpQuestions: Schema.optional(Schema.Array(Schema.String))
 });
 
 const StoredAgentSessionSchema = Schema.Struct({
@@ -108,9 +119,16 @@ export const FileSessionRepository = {
         Effect.mapError(mapStorageError)
       );
 
-      return yield* Schema.decodeUnknownEffect(StoredAgentSessionFromJson)(text).pipe(
+      const decoded = yield* Schema.decodeUnknownEffect(StoredAgentSessionFromJson)(text).pipe(
         Effect.mapError((reason) => new SessionRepositorySerializationError({ reason }))
       );
+
+      const migratedTurns = migrateStoredTurns(decoded.messages, decoded.turns);
+      if (Option.isNone(migratedTurns)) {
+        return yield* new SessionTurnMismatch({ sessionId });
+      }
+
+      return { ...decoded, turns: migratedTurns.value };
     });
 
     const writeSessionFile = (session: StoredAgentSession): Effect.Effect<void, SessionRepositoryError> => Effect.gen(function* () {

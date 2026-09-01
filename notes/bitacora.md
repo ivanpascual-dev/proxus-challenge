@@ -1084,3 +1084,24 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   probarlo en el navegador. No era un bug de layout del propio diálogo: el reset de Tailwind anula
   el `margin: auto` con el que `<dialog>` se centra por defecto. Se fuerza `fixed inset-0 m-auto
   h-fit` en `Dialog.tsx` para recuperarlo.
+
+## 2026-09-01 · Fase 5 · Sesión P0.2, paso 8 (§5.1)
+
+- **Desviación:** el plan (`fase5-el-escritorio-de-estudio.md:889-890`) preveía degradar turno a
+  turno una sesión antigua que no se pudiera migrar con certeza ("marca ese turno como dato de
+  presentación no disponible"). La implementación (`session-migration.ts`) colapsa esa vía: si el
+  número de turnos no coincide con la frontera real de mensajes `user`, o un `messageCount` explícito
+  no cuadra con esa frontera, `migrateStoredTurns` devuelve `None` para la sesión entera y
+  `readSessionFile` declara `SessionTurnMismatch` (esto sí coincide con la redacción de
+  `fase5-el-escritorio-de-estudio.md:901-902`, más estricta, para el caso concreto del cómputo). No
+  hay degradación por turno individual: se prefirió el camino que nunca mezcla presentación parcial
+  con datos no verificados sobre el que intentaba salvar los turnos sanos de una sesión con algún
+  turno roto. En la práctica no debería importar: toda sesión escrita por este mismo código ya trae
+  los campos nuevos, así que `SessionTurnMismatch` solo dispara ante corrupción real, no ante el uso
+  normal de una sesión anterior a la migración.
+- **Hallazgo útil:** la sesión real `.data/agent-sessions/23887fe7-e7d9-41b4-91f6-0ad69ceb17de.json`
+  (la que reprodujo F4-29b, el `<<<FOLLOW-UP>>>` sin cerrar) sirvió de fixture de regresión anonimizado
+  para `session-migration.test.ts`: cubre a la vez el bloque `SCREEN CONTEXT` a recortar y las tres
+  preguntas a recuperar sin el cierre. Merece recordarse como patrón: cuando un bug real deja rastro en
+  `.data/`, esa sesión (con el contenido sensible sustituido por un placeholder) es mejor fixture que
+  uno inventado a mano, porque reproduce la forma exacta que rompió algo.
