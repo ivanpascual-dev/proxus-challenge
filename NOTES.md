@@ -654,15 +654,21 @@ de datos; nunca se convierte en un perfil vacío ni en una recomendación plausi
    después guardaría las fuentes realmente consultadas por el tutor. Es la continuación directa de la
    tesis: el alumno debe ver y poder retirar exactamente lo que el agente sabe. No entró en P2 porque
    necesita contratos y persistencia, no solo interfaz.
-2. **Hacer responsive tablet/móvil.** Un selector Material/Sym en tablet y sidebar como drawer con foco
+2. **Ejecutar el corte de correcciones de fase 5.** Probar P0-P2 a fondo dejó doce fallos medidos y ya
+   diseñados en `notes/plans/correciones.md`: borrado en cascada del perfil de estudio y de los
+   derivados por huella compartida, validación de subida contra el conjunto acumulado de la cola (no
+   solo el lote actual), la asimetría de la gracia de concurrencia que produce 429 al preparar varios
+   materiales a la vez, temas sin sustento textual real, pruebas parciales por insuficiencia declarada
+   en vez de fallo entero, historial de conversaciones ordenado en servidor y el chat como borrador
+   local, tooltips contenidos al viewport y los rails contraíbles de sidebar y outline. Tiene su propio
+   plan, sus decisiones cerradas y su procedimiento de verificación por criterio (`C5-01` a `C5-15` en
+   `docs/especificacion.md`); no entró en esta entrega.
+3. **Hacer responsive tablet/móvil.** Un selector Material/Sym en tablet y sidebar como drawer con foco
    atrapado en móvil. Se deja después del escritorio porque resolverlo antes habría obligado a diseñar
    dos navegaciones mientras las superficies todavía cambiaban.
-3. **Poner techo a los tres listados del CLI.** Elegiría paginación o un rechazo que nombre el total
+4. **Poner techo a los tres listados del CLI.** Elegiría paginación o un rechazo que nombre el total
    pedido para `artifacts show/list/attempts`. No añadiría un `slice`: un recorte silencioso haría que
    el tutor creyese haber visto todo.
-4. **Revalidar la cola acumulada de subida.** Cada lote nuevo volvería a comprobar duplicados y
-   `maxFilesPerUpload` sobre toda la cola e ignoraría respuestas antiguas. El servidor ya protege los
-   datos; por eso es mejora de UX posterior, no un bloqueo de seguridad.
 5. **Versionar el esquema del índice.** Evitaría invalidaciones manuales cuando cambie `MaterialIndex`
    y permitiría nombrar una migración o reindexación concreta. No se hizo antes porque durante el reto
    los datos de `.data` son locales y descartables.

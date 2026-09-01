@@ -1133,3 +1133,38 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   Node recibe `EPERM` al ejecutar `spawnSync("pdftotext")`, incluso cuando el proceso devuelve estado
   0 y texto correcto. El mismo test ejecutado fuera del sandbox pasa sus cuatro páginas; no es un fallo
   del fixture ni del clasificador.
+
+## 2026-09-01 · Fase 5 · cierre P0/P1/P2, tramo P3 pendiente
+
+- **Alcance:** el tramo P3 del plan (`notes/plans/fase5-el-escritorio-de-estudio.md` §5.2, §5.3 y
+  pasos 21-26) se queda sin construir por falta de tiempo. Decisión de Iván, no desviación del plan.
+  Depende de él la mitad de la decisión cerrada #17 (`Abrir páginas` y `Preguntar a Sym` en el menú de
+  un tema; hoy solo están `Ir a apuntes` y `Crear Control`, ver entrada anterior) y la decisión cerrada
+  #26 (etiqueta `Fuentes consultadas` en el chat).
+- **Pendiente para P3, detectado por `@fiel-al-plan`, queda documentado en vez de resuelto ahora:**
+  - `MaterialPanel.tsx` no bajó a las 180 líneas objetivo del plan; subió a 690. Revisar reparto de
+    responsabilidades cuando se retome.
+  - Los casos de prueba de identidad marcados P0 en el plan (§6.4: "¿Quién eres y dónde estoy?" sin
+    mencionar Proxus/Google/Gemini) no están escritos en
+    `packages/server/src/domain/agents/academic-tutor/evals/tutor-behaviour.eval.ts` ni en
+    `scripts/test-guardarrailes.mjs`.
+  - Banda de acciones tras la corrección de un intento (§4.9): solo está `Abrir fuente`; faltan
+    `Preguntar a Sym` y `Crear repaso`.
+  - Auditoría de identidad Sym/Symma en docs (§6.3): hecha en `NOTES.md` y `CHANGELOG.md`, falta en
+    `docs/ai-agent.md` y `docs/architecture.md`.
+  - La decisión cerrada #17 del propio plan (§2) sigue redactada como "cuatro acciones"; falta que el
+    plan remita a esta entrada de bitácora en vez de quedar desactualizado.
+
+## 2026-09-01 · Fase 5 · veredicto de cierre: ⚠️ CIERRA CON DEUDA
+
+- **`/proxus-verifier` sobre `notes/plans/fase5-el-escritorio-de-estudio.md`** (P0-P2, P3 fuera de
+  alcance): los tres checks y el servidor en verde, la suite completa (385 tests) en verde, identidad
+  Sym limpia. La deuda de esta fase es la ya recogida en la entrada anterior de hoy (`@fiel-al-plan`).
+- **Nota de alcance, sin entrar a valorar su contenido:** el verificador incluyó en su primera pasada
+  diez criterios `C5-01` a `C5-15` que en realidad pertenecen a `notes/plans/correciones.md`, un plan
+  de trabajo distinto y posterior (empieza después del commit `b3cad1f`, con su propio ciclo plan →
+  ejecutar → verificar). No se han analizado ni verificado aquí; quedan fuera del cierre de esta fase
+  por no ser su contrato, no porque se hayan revisado y dado por buenos.
+- **Veredicto final de fase 5:** ⚠️ CIERRA CON DEUDA, la deuda es la de P0-P2 detectada por
+  `@fiel-al-plan`. `notes/plans/correciones.md` abre su propio ciclo de fase a partir de aquí, con su
+  propia verificación cuando toque.
