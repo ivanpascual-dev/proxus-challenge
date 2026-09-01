@@ -23,7 +23,7 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 
 // El panel de examen a pantalla completa (decisión 18, §6.11). Mientras dura el examen la aplicación
 // ES el examen: sin barra lateral, sin pestañas, sin chat (App lo pinta sobre la rejilla). Aquí solo
@@ -55,12 +55,15 @@ export function ExamRun(props: ExamRunProps) {
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas text-heading">
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <Centered>Cargando el examen…</Centered>,
-        onError: (error) => (
-          <Centered>
-            <p className="text-danger-ink">No se pudo cargar el examen: {messageOf(error)}</p>
-            <ExitButton onExit={props.onFinished} label="Salir" />
-          </Centered>
-        ),
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "ExamRun");
+          return (
+            <Centered>
+              <p className="text-danger-ink">{notice.title} {notice.description}</p>
+              <ExitButton onExit={props.onFinished} label="Salir" />
+            </Centered>
+          );
+        },
         onDefect: () => (
           <Centered>
             <p className="text-danger-ink">No se pudo cargar el examen: {DEFECT_MESSAGE}</p>
@@ -131,7 +134,8 @@ function ExamBody({
       if (tag === "AttemptAlreadyClosed" || tag === "TimeLimitExceeded") {
         toClosed();
       } else {
-        setError(messageOf(cause));
+        const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "ExamRun");
+        setError(notice.description ?? notice.title);
         submitted.current = false;
         setPhase("running");
       }
@@ -224,7 +228,8 @@ function ExamBody({
         setError("El servidor no devolvió un intento en curso.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "start" }, "ExamRun");
+      setError(notice.description ?? notice.title);
     } finally {
       setBusy(false);
     }
@@ -245,7 +250,8 @@ function ExamBody({
       await abandon({ artifactId, attemptId });
       onFinished();
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "cancel" }, "ExamRun");
+      setError(notice.description ?? notice.title);
       setBusy(false);
     }
   };
@@ -260,7 +266,8 @@ function ExamBody({
         setGraded(result);
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "ExamRun");
+      setError(notice.description ?? notice.title);
     }
   };
 

@@ -12,7 +12,7 @@ import {
   type DraftBlock,
   type NoteDraft
 } from "./draft.ts";
-import { messageOf } from "../../lib/error-message.ts";
+import { describeFailure } from "../../lib/user-feedback.ts";
 
 type NoteArtifact = Extract<Artifact, { readonly kind: "note" }>;
 
@@ -101,7 +101,8 @@ export function NoteWorkspace({ artifact }: NoteWorkspaceProps) {
       }
       setDirty(false);
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "notes", action: "save" }, "NoteWorkspace");
+      setError(notice.description ?? notice.title);
     } finally {
       setIsSaving(false);
     }

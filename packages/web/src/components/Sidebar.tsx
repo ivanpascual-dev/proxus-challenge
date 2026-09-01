@@ -5,7 +5,7 @@ import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { deleteMaterialAction, materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import { UploadDropzone } from "./UploadDropzone.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 
 interface SidebarProps {
   readonly selectedMaterialId: string | null;
@@ -34,7 +34,8 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
     try {
       await deleteMaterial(materialId);
     } catch (cause) {
-      setDeleteError({ materialId, message: messageOf(cause) });
+      const notice = describeFailure(cause, { area: "materials", action: "delete" }, "Sidebar");
+      setDeleteError({ materialId, message: notice.description ?? notice.title });
     } finally {
       setDeletingId(null);
     }
@@ -63,7 +64,10 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
         </div>
         {AsyncResult.matchWithError(materials, {
           onInitial: () => <p className="text-muted">Cargando materiales…</p>,
-          onError: (error) => <p className="text-danger-ink">{messageOf(error)}</p>,
+          onError: (error) => {
+            const notice = describeFailure(error, { area: "materials", action: "list" }, "Sidebar");
+            return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+          },
           onDefect: (defect) => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
           onSuccess: ({ value }) => value.materials.length === 0
             ? <p className="text-muted">Aún no hay PDFs subidos.</p>

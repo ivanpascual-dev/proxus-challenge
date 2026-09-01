@@ -3,7 +3,7 @@ import type { AbandonedAttempt, ArtifactAttempt, GradedAttempt, SolvableAssessme
 import { useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { attemptHistoryQuery, disputeAction, solvableAssessmentQuery } from "../../domain/assessments/atoms.ts";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { answersFromStored, AttemptSummary, type LocalAnswers, QuestionCard } from "./question-view.tsx";
 
 // El historial de una prueba (paso 23 del plan): todos sus intentos, los abandonados incluidos con su
@@ -39,10 +39,11 @@ export function AttemptHistory({
 
       {AsyncResult.matchWithError(history, {
         onInitial: () => <p className="text-muted">Cargando el historial…</p>,
-        onError: (error) => (
-          <p className="text-danger-ink">No se pudo cargar el historial: {messageOf(error)}</p>
-        ),
-        onDefect: () => <p className="text-danger-ink">No se pudo cargar el historial: {DEFECT_MESSAGE}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "history" }, "AttemptHistory");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
+        onDefect: () => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => {
           if (value.length === 0) {
             return (
@@ -156,10 +157,11 @@ function OpenAttempt({
 
       {attempt.status === "graded" && AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando las preguntas…</p>,
-        onError: (error) => (
-          <p className="text-danger-ink">No se pudieron cargar las preguntas: {messageOf(error)}</p>
-        ),
-        onDefect: () => <p className="text-danger-ink">No se pudieron cargar las preguntas: {DEFECT_MESSAGE}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "AttemptHistory");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
+        onDefect: () => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => <GradedDetail attempt={attempt} assessment={value} />
       })}
     </article>

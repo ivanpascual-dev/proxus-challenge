@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    // El detalle técnico va a la consola del navegador, nunca a la pantalla (error-message.ts).
+    // El detalle técnico va a la consola del navegador, nunca a la pantalla (user-feedback.ts).
     console.error("Fallo en render capturado por ErrorBoundary:", error, info.componentStack);
   }
 

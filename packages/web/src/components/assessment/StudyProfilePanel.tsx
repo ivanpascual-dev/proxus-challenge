@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { TopicStudyProfile } from "@proxus/shared";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { studyProfileQuery } from "../../domain/profile/atoms.ts";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 
 // Vista del perfil de estudio de un material (paso 28 del plan). Solo lectura: lo escribe el código al
 // corregir un intento, nunca el modelo, y no hay ninguna ruta que lo escriba (F3-31, invariante 4).
@@ -36,11 +36,12 @@ export function StudyProfilePanel({ materialId }: { readonly materialId: string 
       <div className="border-border border-t px-4 py-4">
         {AsyncResult.matchWithError(profile, {
           onInitial: () => <p className="text-muted text-sm">Cargando tu progreso…</p>,
-          onError: (error) => (
-            <p className="text-danger-ink text-sm">No se pudo cargar tu progreso: {messageOf(error)}</p>
-          ),
+          onError: (error) => {
+            const notice = describeFailure(error, { area: "profile", action: "load" }, "StudyProfilePanel");
+            return <p className="text-danger-ink text-sm">{notice.title} {notice.description}</p>;
+          },
           onDefect: () => (
-            <p className="text-danger-ink text-sm">No se pudo cargar tu progreso: {DEFECT_MESSAGE}</p>
+            <p className="text-danger-ink text-sm">{DEFECT_MESSAGE}</p>
           ),
           onSuccess: ({ value }) => {
             if (value.topics.length === 0) {

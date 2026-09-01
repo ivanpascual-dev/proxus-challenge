@@ -22,7 +22,7 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 
 // --- Entrada al solucionador ----------------------------------------------------------------------
 
@@ -50,7 +50,10 @@ export function AssessmentSolver({
       </div>
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando la prueba…</p>,
-        onError: (error) => <p className="text-danger-ink">No se pudo cargar la prueba: {messageOf(error)}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "AssessmentSolver");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
         onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar la prueba: {DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} />
       })}
@@ -93,7 +96,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió un intento en curso.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "start" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     } finally {
       setStarting(false);
     }
@@ -107,9 +111,10 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
       const result = await reveal({ artifactId: assessment.id, attemptId: attempt.id, questionId });
       setHints((current) => ({ ...current, [questionId]: result.hint }));
     } catch (cause) {
+      const notice = describeFailure(cause, { area: "assessments", action: "hint" }, "AssessmentSolver");
       setHintErrors((current) => ({
         ...current,
-        [questionId]: messageOf(cause)
+        [questionId]: notice.description ?? notice.title
       }));
     }
   };
@@ -132,7 +137,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió el intento corregido.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +154,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setAttempt(result);
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     }
   };
 

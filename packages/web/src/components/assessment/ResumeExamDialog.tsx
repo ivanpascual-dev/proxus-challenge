@@ -1,7 +1,7 @@
 import { useAtomSet } from "@effect/atom-react";
 import { useState } from "react";
 import { abandonAttemptAction } from "../../domain/assessments/atoms.ts";
-import { messageOf } from "../../lib/error-message.ts";
+import { describeFailure } from "../../lib/user-feedback.ts";
 
 // El diálogo de la decisión 19d: lo primero que se ve al arrancar la aplicación si hay un examen a
 // medias. Es también la llave de la puerta cerrada (decisión 18): elijas lo que elijas, sales del
@@ -39,7 +39,8 @@ export function ResumeExamDialog({
       // refresca solo y App vuelve a la aplicación normal.
       await abandon({ artifactId, attemptId });
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "cancel" }, "ResumeExamDialog");
+      setError(notice.description ?? notice.title);
       setBusy(false);
     }
   };

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { conversationsQuery, createConversationAction, deleteConversationAction } from "../domain/tutor/atoms.ts";
-import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 
 // Varias conversaciones, con lista, guardadas en el servidor (fase 4, decisión 6).
 export function ConversationList({
@@ -31,7 +31,8 @@ export function ConversationList({
       const conversation = await createConversation();
       onCreated(conversation.id);
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "chat", action: "create" }, "ConversationList");
+      setError(notice.description ?? notice.title);
     } finally {
       setCreating(false);
     }
@@ -49,7 +50,8 @@ export function ConversationList({
         await create();
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "chat", action: "delete" }, "ConversationList");
+      setError(notice.description ?? notice.title);
     } finally {
       setDeletingId(null);
     }
@@ -72,7 +74,10 @@ export function ConversationList({
 
       {AsyncResult.matchWithError(conversations, {
         onInitial: () => <p className="text-muted text-sm">Cargando conversaciones…</p>,
-        onError: (cause) => <p className="text-danger-ink text-sm">{messageOf(cause)}</p>,
+        onError: (cause) => {
+          const notice = describeFailure(cause, { area: "chat", action: "list" }, "ConversationList");
+          return <p className="text-danger-ink text-sm">{notice.title} {notice.description}</p>;
+        },
         onDefect: () => <p className="text-danger-ink text-sm">{DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => value.length === 0
           ? <p className="text-muted text-sm">Aún no hay conversaciones.</p>

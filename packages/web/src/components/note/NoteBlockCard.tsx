@@ -6,7 +6,7 @@ import { rewriteBlockAction } from "../../domain/artifacts/atoms.ts";
 import { BlockCitation } from "./BlockCitation.tsx";
 import { BlockEditor } from "./BlockEditor.tsx";
 import type { DraftBlock } from "./draft.ts";
-import { messageOf } from "../../lib/error-message.ts";
+import { describeFailure } from "../../lib/user-feedback.ts";
 
 interface NoteBlockCardProps {
   readonly block: DraftBlock;
@@ -58,7 +58,8 @@ export function NoteBlockCard({
       const result = await rewrite({ id: artifactId, blockId: block.id, mode });
       setProposal(result);
     } catch (cause) {
-      setRewriteError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "notes", action: "generate" }, "NoteBlockCard");
+      setRewriteError(notice.description ?? notice.title);
     } finally {
       setRewriting(null);
     }
