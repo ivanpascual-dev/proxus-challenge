@@ -334,6 +334,35 @@ test("si el modelo siempre devuelve preguntas rotas, la generación falla y no g
   assert.equal(store.length, 0);
 });
 
+// C5-06: un truncado por el techo de salida NO es insuficiencia de contenido (decisión 9). Mantiene
+// los reintentos y, al agotarlos sin completar, hace fallar la generación entera sin guardar nada,
+// con un motivo que nombra `finishReason: length`. Es el par del caso "JSON roto" de arriba.
+test("si el modelo se corta por el techo de salida (finishReason: length), la generación falla sin guardar", async () => {
+  const store: Artifact[] = [];
+  const truncatedModel = () => Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([
+        Response.makePart("text", { text: JSON.stringify({ questions: [] }) }),
+        Response.makePart("finish", {
+          reason: "length",
+          usage: new Response.Usage({
+            inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: undefined, text: undefined, reasoning: undefined }
+          }),
+          response: undefined
+        })
+      ]),
+      streamText: () => Stream.empty
+    })
+  );
+  await assert.rejects(
+    generateWithModel(quizInput, store, truncatedModel()),
+    (error: unknown) => /finishReason: length/.test((error as { reason: string }).reason)
+  );
+  assert.equal(store.length, 0);
+});
+
 // C5-05/C5-06: solo una insuficiencia declarada autoriza una prueba parcial; el formato antiguo sin
 // preguntas materializadas contribuye cero, y si es el único tema, la prueba entera no se guarda.
 test("marcador antiguo cuya materialización tampoco produce nada: el tema aporta cero y, al ser el único, no se guarda nada", async () => {
