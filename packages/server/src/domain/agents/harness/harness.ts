@@ -2,6 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import * as AgentCli from "./cli.ts";
 import type { AgentSkill } from "./skill.ts";
+import { renderSystemPrompt, skillsHelp } from "./system-prompt.ts";
 
 const LoadSkill = Tool.make("load_skill", {
   description: "Load the full instructions for a listed skill by name.",
@@ -26,7 +27,6 @@ export const AgentToolkit = Toolkit.make(LoadSkill, Cli);
 export type AgentToolkit = typeof AgentToolkit;
 
 export interface AgentHarness {
-  readonly name: string;
   readonly toolkit: AgentToolkit;
   readonly layer: Layer.Layer<Tool.HandlersFor<AgentToolkit["tools"]>>;
   readonly systemPrompt: string;
@@ -36,8 +36,11 @@ export interface AgentHarness {
 }
 
 export const AgentHarness = {
+  // La plantilla es del agente entero, con `{{SKILLS}}` donde quiere el catálogo (fase 4, sección
+  // 4.1): un agente sin catálogo de skills no es un agente degradado, es uno que no puede trabajar,
+  // y `renderSystemPrompt` falla al construir en vez de dejarlo para producción.
   make: (spec: {
-    readonly name: string;
+    readonly systemPromptTemplate: string;
     readonly skills: readonly AgentSkill[];
     readonly commands?: readonly AgentCli.Command[];
   }): AgentHarness => {
@@ -49,20 +52,12 @@ export const AgentHarness = {
         findSkill(name)?.content ?? unknownSkillHelp(name, spec.skills)
       );
 
-    const systemPrompt = `${spec.name}
-
-You have access to a CLI tool. Use --help when you need command usage, subcommands, or examples.
-
-Available skills:
-${skillsHelp(spec.skills)}
-
-You initially only know skill names and short descriptions.
-Skills are not tools and their names are not callable functions.
-When a task matches a skill description, call the load_skill tool with the skill name, for example { "name": "use-uploaded-materials" }.
-Skill text may describe workflows, conventions, examples, or tools available elsewhere in the harness.`;
+    const systemPrompt = renderSystemPrompt({
+      template: spec.systemPromptTemplate,
+      skills: spec.skills
+    });
 
     return {
-      name: spec.name,
       toolkit: AgentToolkit,
       layer: AgentToolkit.toLayer({
         load_skill: ({ name }) => loadSkill(name),
@@ -77,9 +72,6 @@ Skill text may describe workflows, conventions, examples, or tools available els
     };
   }
 };
-
-const skillsHelp = (skills: readonly AgentSkill[]) =>
-  skills.map((skill) => `- ${skill.name}: ${skill.description}`).join("\n");
 
 const unknownSkillHelp = (name: string, skills: readonly AgentSkill[]) =>
   `Unknown skill: ${name}\n\nAvailable skills:\n${skillsHelp(skills)}`;

@@ -1,7 +1,10 @@
 import { Effect, Queue, Stream } from "effect";
-import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai";
+import { LanguageModel, Prompt, Tool } from "effect/unstable/ai";
 import type { AgentHarness, AgentToolkit } from "./harness.ts";
 import { isMaterialPageImages } from "../../materials/material.ts";
+import { degradeHistory } from "./message-degrade.ts";
+import { dedupeSkillLoads } from "./skill-dedup.ts";
+import { extractFollowUp } from "./follow-up.ts";
 import { AgentMessage, type AgentMessage as AgentMessageType } from "./message.ts";
 
 export interface AgentSessionRunOptions {
@@ -13,10 +16,39 @@ export interface AgentSessionRunInput extends AgentSessionRunOptions {
   readonly messages?: readonly AgentMessageType[];
 }
 
+// La observabilidad por paso (fase 4, decisión 7). `usage` deja sus campos sin definir cuando el
+// modelo no trajo `usageMetadata`: nunca se pinta un cero que finja ser un dato (invariante 3).
+export interface AgentSessionStepUsage {
+  readonly inputTokens?: number | undefined;
+  readonly cachedInputTokens?: number | undefined;
+  readonly outputTokens?: number | undefined;
+}
+
+export interface AgentSessionStepToolCall {
+  readonly name: string;
+  readonly input: unknown;
+}
+
+export interface AgentSessionStepError {
+  readonly message: string;
+  readonly at: string;
+}
+
+export interface AgentSessionStep {
+  readonly index: number;
+  readonly usage: AgentSessionStepUsage;
+  readonly toolCalls: readonly AgentSessionStepToolCall[];
+  readonly error?: AgentSessionStepError | undefined;
+}
+
 export interface AgentSessionRunResult {
   readonly output: string;
+  // Ya degradadas (palanca 1): lo único que se debe persistir o reenviar en turnos futuros.
   readonly newMessages: readonly AgentMessageType[];
   readonly messages: readonly AgentMessageType[];
+  readonly steps: readonly AgentSessionStep[];
+  // Decisión 8: recortadas del texto del modelo por `extractFollowUp`, nunca completadas.
+  readonly followUpQuestions: readonly string[];
 }
 
 export interface AgentSession {
@@ -26,12 +58,19 @@ export interface AgentSession {
   readonly stream: (
     input: AgentSessionRunInput
   ) => Stream.Stream<AgentMessageType, unknown, LanguageModel.LanguageModel | Tool.HandlersFor<AgentToolkit["tools"]>>;
+  // Como `run`, pero con un callback para vivir en directo los mensajes según se producen: es lo que
+  // usa el endpoint NDJSON del tutor para además guardar el turno cerrado (§4.2, tramo 4C).
+  readonly runTurn: (
+    input: AgentSessionRunInput,
+    onMessage: (message: AgentMessageType) => Effect.Effect<void>
+  ) => Effect.Effect<AgentSessionRunResult, unknown, LanguageModel.LanguageModel | Tool.HandlersFor<AgentToolkit["tools"]>>;
 }
 
 export const AgentSession = {
   make: (harness: AgentHarness): AgentSession => ({
     run: (input) => run(harness, input),
-    stream: (input) => stream(harness, input)
+    stream: (input) => stream(harness, input),
+    runTurn: (input, onMessage) => execute(harness, input, onMessage)
   }),
   run,
   stream
@@ -68,11 +107,22 @@ function execute(
     const toolkit = yield* harness.toolkit;
     const previousMessages = input.messages ?? [];
     const newMessages: AgentMessageType[] = [];
+    const steps: AgentSessionStep[] = [];
     const allMessages = () => [...previousMessages, ...newMessages] as const;
     const appendMessage = (message: AgentMessageType): Effect.Effect<void> => Effect.gen(function* () {
       newMessages.push(message);
       yield* emit(message);
     });
+    const close = (output: string, followUpQuestions: readonly string[] = []): AgentSessionRunResult => {
+      const degradedNewMessages = degradeHistory(newMessages);
+      return {
+        output,
+        newMessages: degradedNewMessages,
+        messages: [...previousMessages, ...degradedNewMessages],
+        steps,
+        followUpQuestions
+      };
+    };
 
     yield* appendMessage(AgentMessage.user(input.input));
 
@@ -80,17 +130,42 @@ function execute(
     const maxSteps = input.maxSteps;
 
     for (let step = 0; step < maxSteps; step++) {
-      const prompt = renderPrompt(harness.systemPrompt, allMessages());
-      const response: LanguageModel.GenerateTextResponse<AgentToolkit["tools"]> = yield* LanguageModel.generateText({
+      const prompt = renderPrompt(harness.systemPrompt, dedupeSkillLoads(allMessages()));
+      const outcome = yield* LanguageModel.generateText({
         prompt,
         toolkit,
         toolChoice: "auto" as const
       }).pipe(
         Effect.matchEffect({
-          onFailure: (error) => Effect.succeed(modelErrorResponse(error)),
-          onSuccess: (response) => Effect.succeed(response)
+          onFailure: (error) => Effect.succeed({ ok: false as const, error }),
+          onSuccess: (response) => Effect.succeed({ ok: true as const, response })
         })
       );
+
+      if (!outcome.ok) {
+        // Decisión 7: el fallo del modelo se registra en el paso y acaba el turno, tal cual. Ya no
+        // se disfraza de mensaje del asistente que finge ser una respuesta.
+        const message = formatAgentError(outcome.error);
+        steps.push({
+          index: step,
+          usage: {},
+          toolCalls: [],
+          error: { message, at: new Date().toISOString() }
+        });
+        return close(message);
+      }
+
+      const response: LanguageModel.GenerateTextResponse<AgentToolkit["tools"]> = outcome.response;
+      const usage = response.usage;
+      steps.push({
+        index: step,
+        usage: {
+          inputTokens: usage.inputTokens.total,
+          cachedInputTokens: usage.inputTokens.cacheRead,
+          outputTokens: usage.outputTokens.total
+        },
+        toolCalls: response.toolCalls.map((toolCall) => ({ name: toolCall.name, input: toolCall.params }))
+      });
 
       for (const toolCall of response.toolCalls) {
         yield* appendMessage(AgentMessage.toolCall(toolCall.name, toolCall.params));
@@ -101,37 +176,24 @@ function execute(
       }
 
       if (response.toolResults.length === 0) {
-        const output = response.text.length > 0 ? response.text : lastToolResult;
+        const rawOutput = response.text.length > 0 ? response.text : lastToolResult;
+        const { text: output, questions } = extractFollowUp(rawOutput);
         yield* appendMessage(AgentMessage.assistant(output));
-        return {
-          output,
-          newMessages,
-          messages: allMessages()
-        };
+        return close(output, questions);
       }
 
       lastToolResult = String(response.toolResults.at(-1)?.result ?? lastToolResult);
     }
 
-    const output = lastToolResult.length > 0
+    const rawOutput = lastToolResult.length > 0
       ? lastToolResult
       : "Agent stopped after reaching the maximum number of steps.";
+    const { text: output, questions } = extractFollowUp(rawOutput);
     yield* appendMessage(AgentMessage.assistant(output));
 
-    return {
-      output,
-      newMessages,
-      messages: allMessages()
-    };
+    return close(output, questions);
   });
 }
-
-const modelErrorResponse = (error: unknown): LanguageModel.GenerateTextResponse<AgentToolkit["tools"]> =>
-  new LanguageModel.GenerateTextResponse([
-    Response.makePart("text", {
-      text: `I hit an internal model/tool-routing error, so I stopped this turn safely instead of crashing the app.\n\n${formatAgentError(error)}`
-    })
-  ]);
 
 const formatAgentError = (error: unknown) => {
   if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
@@ -172,6 +234,17 @@ const renderMessage = (message: AgentMessageType): Prompt.MessageEncoded => {
     case "tool-result":
       if (!message.isFailure && isMaterialPageImages(message.result)) {
         const result = message.result;
+
+        // Palanca 1: un resultado degradado (turno cerrado, sin `data`) se describe en texto, nunca
+        // se intenta adjuntar de nuevo. Sin esta rama se le mandaría a Gemini un `file` con
+        // `data: undefined`, porque el tipo del guarda no distingue el caso degradado.
+        if ("omitted" in result && result.omitted === true) {
+          return {
+            role: "user",
+            content: `Tool result ${message.name}: pages ${result.pages.map((page) => page.page).join(", ")} from ${result.material.title} were shown earlier and are no longer attached (their image expired at the end of that turn). Call materials view again if you need to look at them.`
+          };
+        }
+
         const noticeText = result.notice === undefined ? "" : ` ${result.notice}`;
         return {
           role: "user",

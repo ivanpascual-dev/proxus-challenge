@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "note": "Fixture versionado de la eval de generación de preguntas (tramo 4F, paso 18). Cada tema trae su texto fuente embebido para que la eval sea autónoma. La eval genera `questionCount` preguntas de opción única por tema y, por cada una, la contesta dos veces: con solo el enunciado y las opciones, y añadiendo este texto fuente como fragmento citado. Mide la diferencia de acierto entre las dos, nunca la cifra absoluta (en opción única el azar ya acierta el 25 %).",
+  "topics": [
+    {
+      "id": "so-planificacion",
+      "label": "Planificación de procesos en sistemas operativos",
+      "pages": [88, 89, 90],
+      "questionCount": 4,
+      "sourceText": "El planificador de la CPU decide a qué proceso listo se le concede el procesador. En la planificación apropiativa (preemptive) el sistema puede retirar la CPU a un proceso en ejecución, por ejemplo al agotarse su cuanto de tiempo o al llegar un proceso de mayor prioridad; en la no apropiativa, el proceso conserva la CPU hasta que se bloquea o termina. El algoritmo Round Robin asigna a cada proceso un cuanto fijo, típicamente de entre 10 y 100 milisegundos, y forma una cola circular: un cuanto muy pequeño multiplica el coste de los cambios de contexto, y uno muy grande degenera en FCFS (primero en llegar, primero en servirse). Shortest Job First minimiza el tiempo medio de espera, pero puede provocar inanición de los procesos largos si no dejan de llegar procesos cortos. La planificación por colas multinivel con realimentación mueve un proceso a una cola de menor prioridad cada vez que consume su cuanto entero, y lo promociona si lleva mucho tiempo esperando, de forma que los procesos interactivos, que se bloquean pronto por E/S, se quedan en las colas rápidas."
+    },
+    {
+      "id": "derecho-nulidad",
+      "label": "Nulidad y anulabilidad del contrato",
+      "pages": [204, 205],
+      "questionCount": 4,
+      "sourceText": "El contrato nulo de pleno derecho no produce efecto alguno desde el origen: la nulidad opera de forma automática, puede apreciarla el juez de oficio, la puede alegar cualquier interesado y la acción no prescribe. Son causas de nulidad la ausencia de un elemento esencial (consentimiento, objeto o causa), la infracción de una norma imperativa y la ilicitud de la causa. El contrato anulable, en cambio, produce efectos mientras no se impugne: solo puede pedir la anulación la parte protegida por la norma, la acción caduca a los cuatro años y el contrato puede sanarse por confirmación, expresa o tácita, una vez que cesa el vicio. Son causas de anulabilidad los vicios del consentimiento (error, dolo, violencia o intimidación) y la falta de capacidad de obrar plena. Declarada la nulidad o la anulación, las partes deben restituirse recíprocamente lo recibido, con sus frutos e intereses."
+    },
+    {
+      "id": "estudio-parametros",
+      "label": "Protocolo del estudio longitudinal de hábitos de estudio (2021-2024)",
+      "pages": [312, 313, 314],
+      "questionCount": 4,
+      "sourceText": "El estudio siguió a 1.842 estudiantes de segundo curso de seis universidades durante seis semestres. Cada participante registró sus sesiones de estudio en una aplicación que exigía un mínimo de 15 minutos por sesión para contabilizarla; las sesiones separadas por menos de 5 minutos se fusionaban en una sola. La variable dependiente principal fue la nota media ponderada al final de cada semestre, en una escala de 0 a 10. El grupo que estudió en bloques distribuidos (al menos tres días distintos por tema) obtuvo una media de 7,4 frente a 6,1 del grupo que concentró el estudio en las 48 horas previas al examen, una diferencia estadísticamente significativa (p < 0,01). El efecto se mantuvo tras controlar por nota de acceso y horas totales de estudio. La tasa de abandono del registro fue del 23 % y se concentró en el primer semestre. Los autores advierten de que el diseño es observacional y no permite descartar del todo un sesgo de autoselección: los estudiantes más organizados podrían tender a la vez a distribuir el estudio y a rendir mejor por otras razones."
+    }
+  ]
+}

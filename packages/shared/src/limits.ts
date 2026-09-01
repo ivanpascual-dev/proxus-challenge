@@ -1,12 +1,31 @@
 export const LIMITS = {
   // Tamaño de entrada
   maxMessageCharacters: 2_000,
+  // Su razón de ser era el `@` manual de contexto, que queda fuera de alcance en la fase 4 (decisión
+  // 1). Sin él no hay texto pegado que limitar: no aplica, y se deja documentado en vez de fingir que
+  // se cumple (riesgo 8 de la fase 4).
   maxPastedCharactersPerTurn: 12_000,
-  maxHistoryMessages: 400,
-  maxHistoryCharacters: 200_000,
+  // Fusible de coste sobre la conversación entera (no del turno individual, eso ya lo hacen
+  // `maxMessageCharacters`/`maxAgentSteps`): techo sobre el tamaño real y medido del historial
+  // guardado, tomado de los tokens de entrada reales del último paso del último turno, nunca
+  // estimado (invariante 3). Al 75% se avisa en el propio turno; al 100% el turno siguiente se
+  // rechaza antes de llamar al modelo, sugiriendo empezar una conversación nueva (decisión de Iván,
+  // 2026-08-31).
+  maxConversationHistoryTokens: 80_000,
   maxBlockCharacters: 5_000,
   maxUploadBytes: 25 * 1024 * 1024,
   maxMaterials: 5,
+  maxFilesPerUpload: 5,
+  // El máximo simultáneo que la interfaz puede mostrar hoy: un material, el artefacto de su pestaña
+  // activa (apunte o prueba) y un bloque resaltado dentro de él (`MaterialPanel.tsx`, pestañas
+  // mutuamente excluyentes sobre un único material).
+  maxContextRefs: 3,
+  maxConversations: 50,
+  maxConversationTitleCharacters: 80,
+  followUpQuestions: 3,
+  // Medido sobre la conversación real de cierre de fase 4: preguntas específicas y útiles llegaron
+  // a 125 y 165 caracteres. 120 las descartaba aunque el prompt nunca había comunicado ese techo.
+  maxFollowUpQuestionCharacters: 200,
 
   // Coste por turno
   maxPagesPerTurn: 20,
@@ -18,7 +37,14 @@ export const LIMITS = {
   messagesPerDay: { limit: 200, windowMs: 24 * 60 * 60 * 1000 },
   artifactsPerWindow: { limit: 5, windowMs: 10 * 60 * 1000 },
   artifactsPerDay: { limit: 40, windowMs: 24 * 60 * 60 * 1000 },
+  // Documentos por día (fase 4, decisión 4). No es lo mismo que `maxMaterials`: este frena la
+  // FRECUENCIA de subidas (el bucle subir-borrar-subir para explotar la gracia de alta), no cuántos
+  // materiales hay vivos a la vez.
+  uploadsPerWindow: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
+  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` en su primer indexado y su
+  // primera generación de apuntes, porque subir ya se cobró contra `uploadsPerWindow` (fase 4, decisión 4).
+  uploadGraceMs: 10 * 60 * 1000,
 
   // Pruebas (fase 3)
   // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.
@@ -69,7 +95,17 @@ export const LIMITS = {
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)
   jsonModelTemperature: 0, // camino JSON (generación de preguntas y juez): 0 para corregir igual dos veces (ADR-008, capa 4)
-  maxModelOutputTokens: 8_192,
+  // El techo de salida es el fusible contra una salida desbocada, no un control de coste: se paga por
+  // lo generado, no por el techo (fase 4, sección 4.2). Cada valor es el doble del caso peor calculado
+  // de ese camino, pensamiento incluido donde lo lleve, sin pasar del límite del modelo (65.536).
+  modelOutputTokens: {
+    tutor: 4_096, // respuesta larga (~1.500) + bloque de seguimiento (~200)
+    indexing: 4_096, // maxIndexedCharactersPerPage (8.000 caracteres) ≈ 2.500
+    note: 4_096, // medido: 842 de salida + 1.602 de pensamiento = 2.444
+    quiz: 8_192, // 8 preguntas × ~200 = 1.600
+    test: 16_384, // 30 preguntas × ~200 = 6.000, + ~1.600 de pensamiento = 7.600
+    judge: 4_096 // criterios y comentario (~1.000) + ~1.600 de pensamiento
+  },
 
   // Tiempo
   modelCallTimeoutMs: 60_000,

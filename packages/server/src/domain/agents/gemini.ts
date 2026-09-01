@@ -19,12 +19,35 @@ const GeminiPart = Schema.Struct({
   functionCall: Schema.optional(FunctionCall)
 });
 
+// §4.2 del plan de fase 4: campos verificados contra la API real. Todos opcionales porque
+// `usageMetadata` (y `cacheTokensDetails` dentro de él) solo aparece cuando hay algo que contar.
+const GeminiTokensDetail = Schema.Struct({
+  modality: Schema.optional(Schema.String),
+  tokenCount: Schema.optional(Schema.Number)
+});
+
+const GeminiUsageMetadata = Schema.Struct({
+  promptTokenCount: Schema.optional(Schema.Number),
+  candidatesTokenCount: Schema.optional(Schema.Number),
+  totalTokenCount: Schema.optional(Schema.Number),
+  thoughtsTokenCount: Schema.optional(Schema.Number),
+  cachedContentTokenCount: Schema.optional(Schema.Number),
+  promptTokensDetails: Schema.optional(Schema.Array(GeminiTokensDetail)),
+  cacheTokensDetails: Schema.optional(Schema.Array(GeminiTokensDetail)),
+  serviceTier: Schema.optional(Schema.String)
+});
+type GeminiUsageMetadata = typeof GeminiUsageMetadata.Type;
+
+const GeminiCandidate = Schema.Struct({
+  content: Schema.optional(Schema.Struct({
+    parts: Schema.optional(Schema.Array(GeminiPart))
+  })),
+  finishReason: Schema.optional(Schema.String)
+});
+
 const GeminiResponse = Schema.Struct({
-  candidates: Schema.optional(Schema.Array(Schema.Struct({
-    content: Schema.optional(Schema.Struct({
-      parts: Schema.optional(Schema.Array(GeminiPart))
-    }))
-  })))
+  candidates: Schema.optional(Schema.Array(GeminiCandidate)),
+  usageMetadata: Schema.optional(GeminiUsageMetadata)
 });
 
 type GeminiPart = typeof GeminiPart.Type;
@@ -209,11 +232,26 @@ const toolConfig = (options: LanguageModel.ProviderOptions) => {
 // veces. No es composición exótica: es el mismo adaptador con otra configuración.
 export interface GeminiGenerationConfig {
   readonly temperature: number;
+  readonly maxOutputTokens: number;
   readonly responseMimeType?: string;
+  // Nivel de pensamiento de Gemini 3 (`generationConfig.thinkingConfig.thinkingLevel`, verificado
+  // contra la API real). Ausente = sin pensamiento. Hoy solo lo fijan las capas de las evals de
+  // generación (tramo 4F); el enrutado por camino en producción y el nivel final de cada uno se
+  // deciden en el tramo 4G con el resultado de esas evals (decisión 14).
+  readonly thinkingConfig?: { readonly thinkingLevel: "low" | "high" };
 }
 
-const DEFAULT_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.modelTemperature };
-const JSON_GENERATION: GeminiGenerationConfig = { temperature: LIMITS.jsonModelTemperature, responseMimeType: "application/json" };
+// Cada capa de producción con su techo por camino (§4.2, cableado en el tramo 4G): el tutor con el
+// suyo, y `JSON_GENERATION` (la capa "Control") con el de `quiz`, no ya con el del tutor.
+const DEFAULT_GENERATION: GeminiGenerationConfig = {
+  temperature: LIMITS.modelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.tutor
+};
+const JSON_GENERATION: GeminiGenerationConfig = {
+  temperature: LIMITS.jsonModelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.quiz,
+  responseMimeType: "application/json"
+};
 
 const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiGenerationConfig) => ({
   systemInstruction: promptSystemInstruction(options.prompt),
@@ -222,16 +260,58 @@ const requestBody = (options: LanguageModel.ProviderOptions, generation: GeminiG
   toolConfig: toolConfig(options),
   generationConfig: {
     temperature: generation.temperature,
-    maxOutputTokens: LIMITS.maxModelOutputTokens,
-    ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType })
+    maxOutputTokens: generation.maxOutputTokens,
+    ...(generation.responseMimeType === undefined ? {} : { responseMimeType: generation.responseMimeType }),
+    ...(generation.thinkingConfig === undefined ? {} : { thinkingConfig: generation.thinkingConfig })
   }
 });
 
 const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>
   parts.find((part) => part.functionCall?.name !== undefined)?.functionCall;
 
-const decodeGeminiResponse = (json: unknown) =>
+// Exportadas para el test: puras, sin fetch ni Config, así se prueban con `node:test` sin necesidad
+// de una clave de API ni de simular la llamada de red entera.
+export const decodeGeminiResponse = (json: unknown) =>
   Schema.decodeUnknownSync(GeminiResponse)(json);
+
+// Mapeo del plan §4.2: `inputTokens.total` ← `promptTokenCount`; `inputTokens.cacheRead` ←
+// `cachedContentTokenCount`; `inputTokens.uncached` ← `promptTokenCount - (cachedContentTokenCount ?? 0)`;
+// `outputTokens.total` ← `candidatesTokenCount`; `outputTokens.reasoning` ← `thoughtsTokenCount`.
+// Sin `usageMetadata`, todos los campos quedan `undefined`: invariante 3, nunca se pinta un cero
+// donde no hay dato (F4-19).
+export const toUsage = (usage: GeminiUsageMetadata | undefined) =>
+  new Response.Usage({
+    inputTokens: {
+      uncached: usage?.promptTokenCount === undefined
+        ? undefined
+        : usage.promptTokenCount - (usage.cachedContentTokenCount ?? 0),
+      total: usage?.promptTokenCount,
+      cacheRead: usage?.cachedContentTokenCount,
+      cacheWrite: undefined
+    },
+    outputTokens: {
+      total: usage?.candidatesTokenCount,
+      text: undefined,
+      reasoning: usage?.thoughtsTokenCount
+    }
+  });
+
+// Solo los dos motivos que el plan necesita distinguir (riesgo 10: una salida cortada por el techo
+// de tokens no puede leerse como "el tema no daba"). El resto de motivos de Gemini caen en "other",
+// que es justo lo que ese valor de `FinishReason` significa: un motivo real que este protocolo no
+// nombra, no lo mismo que "unknown" (el proveedor no dio ninguno).
+export const toFinishReason = (reason: string | undefined): Response.FinishReason => {
+  switch (reason) {
+    case "STOP":
+      return "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case undefined:
+      return "unknown";
+    default:
+      return "other";
+  }
+};
 
 const toResponseParts = (
   parts: ReadonlyArray<GeminiPart>,
@@ -299,7 +379,15 @@ const makeGeminiLanguageModel = (generation: GeminiGenerationConfig) => Layer.ef
             }
 
             const json = decodeGeminiResponse(await response.json());
-            return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
+            const candidate = json.candidates?.[0];
+            return [
+              ...toResponseParts(candidate?.content?.parts ?? [], options.tools),
+              Response.makePart("finish", {
+                reason: toFinishReason(candidate?.finishReason),
+                usage: toUsage(json.usageMetadata),
+                response: undefined
+              })
+            ];
           },
           catch: (cause) =>
             cause instanceof Error && cause.name === "TimeoutError"
@@ -313,13 +401,94 @@ const makeGeminiLanguageModel = (generation: GeminiGenerationConfig) => Layer.ef
 
 export const GeminiLanguageModelLive = makeGeminiLanguageModel(DEFAULT_GENERATION);
 
-// El mismo adaptador con `responseMimeType: "application/json"` y temperatura 0 (§6.7.1). Se provee
-// con `Effect.provide` en el punto de llamada de la generación de preguntas y del juez; el arnés del
-// tutor sigue con `GeminiLanguageModelLive`, porque ahí hay llamadas a herramientas y forzar JSON las
-// rompería. `responseSchema` se deja para después de medir: con el mime type ya se acaban las vallas
-// de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se queda: el
-// modo JSON forzado reduce los fallos, no los elimina.
+// El mismo adaptador con `responseMimeType: "application/json"` y temperatura 0 (§6.7.1); el arnés
+// del tutor sigue con `GeminiLanguageModelLive`, porque ahí hay llamadas a herramientas y forzar JSON
+// las rompería. `responseSchema` se deja para después de medir: con el mime type ya se acaban las
+// vallas de markdown y el texto alrededor, que es la mayoría del problema. El parseo defensivo se
+// queda: el modo JSON forzado reduce los fallos, no los elimina.
+//
+// Camino "Control" (`quiz`): temperatura JSON, formato JSON forzado, sin pensamiento (decisión 14: es
+// el camino de más volumen, `maxQuizzesPerTopic: 2` por tema, y es práctica), techo de quiz (§4.2).
 export const GeminiJsonLanguageModelLive = makeGeminiLanguageModel(JSON_GENERATION);
+
+// --- fábricas parametrizadas por nivel de pensamiento -------------------------------------------
+//
+// Las usan `assessment-generation.eval.ts`, `note-generation.eval.ts` y `open-answer-judge.eval.ts`
+// (con `--thinking=`) para medir off/low/high antes de decidir. El techo de salida sale del mapa por
+// camino de `packages/shared`, que ya cuenta el pensamiento sumado a la salida (§4.2 del plan).
+
+export type ThinkingMode = "off" | "low" | "high";
+
+const thinkingConfigFor = (mode: ThinkingMode): Pick<GeminiGenerationConfig, "thinkingConfig"> =>
+  mode === "off" ? {} : { thinkingConfig: { thinkingLevel: mode } };
+
+// Camino "Examen" (`test`): temperatura JSON, formato JSON forzado, techo alto (§4.2).
+export const geminiAssessmentGenerationLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.jsonModelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.test,
+    responseMimeType: "application/json",
+    ...thinkingConfigFor(mode)
+  });
+
+// Camino "Apuntes" (`note`): temperatura de prosa, formato libre, techo del apunte (§4.2).
+export const geminiNoteGenerationLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.modelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.note,
+    ...thinkingConfigFor(mode)
+  });
+
+// Camino "Juez" (respuesta abierta): temperatura JSON, formato JSON forzado, techo del juez (§4.2).
+export const geminiJudgeLayer = (mode: ThinkingMode) =>
+  makeGeminiLanguageModel({
+    temperature: LIMITS.jsonModelTemperature,
+    maxOutputTokens: LIMITS.modelOutputTokens.judge,
+    responseMimeType: "application/json",
+    ...thinkingConfigFor(mode)
+  });
+
+// --- capas de producción por camino (tramo 4G, decisión 14 + paso 21) ---------------------------
+//
+// El nivel de pensamiento de cada camino se decidió corriendo `eval:assessments`, `eval:notes` y
+// `eval:judge --thinking=` dos veces cada una (antes y después de traducir los prompts a inglés,
+// paso 20). Resultado medido, con el detalle completo en notes/bitacora.md:
+//
+//   - Apuntes (`note`): "high" baja los términos traducidos de forma consistente en las DOS pasadas
+//     (2/3→1/3 en español, 1/3→0/3 en inglés) sin acercarse al techo de salida (pensamiento medido
+//     ~1.000-1.200 tok de 4.096 disponibles). Mejora visible y repetida: se queda con "high".
+//   - Examen (`test`): "high" mejora la diferencia con/sin material cuando no falla, pero revienta el
+//     techo de salida (`finishReason: "length"`) en 1 de 3 temas en LAS DOS pasadas, con un
+//     pensamiento que osciló entre 1,7k y 15,7k tokens en el mismo fixture: inestable e
+//     impredecible. "low" iguala o mejora a "sin pensamiento" en las dos pasadas (Δ 8% vs Δ 0-8%) con
+//     un pensamiento estable (~100-130 tok). Se queda con "low": el riesgo 10 (una salida cortada se
+//     lee como "el tema no daba" en vez de como lo que es) pesa más que un punto de diferencia que
+//     además no se sostiene entre pasadas.
+//   - Juez (respuesta abierta): ningún nivel mejora el acierto de forma visible sobre "sin
+//     pensamiento" (18/18 apagado en español; 17/18 en los tres modos tras traducir, con una caída
+//     REAL de parseo en "high" que "off" no tuvo). Paso 21: "si un camino no mejora de forma visible,
+//     se queda sin thinking: el que paga la duda es el coste". Desviación de la decisión 14 original
+//     ("Sí" para el juez), prevista por el propio paso 21: el resultado de la eval puede revertirla.
+const NOTE_THINKING: ThinkingMode = "high";
+const TEST_THINKING: ThinkingMode = "low";
+const JUDGE_THINKING: ThinkingMode = "off";
+
+// Camino "Indexación": temperatura JSON, formato JSON forzado, sin pensamiento (decisión 14: 261
+// páginas de una tirada, transcribir no se beneficia de razonar), techo de indexación (§4.2).
+export const GeminiIndexLanguageModelLive = makeGeminiLanguageModel({
+  temperature: LIMITS.jsonModelTemperature,
+  maxOutputTokens: LIMITS.modelOutputTokens.indexing,
+  responseMimeType: "application/json"
+});
+
+// Camino "Examen" (`test`), fijado al nivel decidido arriba.
+export const GeminiJsonThinkingLanguageModelLive = geminiAssessmentGenerationLayer(TEST_THINKING);
+
+// Camino "Juez", fijado al nivel decidido arriba (hoy "off": ver la nota de más arriba).
+export const GeminiJudgeLanguageModelLive = geminiJudgeLayer(JUDGE_THINKING);
+
+// Camino "Apuntes" (`note`), fijado al nivel decidido arriba.
+export const GeminiProseThinkingLanguageModelLive = geminiNoteGenerationLayer(NOTE_THINKING);
 
 export const GeminiModel = AiModel.make(
   "google",

@@ -12,34 +12,73 @@ En local:
 ### Tutor
 
 ```http
-POST /api/tutor/chat
-POST /api/tutor/chat/stream
+POST   /api/tutor/chat
+POST   /api/tutor/chat/stream
+GET    /api/tutor/conversations
+POST   /api/tutor/conversations
+GET    /api/tutor/conversations/:id
+DELETE /api/tutor/conversations/:id
 ```
 
-`/stream` devuelve NDJSON:
+La sesión vive en el servidor (fase 4, decisión 6): `POST /chat` y `/chat/stream` llevan
+`conversationId`, el turno nuevo (`input`) y el contexto de pantalla (`context`, un array de
+`ChatContextRef`), nunca el historial completo. Un alumno puede tener varias conversaciones, con un
+techo (`LIMITS.maxConversations`, 50); `POST /conversations` crea una vacía, `GET /conversations` las
+lista sin su historial (para la barra lateral), `GET /conversations/:id` trae una con sus turnos.
+
+`/stream` devuelve NDJSON (`TutorChatStreamEvent`, `packages/shared/src/api/tutor.ts`):
 
 ```json
 { "type": "message", "message": {} }
+{ "type": "follow-up", "questions": ["...", "...", "..."] }
+{ "type": "usage", "usage": {} }
+{ "type": "warning", "message": "..." }
+{ "type": "error", "message": "..." }
 { "type": "done" }
 ```
+
+`follow-up` trae las tres preguntas de seguimiento ya recortadas del texto (decisión 8); `usage` es el
+coste del paso tal como llega del modelo, sin inventar un cero cuando falta (invariante 3); `warning`
+avisa al 75% de `maxConversationHistoryTokens` sin cortar el turno; `error` es el fallo del modelo tal
+cual, no disfrazado de respuesta (decisión 7).
 
 La ruta streaming está implementada manualmente para soportar eventos incrementales.
 
 ### Materials
 
 ```http
-GET  /api/materials/
-GET  /api/materials/:id
-GET  /api/materials/:id/index
-GET  /api/materials/:id/assessments
-GET  /api/materials/:id/profile
-GET  /api/materials/:id/pages/:page
-POST /api/materials/:id/index
-POST /api/materials/:id/notes
-POST /api/materials/:id/assessments
+GET    /api/materials/
+POST   /api/materials/
+POST   /api/materials/validate
+GET    /api/materials/:id
+DELETE /api/materials/:id
+GET    /api/materials/:id/index
+GET    /api/materials/:id/assessments
+GET    /api/materials/:id/profile
+GET    /api/materials/:id/pages/:page
+POST   /api/materials/:id/index
+POST   /api/materials/:id/notes
+POST   /api/materials/:id/assessments
 ```
 
 Los materiales representan PDFs disponibles para el tutor. El server puede renderizar páginas vía Poppler para que Gemini las procese como imágenes.
+
+`POST /` sube hasta `maxFilesPerUpload` PDFs a la vez (multipart, `maxUploadBytes` por fichero), solo
+PDF (fase 4, decisión 2); al subir, cada material se indexa y se le generan los apuntes en cadena, sin
+pulsar nada más (decisión 3). El fallo de un fichero concreto (tipo, nombre duplicado) va dentro de la
+respuesta, uno por fichero; solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
+abortan la subida entera, antes de escribir nada.
+
+`POST /validate` (cierre de fase 4) comprueba el mismo lote (multipart, mismo `UploadPayload`) sin
+escribir nada: mismo sniff de cabecera + `pdfinfo` y misma comprobación de nombre duplicado que `POST
+/`, pero en modo consulta. La interfaz la llama sola al soltar los ficheros, antes de ofrecer el botón
+de subir de verdad; no comprueba `maxMaterials` (fallo agregado de `upload`) y no cuenta contra
+`uploadsPerWindow` (ese techo es de subidas reales, decisión 4).
+
+`DELETE /:id` borra el PDF y, en cascada, sus artefactos (apunte, Controles y Exámenes con sus
+intentos): dejarlos huérfanos era lo que producía el choque al resubir el mismo PDF, porque el
+`materialId` sale del nombre del fichero (ADR-011, ADR-024). La interfaz avisa de la pérdida antes de
+llamar; el servidor no vuelve a preguntar.
 
 `POST /:id/index` y `POST /:id/notes` devuelven NDJSON con el progreso. `/notes` genera los apuntes del
 material (un bloque por tema del índice, prosa redactada por el modelo) como un servicio del dominio

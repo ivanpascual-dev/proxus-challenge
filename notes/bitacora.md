@@ -732,3 +732,348 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
     movió porque necesita el perfil de estudio y `plan()`, que hoy no corren en `precheck`. Documentado
     en `docs/api.md`.
 - **280 tests en verde, los tres checks limpios**, tras todos los arreglos anteriores.
+
+## 2026-08-31 · Fase 4 · tramo 4A, línea base de tokens
+
+- **`scripts/measure-tokens.mjs` (nuevo, `pnpm measure:tokens`).** Reconstruye, paso a paso, las
+  llamadas que `session.ts` habría mandado a Gemini para un turno ya grabado en
+  `packages/server/.data/agent-sessions/`, y llama a la API real para leer `usageMetadata`. Es una
+  sonda aparte a propósito: hasta este tramo `gemini.ts` no decodificaba ese campo, así que el único
+  sitio de donde podían salir números reales era la API misma. Duplica (documentado en el propio
+  fichero, con aviso de que hay que actualizarlo en el tramo 4E) el prompt de sistema, las skills y
+  las dos declaraciones de herramientas tal cual están hoy.
+- **Línea base medida contra `verifier-f105b-1787938697.json`** (el caso flagship de la §1 del plan,
+  5 llamadas de agente en un turno): **38.881 tokens de entrada, 20.346 cacheados (52,3%), 331 de
+  salida**, 14,82 MB de peticiones sumadas. Detalle por paso:
+
+  | Paso | Entrada | Cacheados | Salida | Petición |
+  | --- | --- | --- | --- | --- |
+  | 0 (solo el user) | 456 | - | 20 | ~0 MB |
+  | 1 (+ load_skill) | 684 | - | 15 | ~0 MB |
+  | 2 (+ materials list) | 843 | - | 58 | ~0 MB |
+  | 3 (+ materials view, 12 páginas) | 14.033 | 8.120 | 28 | 5,66 MB |
+  | 4 (+ materials view, 8 páginas) | 22.865 | 12.226 | 210 | 9,15 MB |
+
+- **Hallazgo que responde al riesgo 4 del plan ("no está medido si la caché cubre las imágenes"): sí
+  las cubre.** Del paso 3 al 4 los tokens cacheados suben de 8.120 a 12.226 (+4.106) mientras el
+  prefijo compartido entre ambas llamadas incluye las 12 páginas de imagen del paso 3; si la caché
+  solo cubriera texto, ese salto no tendría de dónde salir. Dato a favor de que la palanca 1
+  (degradar imágenes a su descripción tras el turno) y la palanca 2 (caché implícita) son
+  complementarias como dice el plan, no redundantes.
+- **Discrepancia con la cifra de la §1 del plan (22,85 MB "en un turno"), anotada y no perseguida.**
+  Esta medición (reproducible, con guion versionado) da 14,82 MB de bytes de petición sumados para el
+  mismo turno, no 22,85 MB. La cifra del plan parece de una medición anterior, informal, hecha a mano;
+  la nueva sustituye a la vieja como referencia porque es la que se puede volver a correr igual. No se
+  ha investigado la diferencia porque no cambia ninguna decisión: el orden de magnitud (imágenes
+  reenviadas en cada llamada posterior del mismo turno) es el mismo, que es lo único de lo que
+  dependían las decisiones 1, 10 y 11.
+- **`gemini.ts`: `usageMetadata` en el esquema y parte `finish`.** `GeminiResponse` gana
+  `usageMetadata` (todos los campos opcionales: solo aparecen cuando hay algo que contar) y cada
+  `candidate` gana `finishReason`. `generateText` emite ahora
+  `Response.makePart("finish", { reason, usage })` con el mapeo de la §4.2 del plan. Sin
+  `usageMetadata`, todos los campos de `usage` quedan `undefined` (invariante 3: nunca se pinta un
+  cero donde no hay dato). `toUsage` y `toFinishReason` quedan exportadas y probadas en
+  `gemini.test.ts` (5 tests nuevos, sin red: fijan el mapeo con `usageMetadata` fabricado a mano, no
+  con una llamada real, que es lo que hace `measure-tokens.mjs`).
+- **285 tests en verde** (280 + 5 nuevos), los tres checks limpios.
+- **Pendiente de la fase**, no de este tramo: `session.ts` sigue sin acumular `usage` por paso ni
+  exponerlo (tramo 4C); el system prompt de este guion quedará desfasado en cuanto el tramo 4E entre
+  en vigor, y hay que actualizarlo entonces.
+
+## 2026-08-31 · Fase 4 · tramo 4B, contratos
+
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión: cómo conviven "varios ficheros por
+  subida" con "un fichero inválido no tumba a los demás" (F4-02).** El plan (§5) pedía el endpoint
+  `upload` con `UnsupportedFileType`, `MaterialAlreadyExists` y `TooManyMaterials` "mapeados, nunca
+  `orDie`", pero no decía por qué canal viaja cada uno. Se resolvió así: los fallos agregados
+  (`TooManyMaterials`, `LimitExceeded` de `maxFilesPerUpload`, `RateLimited` de `uploadsPerWindow`)
+  abortan la petición entera como error HTTP, antes de escribir nada; los fallos por fichero
+  (`UnsupportedFileType`, nombre duplicado con `MaterialAlreadyExists`) van dentro de la respuesta 200,
+  uno por fichero, en `MaterialUploadResult` (`schemas/material.ts`), sin abortar a los demás del
+  lote. No sube a ADR porque es la forma de un contrato HTTP ya acotado por F4-02/F4-03/F4-04, no una
+  decisión de producto nueva.
+- **Tramo deliberadamente a medias, como documenta el propio plan.** Con solo `packages/shared`
+  tocado, `pnpm run typecheck` (raíz) y `pnpm --filter @proxus/server run typecheck` quedan rotos
+  (`gemini.ts` sigue leyendo `LIMITS.maxModelOutputTokens`, que ya no existe; `tutor-chat-service.ts`,
+  `handlers.ts`, `server.ts` y `Chat.tsx` siguen con la forma vieja de `TutorChatRequest`/Response).
+  Es el mapa de los tramos 4C-4E, no una regresión de este commit.
+
+## 2026-08-31 · Fase 4 · tramo 4C, la sesión en el servidor
+
+- **D3 cierra de verdad, no solo de forma parcial.** El hueco conocido desde la fase 1 (ADR-008
+  barrera 3: un `tool-result` fabricado por el cliente podía colarse en el historial que se reenvía al
+  modelo) se cierra porque el contrato de `POST /api/tutor/chat` ya no tiene `messages`: no hay canal
+  por el que ese campo fabricado pueda entrar en la conversación guardada. `scripts/test-guardarrailes.mjs`
+  cambia D3 de "hueco conocido, no bloquea" a comprobar que el texto fabricado no aparece en la
+  conversación leída del servidor tras mandarlo. `D5` (historial por encima de
+  `maxHistoryMessages`) se retira: sin `messages` en la petición no hay nada que inundar desde ahí.
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión, ya no forma parte del plan escrito:
+  el fusible de coste sobre la conversación entera (ADR-023).** Surgió al preguntar Iván, tras cerrar
+  el resto del tramo 4C, qué pasaba con una conversación que no termina nunca. La bitácora guarda el
+  contexto: se consideró resumir o compactar el historial automáticamente al acercarse al techo (como
+  hacen otros agentes de código) y se descartó por sobre-ingeniería para este caso, prefiriendo que la
+  persona empiece una conversación nueva, que ya es gratis. El ADR guarda la decisión en sí
+  (`maxConversationHistoryTokens`, el 75%/100%, medir con datos reales).
+- **Deuda: el aviso al 75% solo está probado por unit test, no de punta a punta contra el servidor
+  real.** Verificarlo de punta a punta habría exigido fabricar un historial de texto real de decenas
+  de miles de caracteres para que un turno ejecutado de verdad devolviera un `inputTokens` medido por
+  encima del umbral; se consideró desproporcionado porque el aviso es solo informativo (no bloquea ni
+  gasta nada). El corte duro al 100% sí se verificó de punta a punta, fabricando a mano el
+  `inputTokens` del último turno guardado en el fichero de sesión (sin gastar una llamada real de
+  80.000 tokens contra Gemini). Se desbloquea, si algún día hace falta, con un guion que genere ese
+  historial largo de verdad.
+
+## 2026-08-31 · Fase 4 · borrar un material
+
+- **Decisión sobre la marcha, resuelta con Iván durante la sesión, no estaba en el plan escrito: borrar
+  un material se lleva sus artefactos en cascada, con aviso previo en la interfaz y sin confirmación
+  doble en el servidor.** Surgió al hablar de qué pasa, ahora que subir un PDF es una acción normal
+  desde la web, cuando alguien borra uno. ADR-011 ya se había topado con el problema y lo había dejado
+  abierto a propósito ("eso es independiente de esta decisión"): en fase 1 no había forma de borrar un
+  material, así que el huérfano era teórico. La bitácora guarda el contexto (por qué ahora sí hacía
+  falta resolverlo, y por qué se descartaron la papelera y la confirmación en servidor); el ADR-024
+  guarda la decisión en sí, y corrige el párrafo de ADR-011 que ya no era cierto.
+
+## 2026-08-31 · Fase 4 · tramo 4E, el agente que se ve
+
+- **`artifact-authoring.eval.ts` medida antes y después del tramo, para dar línea base al paso 19b
+  (tramo 4G).** El plan marca esta eval como obsoleta (riesgo #9) sin asignarle tramo; Iván decidió
+  dejar la reescritura para 19b pero pidió correrla hoy, antes de que el prompt y las skills se movieran
+  más, porque 19b necesita saber "cómo se comportaba antes" para medir el efecto de traducir los
+  prompts. Procedimiento: `git stash push -u` aislado a `academic-tutor.ts`, `academic-tutor/skills/` y
+  `harness/` (el eval llama al harness directo, sin pasar por `tutor-chat-service.ts`), eval corrida
+  contra ese estado pre-4E, `git stash pop`, eval corrida otra vez contra el estado post-4E. Las dos
+  salidas completas quedaron en el scratchpad de la sesión (no versionadas).
+  - **Los dos casos fallan en ambos estados, pero por razones distintas.** Antes de 4E: el tutor
+    autoraba el test entero pegado en el chat (el criterio `should-point-to-tab` falla porque no hay
+    ningún envío a pestaña que detectar) y la llamada a `artifacts list` fallaba por argumento mal
+    formado antes de nombrar el tema. Después de 4E: el tutor ya no reclama autoría y sí nombra el tema
+    con los datos reales del perfil, pero **los dos criterios que siguen fallando lo hacen por un
+    regex desalineado con el vocabulario y el nombre de pestaña actuales**, no por una regresión de
+    conducta: `should-point-to-tab` busca la palabra "Pruebas" y el modelo remite a "Controles"/
+    "Exámenes"; `should-name-topic-and-signal` para la señal "wrong" busca `fallaste|fallad|fallos|te
+    equivocaste` y el modelo dice "3 respuestas incorrectas". Es exactamente la foto que 19b necesita:
+    los cuatro criterios de hoy se conservan, pero su redacción hay que revisarla contra el
+    comportamiento real, no solo añadir los cuatro criterios nuevos del paso 19b.
+  - **Hallazgo colateral, relevante para el criterio de idioma/follow-up del propio 19b:** en una de las
+    corridas post-4E el modelo cerró la respuesta con `<<<FOLLOW-UP>>>` y las tres preguntas pero
+    **sin** el delimitador de cierre `<<<END FOLLOW-UP>>>`. `extractFollowUp` (decisión 8) exige el
+    bloque completo para no inventar nada, así que el texto crudo con el delimitador de apertura se
+    queda tal cual y **se ve en la respuesta al alumno**. Es el comportamiento correcto por diseño
+    (fail-safe: nunca completar un bloque mal formado), pero expone que el modelo a veces olvida el
+    cierre y hoy eso queda visible en pantalla en vez de invisible. No se ha arreglado en 4E (no estaba
+    en su alcance); queda para que 19b lo mida con más casos y decida si hace falta un reintento o un
+    prompt más insistente en el cierre del bloque.
+- **Ningún `ChatContextRef` de tipo `block` en esta fase.** El plan justifica `maxContextRefs: 3` con
+  "un bloque resaltado" dentro del contexto de pantalla, pero `NoteWorkspace.tsx` no tiene hoy ningún
+  concepto de bloque activo/resaltado (todos los bloques se muestran a la vez). Esa pieza de UI es el
+  rediseño de apuntes, ya anotado para después de cerrar las fases. El contrato ya soporta `block`;
+  `ChatContextBar` lo pintará el día que exista un origen real en la interfaz.
+- **`TurnCost` se construyó y se retiró en la misma fase.** Se implementó tal como pedía el paso 17 del
+  plan (mostrar el coste del turno en la interfaz), pero al probarlo Iván decidió que el coste en
+  tokens es un dato interno de logs/desarrolladores y nunca algo que el alumno vea en pantalla. Se
+  eliminó el componente y su estado (`lastUsage`) de `Chat.tsx`; el evento `usage` del stream NDJSON
+  se sigue consumiendo (se descarta explícitamente) por si algún día alimenta un log de servidor, pero
+  el cliente no lo renderiza. Guardado también en memoria del agente para no repetir el patrón en
+  futuras fases.
+
+## 2026-08-31 · Fase 4 · tramo 4F, evals de generación
+
+- **Desviación de plan, aprobada por Iván: el "thinking" de Gemini 3 se adelanta desde el tramo 4G,
+  pero solo el plumbing mínimo.** Las evals de los pasos 18 y 19 necesitan poder elegir off/low/high
+  para el paso 21 (decisión 14), y ese mecanismo no estaba agendado hasta 4G (§4.2 del plan: seis capas
+  con techo propio y `thinkingConfig`, enrutadas por `request.kind` en `server.ts:383`). Se preguntó a
+  Iván en la sesión y decidió construir solo lo que las evals necesitan hoy: `thinkingConfig?` opcional
+  en `GeminiGenerationConfig` y dos factories nuevas, `geminiAssessmentGenerationLayer(mode)` y
+  `geminiNoteGenerationLayer(mode)`, usadas exclusivamente por las dos evals. Las dos capas que ya
+  existían en producción (`GeminiLanguageModelLive`, `GeminiJsonLanguageModelLive`) quedan intactas: se
+  verificó que `DEFAULT_GENERATION`/`JSON_GENERATION` siguen fijando el mismo techo
+  (`LIMITS.modelOutputTokens.tutor`) que antes del cambio. El resto de §4.2 (cuatro capas más, el
+  enrutado real por camino, los techos por vía) sigue pendiente del tramo 4G, que decidirá con el
+  resultado de estas evals qué nivel de pensamiento lleva cada camino.
+
+## 2026-09-01 · Fase 4 · tramo 4G, idioma y medición final
+
+- **Incidencia de traducción (paso 20): dos prompts NO llevan la línea canónica.** `TRANSCRIPTION_PROMPT`
+  y `topicsPrompt()` (`indexing-prompts.ts`) son los dos únicos de los seis que no llevan "Write the
+  output in Spanish. Keep the material's own vocabulary untranslated." al principio de sus reglas. Su
+  propia regla de no-traducción dice lo contrario a propósito: "si la página/el material está en
+  inglés, se queda en inglés" (invariante 1). Añadir la línea canónica contradiría esa regla en el
+  mismo prompt (forzar salida en español sobre un `topicsPrompt()` de un material en inglés traduciría
+  justo lo que la invariante 1 prohíbe traducir). Anotado en el propio fichero
+  (`indexing-prompts.ts:9-13`) y aquí; no resuelto en solitario, queda para que Iván lo confirme al
+  cerrar el tramo: la lectura es que estos dos prompts están fuera del alcance de la decisión 9 por
+  diseño, no que falten por traducir.
+- **Regresión mecánica en `indexing-service.test.ts` tras traducir `TRANSCRIPTION_PROMPT` al inglés.**
+  El test "una página escasa se transcribe y su procedencia queda como transcribed" usaba un modelo
+  simulado que distinguía la llamada de transcripción de la de temas buscando la cadena literal
+  "transcriptor de páginas" dentro del prompt serializado. Al traducir el prompt esa cadena ya no
+  existe, así que el fake devolvía la respuesta de temas para la llamada de transcripción y la página
+  quedaba con `provenance: undefined`. No es una regresión de producto: se corrigió el detector del
+  test para buscar el fragmento en inglés ("transcriber of academic material pages"). `pnpm test`
+  quedó en 327/327 tras el arreglo (antes, 326/327, ese único fallo).
+- **`pnpm test` dio "Exit code 137" en un primer intento, sin salida.** Es un `SIGKILL` (137 = 128+9),
+  no un fallo de aserción. Al relanzarlo sin cambiar nada terminó normal. Se interpreta como
+  transitorio (presión de memoria u otro proceso del entorno), no como algo introducido por el tramo:
+  no se ha vuelto a ver.
+- **Decisión 14, con los datos del paso 21: qué nivel de pensamiento lleva cada camino.** `eval:notes`,
+  `eval:assessments` y `eval:judge --thinking=` corridas en off/low/high, dos veces cada una (antes y
+  después de traducir los prompts en el paso 20), para separar el efecto de la traducción del efecto
+  del pensamiento. Resultado (detalle completo, con el razonamiento, en el comentario de
+  `gemini.ts:451-471`):
+  - **Apuntes (`note`): "high".** Baja los términos traducidos de forma consistente en las dos pasadas
+    (2/3→1/3 en español, 1/3→0/3 en inglés), con un pensamiento medido de ~1.000-1.200 tokens sobre un
+    techo de 4.096: mejora visible y repetida, sin riesgo de tocar el techo.
+  - **Examen (`test`): "low", no "high" como asumía la decisión 14 original.** "high" mejora la
+    diferencia con/sin material cuando no falla, pero revienta el techo de salida
+    (`finishReason: "length"`) en 1 de 3 temas del fixture en LAS DOS pasadas, con un pensamiento que
+    osciló entre 1,7k y 15,7k tokens en el mismo fixture (inestable, no un caso aislado). "low" iguala o
+    mejora a "sin pensamiento" en las dos pasadas (Δ 8% vs Δ 0-8%) con un pensamiento estable
+    (~100-130 tokens). Se prefiere "low": el riesgo 10 del plan (una salida cortada se lee como "el tema
+    no daba" en vez de como lo que es, una pregunta reventada) pesa más que un punto de diferencia que
+    además no se sostiene entre pasadas.
+  - **Juez (respuesta abierta): "off", no "sí" como asumía la decisión 14 original.** Ningún nivel de
+    pensamiento mejora el acierto de forma visible sobre "sin pensamiento": 18/18 apagado en español;
+    17/18 en los tres modos (apagado, low y high) tras traducir, con una caída REAL de parseo en "high"
+    que "off" no tuvo. Aplicado el criterio del propio paso 21 ("si un camino no mejora de forma
+    visible, se queda sin pensamiento: el que paga la duda es el coste").
+  - Las dos reversiones de la decisión 14 (Examen y Juez) están previstas por el propio paso 21 del plan
+    ("el resultado de la eval puede revertirla"): no son una desviación sin cobertura, son el mecanismo
+    funcionando.
+- **`artifact-authoring.eval.ts` → `tutor-behaviour.eval.ts` (paso 19b): renombrado, 4 criterios nuevos,
+  y arreglado el regex de "wrong" que el 4E ya había dejado anotado.** La bitácora del 4E anotó que
+  `should-name-topic-and-signal` para la señal "wrong" solo casaba `fallaste|fallad|fallos|te
+  equivocaste`, y el modelo real dice "3 respuestas incorrectas" o similar. Ampliado con
+  `incorrecta|incorrecto|respuestas? mal|erróneas?`; no relaja el criterio, solo reconoce más formas
+  reales de decir lo mismo. Los 4 criterios nuevos (idioma, seguimiento, elección de skill, contexto de
+  pantalla) pasan de forma estable en las dos corridas contra el modelo real.
+- **Dos hallazgos reales del propio eval, no arreglados (no son bugs de la eval, son comportamiento del
+  tutor a reportar):**
+  - **`should-point-to-tab` decía ser inestable: el modelo a veces no dice "Pruebas".** En una de las
+    dos corridas del caso "no-autora-remite-a-la-pestana", el tutor respondió "puedes ir a la pestaña
+    de Controles y Exámenes" en vez de nombrar la pestaña "Pruebas" (el nombre real,
+    `MaterialPanel.tsx:91`). El nombre exacto de la pestaña solo lo enseña la skill `read-assessments`
+    ("point them to the 'Pruebas' tab"); si el tutor resuelve la negativa directamente desde el system
+    prompt sin cargar esa skill (el caso no la fuerza a cargarse), cae a una paráfrasis con el
+    vocabulario de la interfaz ("Controles y Exámenes") pero sin el nombre literal de la pestaña.
+    **Resuelto (2026-09-01, tras revisión de Iván):** las dos frases señalan el mismo sitio de la
+    interfaz, no hace falta el nombre literal. El regex de `shouldPointToTab`
+    (`tutor-behaviour.eval.ts:344-355`) ahora acepta también `controles y ex[aá]menes`; no se toca el
+    system prompt.
+  - **El caso de contexto de pantalla dispara un `cli` fallido de forma repetible (2/2).** Con un
+    material en el contexto de pantalla, el tutor intenta `materials read <id>` sin el argumento
+    `pages` antes de corregirse (el comando lo exige siempre, de fases anteriores), y ese primer intento
+    queda como `tool-result` con `isFailure: true`. La comprobación de contexto de pantalla en sí
+    (`should-not-relist-materials-with-screen-context`) pasa igual: el tutor no vuelve a listar
+    materiales, solo tropieza con la sintaxis de `materials read`. No es una regresión de 4G (el
+    comando ya exigía `pages` antes de esta fase); es fricción existente que este caso nuevo deja
+    visible por primera vez. No se ha exento este caso del criterio genérico
+    `should-not-have-tool-failures` para no esconder el tropiezo.
+    **Resuelto (2026-09-01, fix posterior al cierre del tramo).** Primer intento (llamar siempre a
+    `materials list` cuando no se conoce el número de páginas) quitó el `tool-result` fallido pero
+    introdujo una regresión nueva: el tutor volvía a listar un material que ya tenía por el contexto de
+    pantalla, violando `should-not-relist-materials-with-screen-context`. Descartado. Fix final, sin
+    ese efecto secundario: si no se conoce el número de páginas, pedir directamente el rango máximo
+    permitido por lectura (`1-20`, `maxIndexTextPagesPerRead`); si el material tiene menos páginas, el
+    propio comando devuelve el conteo real para cualquier página pedida por encima de ese conteo, así
+    que el tutor aprende el dato y recibe el contenido en la misma llamada
+    (`use-uploaded-materials.ts`, paso 2 del workflow). `eval:tutor:behaviour` corrido tres veces contra
+    el modelo real tras ambos arreglos: 6/6 casos, 0 fallos en las dos últimas corridas.
+- **Paso 22, batería de guardarraíles con `STRICT=1`:** primer intento bloqueado por `maxConversations`
+  (50/50), lleno de conversaciones de prueba de corridas anteriores de la propia batería (título
+  reconocible: el ataque B6 crea una por corrida y nadie las borra). Se vació
+  `packages/server/.data/agent-sessions` (dato local descartable, nunca subido) y se relanzó.
+  - **D3 ya no es un hueco conocido: cierra de verdad.** El `tool-result` fabricado por el cliente pasa
+    como barrera dura (`✅ pasa`), no como `🟡 conocido`: la sesión en servidor (decisión 6) le quitó el
+    canal. Corregido el párrafo de `NOTES.md` que todavía lo describía como pendiente.
+  - **D1, D2, D4 pasan.** B4 ("no revela sus herramientas internas") sigue fallando, como ya documentaba
+    `NOTES.md` desde antes de este tramo (hardening de comportamiento, no barrera de código): con
+    `STRICT=1` eso basta para que el script bloquee con exit 1. No es una regresión introducida por
+    4G; es el mismo hueco ya conocido, ahora confirmado con datos frescos. B9 sigue `n/c` (sin
+    `FIXTURE_MATERIAL_ID`). El paso 22 pide correr la batería, no que quede en verde: se reporta tal
+    cual a Iván para que decida si el hardening de B4 entra en el alcance del tramo.
+- **Paso 23, barrido de límites: veredicto por valor.**
+  - **§3, "Límites declarados y nunca aplicados", revisada:** `maxUploadBytes` y `maxMaterials` ya se
+    aplican de verdad (`api/materials.ts:27-28` vía `HttpApiSchema.asMultipart`;
+    `file-material-repository.ts:208`, con test F4-04). Veredicto: **resueltos**, ya no son huecos.
+    `maxPastedCharactersPerTurn` sigue en 0 usos fuera de `limits.ts`: sigue siendo correcto, no un
+    hueco, porque el `@` manual que le daría un caso de uso quedó fuera de alcance de la fase 4
+    (decisión 1); documentado como no aplicable, no como pendiente.
+  - **§4.2, techos de salida por camino:** las seis capas de producción (`tutor`, `indexing`, `note`,
+    `quiz`, `test`, `judge`) están todas enrutadas de verdad en este mismo tramo (`server.ts`,
+    `handlers.ts`). Veredicto: **hecho**.
+  - **Los tres listados sin techo (invariante 11), confirmados con el código actual, no arreglados
+    en este tramo:**
+    - `artifacts show` de un `quiz` o un `test` (`artifact-commands.ts:108-109`): `JSON.stringify(artifact, null, 2)`
+      entero, sin techo. Es el más grave de los tres: un Examen de 30 preguntas con enunciados,
+      opciones, explicaciones y citas ronda 6.000-8.000 tokens en una sola respuesta, y ese texto se
+      queda fijo en el historial del resto de la conversación (hasta que la degradación de imágenes lo
+      toque, que no aplica a texto). Frente a `materials read`, que sí tiene techo
+      (`maxIndexTextCharactersPerTurn`), esto es exactamente el hueco de la invariante 11 que el plan
+      señala.
+    - `artifacts attempts` sin argumento (`:255-271`): todos los intentos de todas las pruebas, sin
+      techo. Impacto por ahora acotado (una línea corta por intento), pero sin techo formal si el
+      histórico crece.
+    - `artifacts list` sin filtro (`:201-217`): todos los artefactos, sin techo. Mismo perfil que
+      `attempts`: una línea por artefacto, sin techo formal.
+    - **No se ha añadido ningún límite nuevo en este tramo.** El paso 23 pide el barrido con veredicto,
+      no la implementación; fijar un techo nuevo (p. ej. `maxArtifactJsonCharacters` o paginar
+      `attempts`/`list`) es una decisión de producto (qué se corta y cómo se avisa) que le toca a Iván,
+      no algo que este tramo decida por su cuenta. Los tres quedan reportados como hueco real y
+      pendiente, no como "no aplica" (a diferencia de `maxPastedCharactersPerTurn`, arriba).
+
+## 2026-09-01 · Fase 4 · cierre, arreglos de la revisión de `@fiel-al-plan`
+
+`@fiel-al-plan` contra `notes/plans/fase4-el-agente.md` dio veredicto ⚠️ DERIVA: cinco hallazgos, uno
+ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
+
+- **`finishReason` ahora se lee en producción (F4-37, riesgo 10).** `assessment-generation-service.ts`
+  y `note-generation-service.ts` registran con `Effect.logWarning` cuando una llamada se corta por el
+  techo de salida (`finishReason: "length"`) y lo nombran en el mensaje de error o en el propio bloque,
+  en vez de dejar que se confunda con "el tema no daba" o con un apunte sin más. Antes solo lo leían
+  las evals.
+- **`Chat.tsx` sigue volcando el `result` crudo en un `<pre>` (megas de base64 posibles): aplazado a
+  propósito, no arreglado.** Decisión de Iván al revisar los hallazgos: se aborda con el rediseño de
+  la vista de apuntes/chat ya anotado para después de cerrar las fases
+  ([[rediseno-vista-apuntes]] en la memoria del agente), no como parche suelto ahora.
+- **`docs/especificacion.md` sincronizado con ADR-025 y con la retirada de `TurnCost`.** F4-35 ya no
+  dice que el Juez usa pensamiento extendido (lo tenía así desde antes de medir con las evals del
+  tramo 4G, y el commit que "sincronizó la documentación" al cerrar 4G no lo tocó); ahora describe el
+  mecanismo de medición, no un nivel fijo por suposición. F4-18/F4-19 dicen "registrar", no "mostrar":
+  el coste del turno es dato de logs, nunca algo que el alumno vea en pantalla.
+- **Subir un PDF ya no escribe nada hasta que el fichero está validado (nuevo, a petición de Iván,
+  más allá de lo que pedía el plan original).** Al soltar o elegir ficheros en `UploadDropzone.tsx`,
+  cada uno se manda solo (sin botón) a la nueva ruta `POST /api/materials/validate`, que corre el
+  mismo sniff de cabecera + `pdfinfo` y la misma comprobación de nombre duplicado que `upload`, pero
+  sin escribir a disco (`MaterialRepository.validate`, `checkCandidate` factorizado de `upload` en
+  `file-material-repository.ts`). Un rechazo se avisa con su motivo y una X para quitarlo; la X está
+  disponible en cualquier fichero de la zona, no solo en los rechazados (un PDF válido que ya no se
+  quiera subir también se puede quitar). El botón "Subir N ficheros" solo se habilita cuando no queda
+  ningún fichero en `validating` ni `rejected`. La ruta nueva va en `CLOSED_ROUTES` de
+  `exam-lockdown.ts`, igual que `upload`, y no cuenta contra `uploadsPerWindow` (decisión 4: ese techo
+  es de subidas reales, no de comprobaciones). Probado a mano en el navegador por Iván: PDF válido,
+  fichero no-PDF, y el mismo nombre repetido en dos lotes.
+- **El contrato de errores de `upload` en `packages/shared` (hallazgo 5, no literal al plan) se deja
+  como está.** Ya estaba resuelto con criterio y documentado antes de esta pasada
+  (`UnsupportedFileType`/`MaterialAlreadyExists` viajan en el 200, no como error HTTP, para que un
+  fichero inválido no tumbe el resto del lote); no hacía falta tocar nada, solo constaba en el informe
+  del agente.
+- **El caso real de tres follow-ups sin delimitador de cierre se recupera, no se pierde.** La sesión
+  observada traía `<<<FOLLOW-UP>>>` y exactamente tres preguntas válidas hasta EOF, pero no
+  `<<<END FOLLOW-UP>>>`; el extractor anterior dejaba todo el sufijo como texto y Streamdown ocultaba
+  parcialmente los marcadores como si fueran tags. El primer arreglo garantizaba F4-30 recortando el
+  sufijo, pero también descartaba las tres preguntas. El cierre definitivo distingue formato de
+  contenido: recupera esas mismas tres cuando solo falta el cierre. La misma sesión descubrió que dos
+  medían 125 y 165 caracteres frente a un techo de 120 que el prompt no comunicaba. El techo explícito
+  pasa a 200 y se incluye en el system prompt; una pregunta de 201 sigue invalidando el bloque entero.
+  Ante dos preguntas, una línea extra, una pregunta fuera de techo o un cierre deformado devuelve cero.
+  Nunca recorta, completa ni inventa.
+- **Revisión posible de fase 5, no bloquea el cierre: la prevalidación solo ve el último FileList.**
+  Dos nombres iguales dentro de una misma selección se detectan, pero si se añade `tema.pdf`, termina
+  su validación y después se añade otro `tema.pdf`, las dos llamadas comprueban lotes separados y las
+  dos filas pueden quedar como válidas. Por el mismo camino se pueden acumular más de
+  `maxFilesPerUpload` ficheros mediante selecciones sucesivas. `upload` vuelve a validar y rechaza en
+  voz alta, así que no hay sobrescritura, pérdida de datos ni rotura de la aplicación. Se acepta como
+  borde de UX para cerrar fase 4 y se mueve al último nivel de prioridad de fase 5: si hay tiempo, se
+  revalida toda la cola staged cada vez que se añadan ficheros, se invalidan respuestas asíncronas
+  antiguas y se prueban duplicado y techo repartidos entre dos selecciones.

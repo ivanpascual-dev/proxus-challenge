@@ -126,12 +126,17 @@ insiste en lo que fallaste y en lo que marcaste.
 (`academic-tutor.ts:20-23`) sin bloque anti-manipulación ni regla de no-invención. Y el historial entero
 viene del cliente, que puede fabricar mensajes de `assistant` y resultados de herramienta.
 
+> **Alcance recortado el 2026-08-31**, con el plan
+> ([`notes/plans/fase4-el-agente.md`](plans/fase4-el-agente.md)). Lo que cae y por qué está en su
+> sección 9. El dato que gobierna la fase: un turno con imágenes envía **14,82 MB** a Gemini sobre un
+> historial de 9,15 MB en disco, medido con `scripts/measure-tokens.mjs`.
+
 **Qué se construye.**
 
-- **`@` para elegir qué entra**: material, artefacto, bloque, nota propia, URL.
-- **Chips visibles y quitables**, cada uno enseñando lo que consume ("apuntes, p. 12-14, 3.200 de
-  12.000"). Nada viaja al agente sin verse antes (invariante 9, ADR-006).
-- **Lo seleccionado en pantalla se manda al chat**, pero lo mandas tú.
+- **Lo que tienes en pantalla se adjunta solo, se ve y se puede quitar.** Chips por encima del cuadro
+  de escribir, con lo que viaja (material, artefacto, bloque). Viaja **por referencia**, sin pegar
+  texto. Enmienda el ADR-006 de "lo eliges tú" a "se propone solo, lo ves y lo quitas"; la invariante 9
+  se sigue cumpliendo, que es lo que importa. **El `@` manual queda fuera.**
 - **Sesión en el servidor.** El `SessionRepository` ya existe (`.data/agent-sessions`) y solo lo usa el
   camino del CLI. Pasarlo al camino HTTP cierra el agujero del historial fabricable **y es la
   funcionalidad de historial de conversaciones**: un cambio, dos cosas.
@@ -146,20 +151,36 @@ viene del cliente, que puede fabricar mensajes de `assistant` y resultados de he
   herramienta primero, anti-manipulación, no inventar citas.
 - **El material envuelto como datos**, con delimitador, declarado como material del alumno y nunca como
   orden.
-- **Subir ficheros**: PDF, `.md` y `.txt`, con techo de 25 MB y tipo comprobado por contenido, no por
-  extensión.
+- **El coste, a la vista y bajo control.** Tres palancas, todas medidas: las imágenes de página duran
+  un turno y después son texto; el prefijo del prompt crece solo por el final para que la caché
+  implícita de Gemini lo abarate (medido: cachea 12.263 de 17.846 tokens **a partir de la tercera
+  llamada**, no antes); y el árbol de comandos va en el mensaje de sistema para que el modelo no gaste
+  un paso en descubrirlo.
+- **Cada camino declara su modelo.** Temperatura, formato y razonamiento se eligen en código según
+  quién llama, sin clasificador que gaste una llamada en decidirlo. Razonamiento extendido en apuntes,
+  Exámenes y juez; nunca en Controles, indexación ni chat.
+- **Tres preguntas de seguimiento** tras cada respuesta, en la misma llamada. **Se adelantan desde la
+  fase 5.**
+- **Subir ficheros**: **solo PDF**, con techo de 25 MB y tipo comprobado por contenido, no por
+  extensión. Los `.md` y `.txt` caen: todo el sistema está construido sobre páginas, y un fichero sin
+  páginas obligaría a inventar una paginación falsa o a romper la invariante 2.
 - **Al subir, indexar y generar apuntes solos** (idea de Iván, tras probar la fase 2). Subir un PDF
   dispara el indexado, y al terminar dispara `NoteGenerationService.forMaterial` (fase 2, decisión
   27): el alumno sube 5 archivos y se encuentra 5 mapas mentales con sus apuntes sin pulsar nada. El
   servicio y su ruta (`POST /api/materials/:id/notes`) ya existen; aquí solo se encadenan al alta.
   "Mapa mental automático" = "indexar automático": el mapa ya se deriva del índice.
-- **`scripts/test-guardarrailes.mjs`**, la batería completa (ADR-008).
+- **`scripts/test-guardarrailes.mjs` ya existe** con D1-D5 y B1-B9. Lo que hace esta fase es **cerrar
+  D3**, su único hueco: el `tool-result` fabricado por el cliente deja de aceptarse porque el historial
+  ya no viene en la petición.
 - Todo **sobre el comando `cli` que ya existe** (ADR-004): cero herramientas nuevas.
 
-**Al terminar.** El chat sabe de qué hablas porque se lo has dicho tú, el coste está a la vista mientras
-decides, y hay un comando que demuestra que los guardarraíles aguantan.
+**Al terminar.** El chat sabe de qué hablas sin que se lo tengas que decir, y puedes quitárselo. La
+conversación sobrevive a recargar. El coste está a la vista con datos reales, no con estimaciones. Y la
+batería demuestra que los guardarraíles aguantan, D3 incluido.
 
-**Fuera.** Búsqueda semántica sobre todo el corpus. Compartir conversaciones. Skills invocables con `/`.
+**Fuera.** Adjuntar imágenes por chat (la foto de apuntes a mano: la vía queda diseñada, ver plan §9).
+El `@` manual. La vuelta de `artifacts create` anclado, que `docs/ai-agent.md` prometía aquí y **no
+vuelve**. Reorganizar `.data`. Búsqueda semántica. Compartir conversaciones. Skills con `/`.
 
 ---
 
@@ -176,7 +197,12 @@ esperado, fallos conocidos y cómo se evaluarían.
 - **Barrido de accesibilidad**: foco, teclado, contraste en los dos temas, lectores de pantalla.
 - **Estados vacíos, de carga y de error** en cada pantalla, incluidos los mensajes de límite superado,
   que son la cara visible de la invariante 11.
-- **Tres preguntas de seguimiento** que propone el tutor al terminar una respuesta.
+- ~~**Tres preguntas de seguimiento** que propone el tutor al terminar una respuesta.~~ **Adelantadas a
+  la fase 4**: salen en la misma llamada del turno, así que su sitio natural era donde se rehace el
+  system prompt.
+- **Adjuntar una imagen por chat** (una foto de apuntes a mano que se incorpora al bloque que le
+  corresponde). Sale de la fase 4 por tiempo, con la vía ya decidida: el tutor la lee y **propone** el
+  bloque con `artifacts note propose`, que el alumno acepta (ADR-014).
 - **`NOTES.md` final**: problema elegido, decisiones, cómo probarlo a mano, limitaciones conocidas. Ahí
   van el fusible que no es cerradura (ADR-007) y la inyección que se contiene pero no se resuelve
   (ADR-008), con el número de ataques que pasa y que no.
@@ -193,11 +219,11 @@ Si falta tiempo se cae en este orden, y **se anota que se cayó** en vez de deja
 
 1. Pomodoro.
 2. Quiz (fase 3): el test cubre el mismo argumento.
-3. Subida de ficheros (fase 4): el `@` sobre lo ya indexado demuestra la idea igual.
+3. ~~Subida de ficheros (fase 4)~~. **Ya no cae**: decisión de Iván del 2026-08-31, es la funcionalidad
+   que abre la fase y sin ella no hay demo que empiece por el principio.
 4. URL externa como fuente (fase 2): quitarla quita también el vector SSRF.
-5. Sesión en el servidor (fase 4): se documenta el historial fabricable en vez de arreglarlo. Sin
-   autenticación y sin datos de otros alumnos, falsificar tu propio historial solo te perjudica a ti.
-   **Pasa a ser crítico el día que haya login.**
+5. ~~Sesión en el servidor (fase 4)~~. **Ya no cae**: es lo mismo que el historial de conversaciones y
+   lo único que cierra D3. Un cambio, tres cosas.
 
 **No se cae nunca**, porque son requisito y no funcionalidad:
 

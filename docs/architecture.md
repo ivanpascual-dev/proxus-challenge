@@ -217,12 +217,22 @@ La composición de dependencias vive principalmente en `transport/http/server.ts
 
 ## Tutor agent
 
-El tutor está implementado como un harness de agente con herramientas públicas:
+El tutor está implementado como un harness de agente con dos herramientas, y solo dos:
 
-- `load_skill`: carga instrucciones especializadas.
+- `load_skill`: carga el cuerpo completo de una skill (comandos, orden de preferencia, advertencias).
 - `cli`: ejecuta comandos permitidos del dominio.
 
-Las skills no se exponen como tools directas; el modelo debe cargarlas mediante `load_skill`.
+Las skills no se exponen como tools directas: el modelo **ya ve**, desde el primer paso, el nombre y
+una descripción corta de cada una dentro del propio system prompt (el catálogo que rellena
+`{{SKILLS}}`, más tres líneas mecánicas que dejan claro que un nombre de skill no es una función
+invocable). Con eso decide qué skill encaja; para el cuerpo (los comandos concretos, en qué orden
+probarlos, qué advertencias trae) hace falta `load_skill`, y para ejecutar cualquier comando hace
+falta `cli`.
+
+El cuerpo de una skill se envía **una sola vez por sesión**: si el modelo la vuelve a cargar, el
+historial la sustituye por un puntero ("ya está más arriba, léela ahí") en vez de repetir sus bytes.
+Es optimización de transporte (menos texto reenviado en cada paso del bucle), no un cambio del
+mecanismo: el modelo sigue viendo solo nombre y descripción hasta que carga la skill, la primera vez.
 
 ```mermaid
 sequenceDiagram

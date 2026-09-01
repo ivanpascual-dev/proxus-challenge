@@ -23,7 +23,13 @@ import {
   type MaterialNotFound,
   type MaterialRepositoryError
 } from "../../domain/materials/material.ts";
-import { GeminiJsonLanguageModelLive, GeminiModel } from "../../domain/agents/gemini.ts";
+import {
+  GeminiIndexLanguageModelLive,
+  GeminiJsonLanguageModelLive,
+  GeminiJsonThinkingLanguageModelLive,
+  GeminiModel,
+  GeminiProseThinkingLanguageModelLive
+} from "../../domain/agents/gemini.ts";
 import { TutorChatService, TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { NoteServiceLive } from "../../domain/artifacts/note-service.ts";
@@ -32,6 +38,7 @@ import { FileMaterialIndexRepository } from "../../infra/materials/file-material
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { IndexingServiceLive } from "../../domain/materials/indexing-service.ts";
 import { NoteGenerationService, NoteGenerationServiceLive } from "../../domain/artifacts/note-generation-service.ts";
+import { MaterialDeletionServiceLive } from "../../domain/materials/material-deletion-service.ts";
 import {
   AssessmentGenerationService,
   AssessmentGenerationServiceLive,
@@ -41,16 +48,19 @@ import { AttemptServiceLive } from "../../domain/artifacts/attempt-service.ts";
 import { OpenAnswerJudgeLive } from "../../domain/artifacts/open-answer-judge.ts";
 import { StudyProfileServiceLive } from "../../domain/profile/study-profile.ts";
 import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
+import { FileSessionRepository } from "../../infra/agents/file-session-repository.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
 import { ExamLockdownGuardLive, rawRouteLockdownRejection } from "./exam-lockdown-guard.ts";
+import { MultipartLimitGuardLive } from "./multipart-limit-guard.ts";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
 }).pipe(
   Layer.provide(HttpHandlersLive),
-  Layer.provide(ExamLockdownGuardLive)
+  Layer.provide(ExamLockdownGuardLive),
+  Layer.provide(MultipartLimitGuardLive)
 );
 
 const DocsRoute = HttpApiScalar.layer(ProxusApi, {
@@ -81,7 +91,10 @@ const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
       return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
     }
 
-    const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest);
+    // F4-11/F4-12: la sesión vive en el servidor, así que un cliente no puede mandar historial
+    // fabricado. `onExcessProperty: "error"` es lo que convierte un campo no declarado (por ejemplo
+    // `messages`) en un 400, en vez de decodificar en silencio ignorándolo (invariante 3).
+    const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest, { onExcessProperty: "error" });
 
     const limitExceeded = checkChatRequestLimits(input);
     if (Option.isSome(limitExceeded)) {
@@ -150,10 +163,13 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
 
     const rateLimiter = yield* RateLimiter;
     const key = yield* clientKey;
-    const rejected = yield* rateLimiter.check(key, "messages").pipe(
+    // La gracia de alta (fase 4, decisión 4): la primera indexación de un material recién subido no
+    // cobra su cubo, porque subir ya se cobró contra `uploadsPerWindow`.
+    const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const rejected = yield* (hasGrace ? Effect.succeed(Option.none<RateLimited>()) : rateLimiter.check(key, "messages").pipe(
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
-    );
+    ));
     if (Option.isSome(rejected)) {
       return yield* HttpServerResponse.json(encodeRateLimited(rejected.value), { status: 429 });
     }
@@ -191,7 +207,7 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
         "x-accel-buffering": "no"
       }
     });
-  })
+  }).pipe(Effect.provide(GeminiIndexLanguageModelLive))
 );
 
 const encodeNoteAlreadyExists = Schema.encodeSync(NoteAlreadyExists);
@@ -221,8 +237,11 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const key = yield* clientKey;
     // Genera un artefacto y hace una llamada al modelo por tema: cuenta contra el cubo `artifacts`
     // (más estricto que `messages`) y toma un permiso de concurrencia, igual que el chat, porque es
-    // caro y no debe poder lanzarse en paralelo sin tope.
-    const rejected = yield* rateLimiter.check(key, "artifacts").pipe(
+    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (fase 4, decisión 4)
+    // salta el cubo, no la concurrencia, cuando es la primera generación de apuntes de un material
+    // recién subido: ya se cobró al decidir subir.
+    const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const rejected = yield* (hasGrace ? Effect.void : rateLimiter.check(key, "artifacts")).pipe(
       Effect.andThen(() => rateLimiter.acquire(key)),
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
@@ -287,7 +306,7 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
         "x-accel-buffering": "no"
       }
     });
-  })
+  }).pipe(Effect.provide(GeminiProseThinkingLanguageModelLive))
 );
 
 const encodeAssessmentGenEvent = Schema.encodeSync(AssessmentGenerationStreamEvent);
@@ -342,7 +361,10 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
       return yield* HttpServerResponse.json({ message: rejection.value.message }, { status: rejection.value.status });
     }
 
-    const languageModel = yield* LanguageModel.LanguageModel;
+    // La capa elegida según `request.kind` (§4.2): Examen lleva el pensamiento decidido en el tramo
+    // 4G (paso 21); Control se queda sin pensar (decisión 14, es el camino de más volumen).
+    const generationLayer = request.kind === "test" ? GeminiJsonThinkingLanguageModelLive : GeminiJsonLanguageModelLive;
+    const languageModel = yield* LanguageModel.LanguageModel.pipe(Effect.provide(generationLayer));
 
     const events = Stream.callback<AssessmentGenerationStreamEvent, never, LanguageModel.LanguageModel>((queue) =>
       assessmentGen.forMaterial(id, request, (progress) => Queue.offer(queue, {
@@ -380,7 +402,7 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
         "x-accel-buffering": "no"
       }
     });
-  }).pipe(Effect.provide(GeminiJsonLanguageModelLive))
+  })
 );
 
 const Routes = Layer.mergeAll(
@@ -397,6 +419,7 @@ const DomainLive = Layer.mergeAll(
   GeminiModel,
   NoteServiceLive,
   NoteGenerationServiceLive,
+  MaterialDeletionServiceLive,
   AssessmentGenerationServiceLive,
   AttemptServiceLive.pipe(Layer.provide(OpenAnswerJudgeLive))
 ).pipe(
@@ -413,7 +436,8 @@ const InfraLive = Layer.mergeAll(
     Layer.provide(IndexingServiceLive.pipe(Layer.provide(PopplerPdfService.layer)))
   ),
   FileArtifactRepository.layer(".data/artifacts"),
-  FileStudyProfileRepository.layer(".data/profile")
+  FileStudyProfileRepository.layer(".data/profile"),
+  FileSessionRepository.layer(".data/agent-sessions")
 );
 
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(

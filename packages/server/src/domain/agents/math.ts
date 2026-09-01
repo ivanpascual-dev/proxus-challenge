@@ -101,7 +101,12 @@ If you need exact command usage, call \`cli({ "input": "math --help" })\` or \`c
 });
 
 const MathHarness = AgentHarness.make({
-  name: "You are a math agent.",
+  systemPromptTemplate: `You are a math agent.
+
+You have access to a CLI tool. Use --help when you need command usage, subcommands, or examples.
+
+Available skills:
+{{SKILLS}}`,
   skills: [MathSkill],
   commands: [math]
 });

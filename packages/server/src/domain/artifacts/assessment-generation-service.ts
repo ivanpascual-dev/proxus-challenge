@@ -259,7 +259,14 @@ export const make = (
     // aquí.
     priorPrompts: readonly string[]
   ): Effect.Effect<
-    { readonly questions: readonly ParsedQuestion[]; readonly retries: number; readonly insufficient: number | null },
+    {
+      readonly questions: readonly ParsedQuestion[];
+      readonly retries: number;
+      readonly insufficient: number | null;
+      // Riesgo 10 / F4-37: si el último intento se cortó por el techo de salida, quien llama no puede
+      // reportarlo como "el tema no daba" ni como reintentos agotados sin más.
+      readonly truncated: boolean;
+    },
     AssessmentGenerationError,
     LanguageModel.LanguageModel
   > => Effect.gen(function* () {
@@ -274,6 +281,7 @@ export const make = (
     // Solo evita que el modelo repita una pregunta DENTRO de esta misma generación (entre reintentos).
     const seenPrompts = new Set<string>();
     let retries = 0;
+    let lastCallTruncated = false;
 
     for (let attempt = 0; attempt <= LIMITS.maxGenerationRetriesPerTopic; attempt += 1) {
       const stillNeeded = [...deficit.entries()].filter(([, count]) => count > 0);
@@ -335,9 +343,16 @@ export const make = (
         }))
       );
 
+      lastCallTruncated = response.finishReason === "length";
+      if (lastCallTruncated) {
+        yield* Effect.logWarning(
+          `generación de prueba: el tema "${topic.label}" se cortó por el techo de salida del modelo (finishReason: length)`
+        );
+      }
+
       const parsed = parseGeneratedQuestions(response.text);
       if (parsed.kind === "insufficient") {
-        return { questions: collected, retries, insufficient: parsed.maxPossible };
+        return { questions: collected, retries, insufficient: parsed.maxPossible, truncated: lastCallTruncated };
       }
       if (parsed.kind === "unparseable") {
         continue;
@@ -368,7 +383,7 @@ export const make = (
       }
     }
 
-    return { questions: collected, retries, insufficient: null };
+    return { questions: collected, retries, insufficient: null, truncated: lastCallTruncated };
   });
 
   const forMaterial = (
@@ -500,13 +515,17 @@ export const make = (
 
         if (outcome.insufficient !== null) {
           return yield* new AssessmentGenerationError({
-            reason: `el tema "${topic.label}" solo da para ${outcome.insufficient} preguntas de las ${holes.length} que pedía el reparto. Genera una prueba más corta.`
+            reason: outcome.truncated
+              ? `el tema "${topic.label}" se cortó por el techo de salida del modelo (finishReason: length) al generar las ${holes.length} preguntas del reparto. Vuelve a intentarlo.`
+              : `el tema "${topic.label}" solo da para ${outcome.insufficient} preguntas de las ${holes.length} que pedía el reparto. Genera una prueba más corta.`
           });
         }
 
         if (outcome.questions.length < holes.length) {
           return yield* new AssessmentGenerationError({
-            reason: `no se pudieron generar las ${holes.length} preguntas del tema "${topic.label}" (salieron ${outcome.questions.length}) tras ${LIMITS.maxGenerationRetriesPerTopic} reintentos. Vuelve a intentarlo.`
+            reason: outcome.truncated
+              ? `no se pudieron generar las ${holes.length} preguntas del tema "${topic.label}" (salieron ${outcome.questions.length}): el modelo se cortó por el techo de salida (finishReason: length) tras ${LIMITS.maxGenerationRetriesPerTopic} reintentos.`
+              : `no se pudieron generar las ${holes.length} preguntas del tema "${topic.label}" (salieron ${outcome.questions.length}) tras ${LIMITS.maxGenerationRetriesPerTopic} reintentos. Vuelve a intentarlo.`
           });
         }
 

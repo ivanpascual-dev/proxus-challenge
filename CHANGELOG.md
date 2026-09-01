@@ -34,6 +34,19 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Techos del tutor visibles y en voz alta.** El cuadro del chat cuenta los caracteres contra el
   máximo. Pedir más páginas de la cuenta, un mensaje demasiado largo o demasiadas peticiones seguidas
   se rechaza nombrando el techo y lo que se pidió, nunca en silencio.
+- **Aviso cuando una conversación con el tutor se hace muy larga.** Al acercarse al techo de historial
+  aparece un aviso con un botón para empezar una conversación nueva, sin dejar de poder seguir
+  escribiendo; al superar el techo, el mensaje siguiente se rechaza pidiendo lo mismo.
+- **Varias conversaciones con el tutor, guardadas.** Una lista lateral junto al chat muestra las
+  conversaciones anteriores, deja crear una nueva y borrar las que sobren; cambiar de una a otra
+  recupera su historial completo.
+- **El tutor propone hasta tres preguntas de seguimiento.** Al final de cada respuesta aparecen, como
+  botones, hasta tres preguntas relacionadas con lo que acaba de explicar; pulsar una la envía como si
+  se hubiera escrito. Si están las tres y solo falta el cierre técnico, se recuperan; si el contenido
+  no permite validar las tres, no aparece ninguna. Los marcadores internos nunca se enseñan.
+- **El tutor ve lo que tienes abierto, y se enseña antes de enviar.** Con un material abierto, y su
+  apunte o su prueba a la vista, aparece como una etiqueta encima del cuadro de texto; se puede quitar
+  con la "×" antes de enviar y solo lleva el título y el identificador, nunca el contenido.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
   un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
@@ -103,6 +116,15 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
   navegador, no a la pantalla.
+- **Subir tus propios PDFs.** La barra lateral tiene una zona para arrastrar uno o varios PDFs, o
+  elegir un fichero. Cada uno se comprueba solo, sin escribir nada, en cuanto se suelta: un fichero
+  que no es un PDF de verdad, o que repite el nombre de un material ya subido, se avisa con su motivo y
+  una X para quitarlo. El botón "Subir" solo aparece cuando todo lo que queda en la zona está validado;
+  al pulsarlo, cada fichero sube, se indexa y genera sus apuntes en cadena, sin pulsar nada más, con su
+  propio progreso (subiendo, indexando página N de M, generando apuntes tema N de M).
+- **Borrar un material.** Cada material de la barra lateral tiene un botón para borrarlo. Antes de
+  hacerlo se avisa de que también se pierden su apunte, sus controles y sus exámenes con sus intentos,
+  y de que no se puede deshacer.
 
 ### Cambiado
 
@@ -152,6 +174,18 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Los temas marcados como importantes reciben más preguntas al generar una prueba.** El reparto ya
   pesaba el énfasis, pero la generación no le pasaba qué temas estaban marcados, así que la marca no
   cambiaba nada. Ahora un tema marcado pesa el doble en el reparto.
+- **El tutor ya no se atasca leyendo un material que solo conoce por el contexto de pantalla.** Al
+  faltarle el número de páginas pedía la lectura sin rango y el comando la rechazaba. Ahora pide
+  directamente el máximo de páginas permitido; si el material tiene menos, el propio comando le dice
+  cuántas tiene y responde con el contenido en la misma llamada.
+- **Subir más ficheros de la cuenta ya no responde con un error genérico.** Una tanda por encima del
+  máximo permitido, o un fichero por encima de su tamaño, terminaba en un error sin motivo. Ahora se
+  rechaza nombrando el techo real y cuántos se enviaron, igual que el resto de rechazos de la subida.
+- **Borrar un material ya no deja intentos huérfanos de sus controles y exámenes.** Se borraban el PDF
+  y sus artefactos, pero los intentos guardados de esos artefactos se quedaban apuntando a un artefacto
+  que ya no existía. Ahora se borran con el resto.
+- **Generar un apunte o una prueba avisa cuando el modelo se corta a media respuesta**, en vez de leerse
+  como "el tema no daba para tanto" o entregarse con el bloque incompleto sin decirlo.
 
 ### Eliminado
 

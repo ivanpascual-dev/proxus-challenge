@@ -10,6 +10,16 @@ export interface RateLimiter {
   ) => Effect.Effect<void, RateLimited>;
   readonly acquire: (key: string) => Effect.Effect<void, RateLimited>; // concurrencia
   readonly release: (key: string) => Effect.Effect<void>;
+  // La frecuencia de subidas (fase 4, decisión 4): un solo umbral (`LIMITS.uploadsPerWindow`), sin
+  // el segundo tramo diario que sí tienen "messages" y "artifacts". No encaja en `check`, por eso
+  // tiene su propio método en vez de una tercera `RateLimiterFamily`.
+  readonly checkUpload: (key: string) => Effect.Effect<void, RateLimited>;
+  // La gracia de alta (fase 4, decisión 4, sección 4.2): un material recién subido no cobra el cubo
+  // `artifacts` en su primera indexación ni su primera generación de apuntes, porque subir ya se
+  // cobró contra `uploadsPerWindow`. Es un hueco deliberado (riesgo 6 de la fase 4): lo acota el
+  // techo de subidas, no la gracia misma.
+  readonly grantUploadGrace: (materialId: string) => Effect.Effect<void>;
+  readonly hasUploadGrace: (materialId: string) => Effect.Effect<boolean>;
 }
 
 export const RateLimiter = Context.Service<RateLimiter>(
@@ -35,6 +45,7 @@ export const make = (
   Effect.gen(function* () {
     const hitsRef = yield* Ref.make(new Map<string, readonly number[]>());
     const concurrencyRef = yield* Ref.make(new Map<string, number>());
+    const uploadGraceRef = yield* Ref.make(new Map<string, number>()); // materialId -> expira en
 
     const recentHits = (
       hits: ReadonlyMap<string, readonly number[]>,
@@ -126,7 +137,35 @@ export const make = (
         return next;
       });
 
-    return { check, acquire, release };
+    const checkUpload: RateLimiter["checkUpload"] = (key) =>
+      Effect.gen(function* () {
+        const t = now();
+        const bucket = `uploads:window:${key}`;
+        const windowDays = Math.round(LIMITS.uploadsPerWindow.windowMs / 1_000 / 60 / 60 / 24);
+        const recent = yield* checkBucket(
+          bucket,
+          LIMITS.uploadsPerWindow,
+          "uploadsPerWindow",
+          windowDays <= 1
+            ? "Has llegado a tu límite de subidas de hoy. Vuelve mañana."
+            : `Has llegado a tu límite de subidas de los últimos ${windowDays} días. Espera un poco antes de volver a intentarlo.`,
+          t,
+        );
+        yield* Ref.update(hitsRef, (map) => new Map(map).set(bucket, [...recent, t]));
+      });
+
+    const grantUploadGrace: RateLimiter["grantUploadGrace"] = (materialId) =>
+      Ref.update(uploadGraceRef, (map) => new Map(map).set(materialId, now() + LIMITS.uploadGraceMs));
+
+    const hasUploadGrace: RateLimiter["hasUploadGrace"] = (materialId) =>
+      Ref.get(uploadGraceRef).pipe(
+        Effect.map((map) => {
+          const expiresAt = map.get(materialId);
+          return expiresAt !== undefined && now() < expiresAt;
+        }),
+      );
+
+    return { check, acquire, release, checkUpload, grantUploadGrace, hasUploadGrace };
   });
 
 export const layer = (now?: () => number) =>

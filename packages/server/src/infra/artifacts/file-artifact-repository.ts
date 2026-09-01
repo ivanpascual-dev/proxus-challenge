@@ -150,6 +150,15 @@ export const FileArtifactRepository = {
       yield* fs.remove(filePath).pipe(Effect.mapError(mapStorageError));
     });
 
+    const deleteAttempt = (id: string): Effect.Effect<void, ArtifactRepositoryError> => Effect.gen(function* () {
+      const filePath = attemptPath(id);
+      const exists = yield* fs.exists(filePath).pipe(Effect.mapError(mapStorageError));
+      if (!exists) {
+        return yield* new AttemptNotFound({ attemptId: id });
+      }
+      yield* fs.remove(filePath).pipe(Effect.mapError(mapStorageError));
+    });
+
     // Igual que `listArtifacts`: un fichero de intento ilegible (por ejemplo de una versión anterior
     // del esquema) se salta y se registra con su motivo crudo en el log del servidor, en vez de
     // tumbar el listado entero (invariante 3). El motivo técnico no viaja al cliente.
@@ -174,7 +183,8 @@ export const FileArtifactRepository = {
       listArtifacts,
       saveAttempt: writeAttemptFile,
       getAttempt: readAttemptFile,
-      listAttempts
+      listAttempts,
+      deleteAttempt
     };
   }),
   layer: (directory: string) => Layer.effect(ArtifactRepository)(FileArtifactRepository.make(directory))

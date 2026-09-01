@@ -27,6 +27,51 @@ sí solo, no merece commit propio. Ni un commit gigante por fase ni un commit po
 por pieza que hace algo. Si lo que hay staged son dos piezas, **propón el corte** en dos commits en vez
 de escribir un mensaje con "y" dentro.
 
+## Separar piezas que comparten fichero (cortar por hunk)
+
+Cuando dos piezas tocan las mismas líneas del mismo fichero, el corte se hace con las herramientas de
+git para esto, que nunca tocan el contenido del working tree:
+
+```bash
+git add -p <fichero>       # elige qué hunks entran en este commit, deja el resto sin stagear
+git reset -p <fichero>     # para deshacer una elección
+```
+
+**Nunca edites el contenido de un fichero a mano para dejar solo una parte "temporalmente" con la
+intención de restaurar el resto después.** No hay ninguna operación de git detrás de esa promesa: depende
+de recordar con exactitud qué se quitó en cada fichero, y en una sesión larga con muchas piezas eso se
+pierde. Ya ha costado una sesión entera de trabajo real perdido.
+
+Si hace falta comprobar que el corte parcial compila o pasa el typecheck sin que el resto interfiera:
+
+```bash
+git stash push --keep-index -u   # deja en el árbol solo lo staged
+# ejecutar aquí el check
+git stash pop                    # devuelve todo lo demás intacto
+```
+
+**Antes de lanzarte a un corte así en varios ficheros entrelazados, avisa del coste.** Aunque Iván pida
+explícitamente separar por hunk, si los ficheros están muy entrelazados dilo antes: "esto toca N ficheros
+compartidos, ¿un commit combinado no sale más barato y más seguro?". Es su decisión, pero con el coste
+visible antes, no después de perder media hora.
+
+## Eficiencia
+
+**30 minutos y 200 llamadas a herramientas para un puñado de commits no es aceptable.** Antes de tocar
+nada:
+
+- Analiza el diff **completo del tramo una sola vez** y decide de golpe todos los cortes de commit que
+  va a haber. Preséntalos todos juntos para un único OK, no pidas confirmación commit a commit salvo que
+  el corte cambie a mitad de camino.
+- Sincroniza los documentos (paso 3) **una sola vez para todo el tramo**, no repitas la tabla completa
+  por cada commit que sale de él.
+- Agrupa en una misma llamada los comandos de git que no dependan entre sí (ya lo pide el paso 1).
+- No relances un typecheck o build completo más de una vez por corte. Si necesitas comprobar un commit
+  parcial, usa `git stash push --keep-index -u` en vez de reconstruir nada a mano.
+- Si un check falla a mitad de un corte que tú mismo acabas de hacer, sospecha primero de tu propia
+  cirugía (compara el working tree contra el estado esperado) antes de preguntar o escalar. El síntoma
+  ("el tipo no existe") casi nunca es la causa cuando la causa eres tú.
+
 ## Proceso
 
 ### 1 · Analizar
@@ -57,7 +102,8 @@ Si salta cualquiera de los dos: **paras, no commiteas y lo dices**.
 
 ### 3 · Sincronizar los documentos que el cambio deja desfasados
 
-El código no se aleja de los documentos. Antes del commit, comprueba y actualiza:
+El código no se aleja de los documentos. Si el tramo va a salir en varios commits, hazlo **una sola vez
+para el tramo entero**, no por cada commit que salga de él. Antes del commit, comprueba y actualiza:
 
 | Si el cambio... | Actualiza |
 | --- | --- |
@@ -108,6 +154,9 @@ Tipos: `feat` · `fix` · `refactor` · `docs` · `chore` · `test` · `perf`.
 ```
 
 **Javi va a leer estos mensajes.** Si hay algo que Iván no diría, se cambia.
+
+Si el tramo tiene varios commits, **mismo formato en todos**: si el primero lleva cuerpo, los siguientes
+también, salvo que de verdad no haga falta explicar el porqué.
 
 ### 6 · Enseñar y esperar
 

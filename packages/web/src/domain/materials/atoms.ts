@@ -37,3 +37,45 @@ export const materialPageQuery = Atom.family((key: string) => {
 });
 
 export const materialPageKey = (materialId: string, page: number) => `${materialId}:${page}`;
+
+// Sube un lote de PDFs (decisión 2: solo PDF). El payload es un FormData de verdad: el cliente
+// generado solo sabe codificar multipart cuando `request.payload instanceof FormData`
+// (`HttpApiClient.js`), así que aquí no hay schema que codifique nada.
+export const uploadMaterialsAction = apiRuntime.fn(
+  (files: readonly File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+    return ApiClient.use((client) =>
+      client.materials.upload({ payload: formData })
+    ).pipe(Effect.withSpan("materials.upload", { kind: "client" }));
+  },
+  { reactivityKeys: ["materials"] }
+);
+
+// Comprueba un lote de PDFs (tipo, nombre duplicado) sin subir nada: la zona de arrastre lo llama
+// sola al soltar los ficheros, antes de ofrecer el botón "Subir". Sin `reactivityKeys`: no crea ni
+// cambia ningún material, así que no hay nada que invalidar.
+export const validateMaterialsAction = apiRuntime.fn(
+  (files: readonly File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+    return ApiClient.use((client) =>
+      client.materials.validate({ payload: formData })
+    ).pipe(Effect.withSpan("materials.validate", { kind: "client" }));
+  }
+);
+
+// Borra el PDF y, en cascada, su apunte, controles y exámenes (ADR-011: el materialId sale del
+// nombre del fichero, así que un huérfano choca al resubir el mismo PDF). Invalida ambas etiquetas:
+// la lista de materiales y la de artefactos.
+export const deleteMaterialAction = apiRuntime.fn(
+  (materialId: string) =>
+    ApiClient.use((client) =>
+      client.materials.remove({ params: { id: materialId } })
+    ).pipe(Effect.withSpan("materials.remove", { kind: "client" })),
+  { reactivityKeys: ["materials", "artifacts"] }
+);

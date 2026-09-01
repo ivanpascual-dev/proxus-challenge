@@ -76,7 +76,7 @@ URLs por defecto:
 pnpm run typecheck
 pnpm --filter @proxus/web run build
 pnpm --filter @proxus/server run agent:tutor "list my uploaded materials"
-pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta"
+pnpm --filter @proxus/server run agent:tutor "¿qué llevo peor de este material?"
 ```
 
 ## Por dónde empezar si estás evaluando el proyecto

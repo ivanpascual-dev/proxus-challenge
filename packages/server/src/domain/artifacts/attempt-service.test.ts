@@ -93,7 +93,10 @@ const fakeMaterials = Layer.succeed(MaterialRepository, MaterialRepository.of({
   get: (id) => id === "m1" ? Effect.succeed(material) : Effect.fail(new MaterialNotFound({ materialId: id })),
   renderPage: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
   getIndex: (id) => id === "m1" ? Effect.succeed(index) : Effect.fail(new MaterialNotFound({ materialId: id })),
-  reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id }))
+  reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
+  upload: () => Effect.die("stub: upload no debería llamarse en este test"),
+  validate: () => Effect.die("stub: validate no debería llamarse en este test"),
+  remove: () => Effect.die("stub: remove no debería llamarse en este test")
 }));
 
 const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => Layer.succeed(ArtifactRepository, ArtifactRepository.of({
@@ -112,7 +115,11 @@ const fakeArtifacts = (artifacts: Artifact[], attempts: ArtifactAttempt[]) => La
     const found = attempts.find((a) => a.id === id);
     return found === undefined ? Effect.fail(new AttemptNotFound({ attemptId: id })) : Effect.succeed(found);
   },
-  listAttempts: (artifactId) => Effect.succeed(artifactId === undefined ? attempts : attempts.filter((a) => a.artifactId === artifactId))
+  listAttempts: (artifactId) => Effect.succeed(artifactId === undefined ? attempts : attempts.filter((a) => a.artifactId === artifactId)),
+  deleteAttempt: (id) => Effect.sync(() => {
+    const at = attempts.findIndex((a) => a.id === id);
+    if (at !== -1) { attempts.splice(at, 1); }
+  })
 }));
 
 // El juez falso: cumple todos los criterios.

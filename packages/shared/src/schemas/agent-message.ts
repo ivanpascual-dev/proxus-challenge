@@ -19,6 +19,10 @@ export const ToolCallMessage = Schema.Struct({
 });
 export type ToolCallMessage = typeof ToolCallMessage.Type;
 
+// `result` se queda en `Schema.Unknown` a propósito. La palanca 1 (fase 4, decisión 10) degrada un
+// `material-page-images` a `{ type, material, pages: [{ page, mediaType }], omitted: true }` sin
+// `data`, pero sigue siendo JSON arbitrario de cada comando: acotarlo aquí exigiría un esquema por
+// forma de resultado, y el harness ya valida lo que le importa al leerlo.
 export const ToolResultMessage = Schema.Struct({
   role: Schema.Literal("tool-result"),
   name: Schema.String,

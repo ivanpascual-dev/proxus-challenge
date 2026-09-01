@@ -48,6 +48,9 @@ const fakeMaterials = (overrides?: Partial<MaterialRepository>) => Layer.succeed
     renderPage: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
     getIndex: (id) => id === material.id ? Effect.succeed(index) : Effect.fail(new MaterialNotFound({ materialId: id })),
     reindex: (id) => Effect.fail(new MaterialNotFound({ materialId: id })),
+    upload: () => Effect.die("stub: upload no debería llamarse en este test"),
+    validate: () => Effect.die("stub: validate no debería llamarse en este test"),
+    remove: () => Effect.die("stub: remove no debería llamarse en este test"),
     ...overrides
   })
 );
@@ -70,7 +73,8 @@ const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
     }),
     saveAttempt: () => Effect.void,
     getAttempt: () => Effect.die("not used"),
-    listAttempts: () => Effect.succeed([])
+    listAttempts: () => Effect.succeed([]),
+    deleteAttempt: () => Effect.die("not used")
   })
 );
 

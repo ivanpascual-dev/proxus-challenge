@@ -198,6 +198,15 @@ posibilidad de quitarlo**.
 usa contexto que la persona no pueda ver ni retirar, que es la invariante de "nada en silencio"
 aplicada a la interfaz.
 
+**Enmienda (fase 4, tramo 4A).** El `@` manual ("algo nombrado a propósito") queda fuera de alcance de
+la fase 4: no hay interfaz para adjuntar a mano un material, artefacto o bloque que no esté ya en
+pantalla. La decisión pasa de "se elige" a "se propone solo, lo ves y lo quitas": el contexto de
+pantalla (`ChatContextRef`, id y título del material, artefacto o bloque activo) se adjunta
+automáticamente al mensaje según lo que la interfaz ya tiene abierto (`ChatContextBar`), y la persona
+lo ve antes de enviar y puede quitarlo (invariante 9), pero no puede añadir algo que no esté delante.
+`maxPastedCharactersPerTurn` queda declarado y sin uso por esto mismo: su caso de uso era el texto
+pegado del `@` manual, que no existe hoy.
+
 ---
 
 ## ADR-007 · Los límites son explícitos, viven en el contrato compartido y el presupuesto es por turno
@@ -520,11 +529,15 @@ que exige la invariante 3 llevada a la interfaz: un material sin indexar se dice
   primero. La identidad se resuelve al leer, contra el fichero que hoy tiene esa huella.
 - **Borrar un PDF no borra su índice.** Se queda huérfano a propósito: borrar es el caso en que más
   probable es que el fichero vuelva, y si vuelve el mismo contenido vuelve su huella y el índice sirve
-  intacto. Lo que sí queda roto son las citas de artefactos que apunten a un material borrado, y eso es
-  independiente de esta decisión: viene de que el `materialId` sale del nombre del fichero.
-- **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** El día que haya
-  subida de ficheros con id generado (fase 4), la primera mitad de este registro se revisa; la segunda,
-  la del archivado por huella, no cambia.
+  intacto. (Lo que sí quedaba roto eran las citas de artefactos que apuntaran a un material borrado;
+  esta ADR lo dejó como algo independiente, pendiente de resolver. La fase 4 lo resuelve: ADR-024
+  decide que borrar un material se lleva sus artefactos en cascada, así que ya no hay cita huérfana que
+  pueda quedar.)
+- **Esta decisión depende de que el `materialId` siga saliendo del nombre del fichero.** Revisado
+  tras la subida de la fase 4 (`file-material-repository.ts`, `upload`): la subida sigue derivando el
+  id del nombre subido (`idFor`, el mismo `path.basename` sin la extensión `.pdf` que usaba `list()`
+  antes de esta fase), no genera un id propio. La primera mitad de este registro sigue vigente sin
+  cambios; la segunda, la del archivado por huella, tampoco cambia.
 
 ---
 
@@ -1049,3 +1062,161 @@ alumno desde la interfaz (F3-31).
 - El perfil es por material; cruzarlos es otra fase.
 - Quitarle tres comandos al tutor puede dejarlo pobre en la demo (riesgo 8): la fase 4 es la que lo
   compensa.
+
+## ADR-023 · El historial de una conversación tiene un techo de tokens, con aviso al 75% y corte al 100%
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-31
+
+**Contexto.** La fase 4 mueve la sesión del tutor al servidor (decisión 6 del plan): una conversación
+guardada puede crecer sin límite mientras la persona siga escribiendo. Nada del plan escrito cubría
+ese caso; surgió al preguntar Iván, tras cerrar el tramo 4C, qué pasaba con una conversación que no
+termina nunca. Se decidió en esta misma sesión, no en la planificación de la fase.
+
+**Decisión.** Un fusible sobre la conversación **entera**, no sobre el turno individual (eso ya lo
+hacen `maxMessageCharacters`/`maxAgentSteps`): `maxConversationHistoryTokens = 80.000`. Al 75% se
+avisa al terminar el turno, informativo, la conversación sigue usándose. Al 100% el turno siguiente se
+rechaza **antes** de llamar al modelo, sin gastar la llamada. Ambos casos sugieren empezar una
+conversación nueva; no hay resumen ni compactación automática del historial.
+
+El tamaño se mide con el dato **real**: los `inputTokens` medidos (`usageMetadata` de Gemini) del
+último paso del último turno ya guardado, nunca una estimación de caracteres. Sin ese dato
+(conversación nueva, o el modelo no lo trajo esa vez) no se avisa ni se rechaza (invariante 3: no
+fabricar un límite superado donde no hay dato).
+
+**Opciones consideradas.**
+
+- **Resumir o compactar el historial automáticamente** al acercarse al techo (lo que hacen varios
+  agentes de código). Descartada por sobre-ingeniería para este caso: exige un camino de resumen con
+  su propio presupuesto y sus propios fallos, para un techo (80.000 tokens) que una sesión de estudio
+  normal tarda en alcanzar. Empezar una conversación nueva es gratis y ya existe.
+- **Contar caracteres del historial guardado**, como hacía el mecanismo retirado
+  (`maxHistoryMessages`/`maxHistoryCharacters`, fase 1). Descartada: un carácter no cuesta lo mismo
+  que otro en tokens (código, símbolos, idioma), y el coste real que importa es el que cobra el
+  modelo, no una aproximación.
+- **Cortar solo al 100%, sin aviso previo.** Descartada: la persona pierde el mensaje que estaba
+  escribiendo sin ninguna señal previa; el aviso al 75% deja margen para terminar la idea y migrar a
+  una conversación nueva sin perder nada.
+
+**Consecuencias.**
+
+- El fusible depende de que exista un turno guardado con `usage` medido: la primera conversación, o
+  una donde el modelo nunca devolvió `usageMetadata`, no tiene nada que comparar y no bloquea nunca
+  (mismo criterio que el resto de la fase 4 con datos de coste, F4-19).
+- Una conversación que se queda justo por debajo del 75% para siempre es posible (no hay techo de
+  turnos ni de tiempo, solo de tokens): aceptado, es el mismo fusible de coste que el resto de la fase,
+  no una cuota de uso.
+- Si el techo resulta corto o largo en uso real, se ajusta la cifra en `limits.ts`; no hace falta
+  tocar el mecanismo.
+
+---
+
+## ADR-024 · Borrar un material se lleva sus artefactos, en cascada y sin preguntar dos veces
+
+- **Estado:** aceptada
+- **Fecha:** 2026-08-31
+
+**Contexto.** El plan de la fase 4 no traía borrado de materiales; surgió al hablar con Iván de qué
+pasaba, ahora que subir un PDF es una acción normal desde la interfaz, cuando alguien se equivoca de
+fichero o quiere quitar uno. ADR-011 ya se había topado con el problema y lo había dejado explícitamente
+abierto: "lo que sí queda roto son las citas de artefactos que apunten a un material borrado, y eso es
+independiente de esta decisión". En fase 1 ese hueco era teórico, no había forma de borrar un material
+desde la aplicación. Con un botón real, deja de serlo: cada borrado dejaría un apunte, unos controles y
+unos exámenes citando un `materialId` que ya no abre nada, exactamente el fallo silencioso que el
+sistema evita en cualquier otro sitio (invariante 3).
+
+**Decisión.** Borrar un material borra también, en cascada, todo lo que cuelga de él: su apunte, sus
+controles y sus exámenes con sus intentos. La interfaz avisa del alcance de la pérdida antes de llamar
+(confirmación con la lista de lo que se pierde); el servidor no vuelve a preguntar, igual que en el
+resto de acciones destructivas del sistema (borrar una conversación, borrar un bloque). La orquesta
+`MaterialDeletionService` (`domain/materials/`): lista los artefactos, filtra los que pertenecen a ese
+`materialId`, los borra uno a uno con `ArtifactRepository.deleteArtifact` y solo entonces borra el PDF
+con `MaterialRepository.remove`. El índice cacheado por huella de contenido (ADR-011) no se toca: sigue
+siendo una optimización compartida entre ficheros, no algo del usuario.
+
+**Opciones consideradas.**
+
+- **Dejar los artefactos huérfanos**, como contemplaba ADR-011 cuando el borrado no existía. Descartada
+  por la razón de arriba: con un botón real el huérfano deja de ser un caso raro y pasa a ser lo normal
+  cada vez que alguien borra algo.
+- **Borrado suave (papelera, deshacer).** Descartada por alcance: ninguna otra acción destructiva del
+  sistema es reversible (conversación, bloque), y añadir una papelera solo para materiales rompe esa
+  coherencia sin que el reto la pida.
+- **Confirmar también en el servidor**, con un segundo golpe además del de la interfaz. Descartada: es
+  el mismo patrón que ya usan borrar una conversación y borrar un bloque, la interfaz es quien avisa y
+  el servidor ejecuta.
+
+**Consecuencias.**
+
+- El párrafo de ADR-011 que dejaba el problema abierto queda corregido para apuntar aquí.
+- Borrar y resubir el mismo PDF (mismo nombre, `materialId` de ADR-011) ya no puede reencarnar
+  artefactos huérfanos con datos desincronizados: al borrar, sus artefactos desaparecen con él, así que
+  resubir empieza limpio.
+- Un fallo a mitad de la cascada (por ejemplo, un artefacto que no se deja borrar) deja el material sin
+  borrar y algunos artefactos ya borrados: no hay transacción entre dos repositorios de ficheros
+  distintos. Se acepta porque el caso es raro (el mismo fallo que impediría borrar el artefacto desde su
+  propia pantalla) y el estado resultante es visible, no silencioso.
+
+---
+
+## ADR-025 · El techo de salida y el pensamiento del modelo se fijan por camino, con datos
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** Hasta la fase 4 el tutor tenía dos capas de Gemini: una para conversación
+(`GeminiLanguageModelLive`, temperatura baja) y una para JSON (`GeminiJsonLanguageModelLive`,
+temperatura 0), y las dos compartían el mismo techo de salida (`LIMITS.modelOutputTokens.tutor`,
+4.096) sin importar si detrás había un chat, una indexación, un apunte, un Control, un Examen o el
+juez de respuesta abierta. Gemini 3 añade además `thinkingConfig.thinkingLevel` (off/low/high): el
+modelo puede "pensar" antes de responder, y ese pensamiento gasta tokens del mismo techo de salida,
+no de uno aparte. Compartir capa entre caminos tan distintos (temperatura, formato, longitud esperada,
+coste de un error) era una simplificación que ya no se sostenía.
+
+**Opciones consideradas.**
+
+- **Seguir con dos capas compartidas, techo único.** Descartada: un Examen de 30 preguntas necesita un
+  techo muy por encima del de un apunte de un bloque, y fijar el techo más alto de todos como techo
+  único paga ese coste en cada camino, incluidos los baratos.
+- **Configurar el modelo ad hoc en cada punto de llamada.** Descartada: sin una capa nombrada por
+  camino, la temperatura, el formato y el techo de cada sitio se deciden por copiar y pegar el punto de
+  llamada más parecido, y no hay un solo lugar que diga qué lleva cada uno ni por qué.
+- **Fijar el nivel de pensamiento de cada camino por impresión, sin medir.** Es lo que asumía la
+  decisión 14 original (apuntes y juez con pensamiento, indexación y Control sin él, Examen a decidir).
+  Descartada como método: el tramo 4G la puso a prueba con las evals reales
+  (`eval:notes`, `eval:assessments`, `eval:judge --thinking=`) y dos de las tres suposiciones no se
+  sostuvieron (ver más abajo).
+
+**Decisión.** Seis capas de producción, una por camino, cada una una función pura de
+`GeminiGenerationConfig` (temperatura, formato, techo de salida y, donde aplica,
+`thinkingConfig`): `tutor`, `indexing`, `note`, `quiz` (Control), `test` (Examen) y `judge`
+(`gemini.ts`). Cada techo de salida (`LIMITS.modelOutputTokens.<camino>`, `packages/shared`) es el
+doble del caso peor calculado de ese camino, pensamiento incluido donde lo lleva, sin pasar del límite
+del modelo (65.536): es el fusible contra una salida desbocada, no un control de coste, porque se paga
+por lo generado, no por el techo. El nivel de pensamiento de cada camino se decidió corriendo las tres
+evals de medida dos veces cada una (antes y después de traducir los prompts al inglés, tramo 4G, paso
+21), off/low/high, y quedándose con lo que los datos mostraban, no con la suposición inicial:
+
+| Camino | Pensamiento | Por qué |
+| --- | --- | --- |
+| Apuntes (`note`) | `high` | Baja los términos traducidos de forma consistente en las dos pasadas, con un pensamiento medido de ~1.000-1.200 tokens sobre un techo de 4.096: mejora visible y repetida, sin riesgo de tocar el techo. |
+| Examen (`test`) | `low` (la decisión 14 original asumía `high`) | `high` revienta el techo de salida (`finishReason: "length"`) en 1 de 3 temas del fixture en las dos pasadas, con un pensamiento que osciló entre 1,7k y 15,7k tokens en el mismo fixture: inestable e impredecible. `low` iguala o mejora a "sin pensamiento" con un pensamiento estable (~100-130 tokens). |
+| Juez (respuesta abierta) | `off` (la decisión 14 original asumía "sí") | Ningún nivel mejora el acierto de forma visible sobre "sin pensamiento" (18/18 apagado en español; 17/18 en los tres modos tras traducir), y `high` tuvo una caída real de parseo que "off" no tuvo. |
+| Control (`quiz`) | sin pensamiento | Camino de más volumen y de práctica, no de examen real; no se midió con las evals de este tramo (decisión 14 original). |
+| Indexación | sin pensamiento | 261 páginas de una tirada del corpus local; transcribir una página no se beneficia de razonar sobre ella (decisión 14 original). |
+| Tutor (chat) | sin pensamiento | Fuera del alcance de las evals de este tramo; sigue con la configuración de conversación de antes de la fase 4. |
+
+**Consecuencias.**
+
+- El criterio que decide el pensamiento de un camino es "si no mejora de forma visible en la eval, se
+  queda sin pensamiento": el que paga la duda es el coste (tiempo y tokens), no la calidad. Dos de las
+  tres suposiciones de la decisión 14 original se revirtieron con datos; es el mecanismo funcionando,
+  no una desviación sin cobertura.
+- El coste y la latencia por llamada varían mucho entre caminos a propósito: un apunte con `high` cuesta
+  más por bloque que un Examen con `low` por pregunta. No hay una única cifra de "coste del tutor".
+- Si Gemini cambia cómo reparte tokens de pensamiento, o si el fixture de una eval deja de representar
+  el caso real, la tabla se vuelve a medir con las mismas evals; no hace falta rediseñar el mecanismo,
+  solo volver a correr `eval:notes`, `eval:assessments --thinking=` y `eval:judge --thinking=` y
+  actualizar la fila que cambió.
+- Detalle completo de la medición (las dos pasadas, antes y después de traducir), en
+  `notes/bitacora.md` (2026-09-01) y en el comentario de `gemini.ts:451-471`.

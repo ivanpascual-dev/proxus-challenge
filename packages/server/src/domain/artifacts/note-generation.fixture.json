@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "note": "Fixture versionado de la eval de generación de apuntes (tramo 4F, paso 19). Cada bloque trae su texto fuente embebido para que la eval sea autónoma (no depende de ningún PDF de .data). `keepUntranslated` es la lista de la invariante 1: términos que el material usa en inglés y que el apunte NO debe traducir; `mistranslations` son las traducciones que, si aparecen en el apunte, cuentan como incumplimiento.",
+  "blocks": [
+    {
+      "id": "ml-overfitting",
+      "topicLabel": "Overfitting y partición de los datos",
+      "pages": [12, 13],
+      "sourceText": "En aprendizaje automático supervisado, un modelo se entrena minimizando el error sobre un conjunto de entrenamiento (training set) y se mide sobre un conjunto de prueba (test set) que no ha visto durante el entrenamiento. Se habla de overfitting cuando el modelo memoriza el ruido del training set: su error de entrenamiento sigue bajando mientras el error de test empieza a subir. Una partición habitual reserva el 80 % de los ejemplos para entrenamiento y el 20 % para prueba, y con frecuencia se aparta además un 10 % como conjunto de validación para ajustar los hiperparámetros. Técnicas como la regularización, el early stopping o el dropout, que desactiva al azar una fracción de las unidades (a menudo el 50 %) en cada paso de entrenamiento, reducen el overfitting sin cambiar la arquitectura. La validación cruzada de k particiones, con k igual a 5 o a 10, da una estimación más estable del error de generalización que una única división en dos.",
+      "keepUntranslated": [
+        { "term": "overfitting", "mistranslations": ["sobreajuste", "sobre-ajuste", "sobreentrenamiento"] },
+        { "term": "dropout", "mistranslations": ["abandono", "descarte aleatorio"] },
+        { "term": "early stopping", "mistranslations": ["parada temprana", "detención temprana", "parada anticipada"] }
+      ]
+    },
+    {
+      "id": "finanzas-credit-spread",
+      "topicLabel": "Credit spread y cobertura con CDS",
+      "pages": [40],
+      "sourceText": "El credit spread de un bono corporativo es la rentabilidad adicional que paga sobre un bono soberano del mismo plazo tomado como referencia sin riesgo. Recoge la probabilidad de default que el mercado atribuye al emisor y la pérdida esperada en ese escenario. Un spread de 150 puntos básicos equivale a 1,5 puntos porcentuales al año. Si la aversión al riesgo aumenta, el spread se amplía y el precio del bono baja. Para cubrir esa exposición, un inversor puede comprar un credit default swap: un contrato que abona el nominal asegurado si el emisor incurre en default, a cambio de una prima trimestral. En 2008, el spread de la deuda bancaria europea saltó de unos 40 puntos básicos a más de 500 en cuestión de meses.",
+      "keepUntranslated": [
+        { "term": "spread", "mistranslations": ["diferencial", "margen de crédito"] },
+        { "term": "default", "mistranslations": ["impago", "incumplimiento", "quiebra"] }
+      ]
+    },
+    {
+      "id": "estadistica-outlier",
+      "topicLabel": "Intervalos de confianza y outliers",
+      "pages": [7, 8],
+      "sourceText": "Un intervalo de confianza al 95 % para la media estima el rango en el que se encontraría la media de la población si el muestreo se repitiera muchas veces: en el 95 % de esas muestras el intervalo construido contendría el valor real. Su amplitud depende del tamaño de la muestra, de modo que multiplicar por 4 el número de observaciones reduce el error estándar a la mitad. Un outlier, una observación muy alejada del resto, puede desplazar la media y ensanchar la desviación típica lo suficiente para invalidar esa estimación; la mediana y el rango intercuartílico apenas se ven afectados por él. La regla práctica señala como outlier todo valor que quede más de 1,5 veces el rango intercuartílico por debajo del primer cuartil o por encima del tercero. Con un nivel de significación del 5 %, todavía cabe esperar un falso positivo por cada 20 contrastes independientes.",
+      "keepUntranslated": [
+        { "term": "outlier", "mistranslations": ["valor atípico", "dato atípico", "dato anómalo", "valor extremo"] }
+      ]
+    }
+  ]
+}

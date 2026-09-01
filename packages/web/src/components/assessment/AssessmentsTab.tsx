@@ -39,12 +39,16 @@ export function AssessmentsTab({
   materialId,
   pendingControl,
   onPendingControlConsumed,
-  onStartExam
+  onStartExam,
+  onActiveArtifactChange
 }: {
   readonly materialId: string;
   readonly pendingControl: PendingControl | null;
   readonly onPendingControlConsumed: () => void;
   readonly onStartExam: (artifactId: string, title: string) => void;
+  // Contexto de pantalla (fase 4, decisión 5): la prueba abierta en detalle, para el chip del tutor.
+  // `undefined` mientras se está en la lista, sin ninguna prueba concreta abierta.
+  readonly onActiveArtifactChange?: (artifact: { readonly id: string; readonly title: string } | undefined) => void;
 }) {
   const assessments = useAtomValue(materialAssessmentsQuery(materialId));
   const refresh = useAtomRefresh(materialAssessmentsQuery(materialId));
@@ -58,6 +62,10 @@ export function AssessmentsTab({
       onPendingControlConsumed();
     }
   }, [pendingControl, onPendingControlConsumed]);
+
+  useEffect(() => {
+    onActiveArtifactChange?.(view.kind === "list" ? undefined : { id: view.id, title: view.title });
+  }, [view, onActiveArtifactChange]);
 
   if (view.kind === "solve") {
     return (
