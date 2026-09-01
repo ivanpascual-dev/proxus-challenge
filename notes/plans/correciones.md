@@ -85,8 +85,13 @@ pieza del nivel siguiente a medias.
     completos. Solo la respuesta nueva se revela en cliente, durante como mucho 1,5 segundos. Historial
     y `prefers-reduced-motion` se muestran al instante.
 15. **Contraer no significa redimensionar libremente.** El sidebar alterna 224px y un rail de 56px; el
-    índice de bloques alterna 240px y un rail de 48px. No hay arrastre. Ambos controles siguen siendo
+    índice de bloques alterna 240px y un rail de 56px. No hay arrastre. Ambos controles siguen siendo
     visibles, tienen nombre accesible y no descartan selección ni borrador.
+    _Enmienda posterior a la sesión 4 (Iván): la frase "seleccionar y añadir URL requieren expandir" del
+    rail de bloques queda sustituida. El rail de bloques ahora lista los bloques numerados y
+    seleccionables, con recuadro en los destacados, y ofrece añadir bloque y añadir desde una URL, igual
+    que el rail del sidebar lista y selecciona materiales. Buscar y borrar siguen requiriendo expandir.
+    El rail pasa de 48px a 56px para que quepan el número y el recuadro._
 16. **Al llegar a cinco materiales desaparece la capacidad de subir.** El botón `Subir material`, el
     dropzone y el input no se renderizan. Si hay trabajos iniciados, puede quedar un control de solo
     progreso que no acepta nuevos ficheros.
@@ -406,7 +411,8 @@ generar apuntes`.
   de borrar material no se ofrece en el rail para evitar un icono destructivo sin contexto; se hace al
   expandir.
 - `NoteWorkspace.tsx` posee `outlineCollapsed`. `NoteOutline.tsx` recibe el estado y alterna 240px y
-  48px. El rail conserva el botón de expandir y `Añadir bloque`; seleccionar, buscar, añadir URL y
+  56px. El rail conserva expandir, `Añadir bloque` y `Añadir desde una URL`, y lista los bloques
+  numerados y seleccionables, con recuadro en los destacados (enmienda de la decisión 15). Buscar y
   borrar requieren expandir. El componente editor y `draft` no se desmontan.
 - La preferencia del sidebar global se persiste; la del índice de bloques dura mientras el workspace
   del apunte esté montado. No se guarda estado educativo ni selección en `localStorage`.
@@ -655,7 +661,7 @@ pnpm. No se añade contenido real ni se commitea `.data`.
 | C5-11         | Abrir chat vacío y verificar el mensaje y las tres sugerencias literales. Pulsar cada una e inspeccionar la petición: solo viaja el texto elegido y el contexto visible; ninguna ofrece crear una prueba.                                                                                                                                                                           |
 | C5-12         | A 1280x720, 1440x900 y 1920x1080, enfocar y pasar el ratón por controles en las cuatro esquinas, sidebar, diálogo y outline con scroll. La caja queda a 8px o más del borde, no se corta y `document.documentElement.scrollWidth` no aumenta.                                                                                                                                       |
 | C5-13         | Contraer sidebar: mide 56px, todos los materiales siguen seleccionables por teclado y sus nombres se leen por tooltip o nombre accesible. Recargar: sigue contraído. Expandir: vuelve a 224px y reaparecen títulos y borrado.                                                                                                                                                       |
-| C5-14         | Editar un bloque sin guardar, contraer a 48px, cambiar foco entre editor y rail, expandir y comprobar mismo texto, misma selección y ninguna petición PUT.                                                                                                                                                                                                                          |
+| C5-14         | Editar un bloque sin guardar, contraer a 56px, comprobar que el rail lista los bloques numerados (recuadro en los destacados) y deja seleccionar, añadir bloque y añadir URL. Cambiar foco entre editor y rail, expandir y comprobar mismo texto, misma selección tras el propio contraer y ninguna petición PUT.                                                                       |
 | C5-15         | Subir hasta cinco: desaparecen botón, input y dropzone. Mientras la quinta cadena sigue activa solo aparece `Ver progreso de preparación`. Borrar un material: vuelve `Subir material`.                                                                                                                                                                                             |
 
 ### 8.4 Recorrido final integrado

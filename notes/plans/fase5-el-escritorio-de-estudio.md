@@ -1204,7 +1204,12 @@ ni una migración incompleta. Si el calendario termina aquí, actualizar documen
     contexto de prueba exacta. Actualizar contratos y documentación solo de lo realmente construido.
 25. Completar responsive al final: selector Material/Sym en tablet y sidebar como drawer accesible en
     móvil. Probar 1024x768 y 390x844 sin rebajar la calidad ya cerrada para escritorio.
-26. Cierre final opcional: recorrido completo, tests, typecheck, build, logs, capturas y changelog.
+26. Contraer también el panel de Sym a un rail, para dejar Apuntes a pantalla completa (petición de
+    Iván tras las correcciones de cierre; hoy `AppShell` solo contrae sidebar e índice de bloques, y el
+    plan de correcciones §9 excluye "ocultar a cero" un panel). Es un cuarto estado de layout: rail con
+    control de restaurar, persistencia, teclado y comportamiento del separador. Encaja aquí junto a la
+    superficie de estudio ampliada, no en el corte de correcciones.
+27. Cierre final opcional: recorrido completo, tests, typecheck, build, logs, capturas y changelog.
 
 ## 8. Cómo se sabe que funciona
 

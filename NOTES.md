@@ -281,6 +281,16 @@ sin jerarquía y un mapa que no se podía manipular.
   `aria-pressed`; pestañas, filas, miniaturas y herramientas compactas conservan su patrón propio.
 - Se verificó teclado, nombres accesibles, contraste semántico, zoom al 200%, movimiento reducido,
   carga diferida del PDF, un solo editor y pan sin medir texto de nuevo.
+- **Acabado visual (sesión 4 del corte de correcciones y añadidos posteriores).** Los tooltips se
+  montan en un portal a `document.body` con `position: fixed`, se voltean y se recolocan para no
+  cortarse contra ningún borde ni ningún `overflow-hidden` de un ancestro. El panel lateral y el
+  índice de bloques de un apunte se contraen a un rail de 56px que conserva selección y borrador; la
+  preferencia del sidebar se recuerda. La respuesta nueva de Sym se revela por bloques durante como
+  mucho segundo y medio (el mensaje llega entero del servidor, decisión 14; el cliente solo elige el
+  prefijo visible), y el historial y `prefers-reduced-motion` se muestran completos. Symma gana marca
+  propia (una "S" bicolor en SVG local) y Sym un avatar (chispa sobre disco de marca); hay favicon y
+  `theme-color`. Las tres zonas del escritorio se separan por superficie y una sombra tenue, no solo
+  por una línea. El estado vacío del chat se apila según el ancho de su panel, no el de la ventana.
 
 **Qué se descartó o aplazó.**
 
@@ -432,6 +442,13 @@ Con un material indexado y su apunte generado.
 8. **Accesibilidad y coste.** Navega con teclado, aplica zoom del navegador al 200%, cambia tema y
    activa `prefers-reduced-motion`. El mapa no recalcula layout durante pan, el PDF carga de forma
    incremental y Apuntes mantiene un editor.
+9. **Acabado visual (C5-12 a C5-14).** Pasa el ratón y el foco por controles en las cuatro esquinas,
+   dentro del sidebar, un diálogo y el índice con scroll: el tooltip queda entero y a 8px o más del
+   borde. Contrae el sidebar (mide 56px, sigue navegable, se recuerda al recargar) y el índice de
+   bloques (lista numerada seleccionable, editar sin guardar y expandir no pierde texto ni selección).
+   Envía un mensaje a Sym y comprueba que la respuesta nueva se revela y el historial no; repite con
+   `prefers-reduced-motion` y sale entera. Estrecha el panel de Sym: las sugerencias del estado vacío
+   se apilan sin desbordarse.
 
 ---
 

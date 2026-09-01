@@ -1244,3 +1244,34 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   - El chat usa el 85% del ancho de su columna (`w-[85%] max-w-5xl`) en vez de `max-w-3xl`. El
     contenedor con `overflow-y-auto` ocupa el 100% para que la barra de scroll quede pegada al borde
     de la ventana y no al texto; el contenido (mensajes, avisos y composer) se centra al 85%.
+
+## 2026-09-02 · Correcciones de cierre de fase 5 · Sesión 4 (acabado visual) + añadidos de Iván
+
+- **Desviación en el revelado (§4.2.6 / C5-10):** la clave del turno vivo pasa de la constante
+  `"live-turn"` a `live-${crypto.randomUUID()}` (`turn-view.ts`) y `MessageList` mete el turno vivo en
+  el mismo `.map` que el resto en vez de renderizarlo aparte. Sin esto, dos turnos seguidos en la
+  misma sesión compartían `key` (clave duplicada latente) y, al cerrarse el turno vivo, React
+  desmontaba y remontaba `ChatMessage`, lo que reiniciaba el temporizador de revelado a mitad. Con la
+  key estable por turno enviado, el componente se reconcilia en su sitio y el revelado no se corta.
+- **Desviación en `AppShell` (§4.2.8):** `sidebar` pasa de `ReactNode` a render prop
+  `({ collapsed, onToggleCollapsed }) => ReactNode`. El estado de contraído lo posee `AppShell`
+  (persiste `symma.workspace.sidebarCollapsed`) y solo la barra lo necesita; `material` y `chat`
+  siguen siendo nodos.
+- **Sin tests de componente para los rails ni el revelado:** misma decisión que las sesiones 1 y 3
+  (el repo no tiene infra de test de componentes React). Lo que sí queda con test automático es la
+  lógica pura extraída: `placeTooltip` (`tooltip-placement.test.ts`, 7 casos de volteo y recorte
+  contra el viewport) y `assistant-reveal` (`assistant-reveal.test.ts`, 5 casos de calendario de
+  revelado y conteo por code points). C5-12, C5-13 y C5-14 quedan para recorrido manual.
+- **Decisión sobre la marcha, aprobada por Iván: enmienda de la decisión 15.** El rail del índice de
+  bloques ya no obliga a expandir para seleccionar: lista los bloques numerados y seleccionables, con
+  recuadro en los destacados, y ofrece añadir bloque y añadir desde una URL, igual que el rail del
+  sidebar lista materiales. Buscar y borrar siguen requiriendo expandir. El rail pasa de 48 a 56px
+  para que quepan el número y el recuadro. Registrada en `notes/plans/correciones.md` (decisión 15,
+  §4.2.8, C5-14) y en `docs/especificacion.md` (C5-14); no da para ADR (los rails viven en la lista
+  de decisiones del plan).
+- **Decisión sobre la marcha: identidad visual redibujada a mano.** `logo.jpg` (1,5 MB, render 3D con
+  degradados y perspectiva) no se puede convertir a vector con fidelidad, así que `BrandMark` es una
+  lectura plana bicolor de la "S" (morado arriba, oro abajo) dibujada a mano en SVG local, sin
+  librería. El avatar de Sym (`SymAvatar`) se rehízo tres veces al probar: un monograma "S" se leía
+  mal a 26px, se optó por una chispa blanca sobre un disco del color de marca. El `logo.jpg` de
+  origen se queda fuera del repo (la app usa el SVG).

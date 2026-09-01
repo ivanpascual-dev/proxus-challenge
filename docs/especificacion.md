@@ -845,7 +845,9 @@ opcional y corrige comportamientos encontrados al probar P0 a P2.
   56px, mantener accesibles selección de material, estado de subida y tema mediante iconos con nombre,
   y recordar solo esa preferencia en almacenamiento local.
 - **C5-14.** CUANDO la persona contraiga el índice de bloques de Apuntes, EL sistema DEBERÁ pasar de
-  240px a un rail de 48px sin desmontar el editor, perder la selección ni descartar cambios sin guardar.
+  240px a un rail de 56px que conserve los bloques numerados y seleccionables, con un recuadro en los
+  destacados, más añadir bloque y añadir desde una URL; NO DEBERÁ desmontar el editor, cambiar la
+  selección por el propio contraer ni descartar cambios sin guardar.
 - **C5-15.** MIENTRAS haya `maxMaterials` materiales, EL control `Subir material` y la entrada de
   ficheros NO DEBERÁN estar visibles ni disponibles; una cadena ya iniciada PODRÁ mantener un control
   de progreso sin capacidad de añadir ficheros.

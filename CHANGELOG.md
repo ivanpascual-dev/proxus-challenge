@@ -150,6 +150,21 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Pulsar una cita de un apunte o de una corrección abre el material en la pestaña PDF** y salta
   directo a la página citada, con un resalte breve. Si la cita no tiene página anclada, lo dice y no
   navega.
+- **Los tooltips nunca se cortan contra el borde de la ventana.** Aparezcan donde aparezcan (una
+  esquina, un contenedor con scroll, un diálogo), la etiqueta se voltea arriba o abajo y se recoloca
+  para caber entera dentro de la pantalla, y se recalcula si se hace scroll o cambia el tamaño de la
+  ventana.
+- **El panel lateral se puede contraer a un rail.** Un botón lo reduce a una franja de iconos con la
+  marca, la subida o su progreso, un icono por material (con su tooltip y su punto de "preparándose")
+  y el tema; otro lo devuelve a su ancho. La preferencia se recuerda entre recargas. Borrar un
+  material sigue necesitando expandir.
+- **El índice de bloques de un apunte se puede contraer a un rail.** Queda una franja con los bloques
+  numerados y seleccionables (recuadro en los destacados), más añadir bloque y añadir desde una URL.
+  Buscar y borrar necesitan expandir. Contraer no cambia el bloque abierto ni descarta lo que estabas
+  escribiendo.
+- **Symma tiene marca propia y Sym tiene avatar.** Una "S" bicolor identifica a Symma en la barra
+  lateral y en el icono de la pestaña del navegador; un disco con una chispa identifica a Sym en la
+  cabecera del chat, en cada respuesta y en el estado vacío.
 
 ### Cambiado
 
@@ -217,6 +232,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Añadir una nueva selección de ficheros que no cabe con los que ya están en cola se rechaza entera**,
   explicando cuántos se recibieron, cuántos caben y el máximo de materiales. Los que ya estaban en cola
   no se tocan.
+- **La respuesta nueva de Sym se revela progresivamente.** El texto de la última respuesta aparece en
+  bloques durante como mucho segundo y medio en vez de salir de golpe; el historial anterior y, si el
+  sistema pide movimiento reducido, también la respuesta nueva, se muestran completos al instante.
+- **Las tres zonas del escritorio se distinguen por su fondo.** La barra lateral y Sym van sobre una
+  superficie y el material sobre otra un escalón por debajo, con una sombra muy tenue en el borde de
+  la barra lateral, en vez de separarse solo con una línea.
 
 ### Corregido
 
@@ -257,6 +278,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   páginas quedan sin tema y ya no generan un bloque de apuntes de relleno ("no tiene apenas texto...").
 - **Rechazar la generación de una prueba (rango de preguntas, tope alcanzado, material sin indexar) ya
   muestra el motivo real** en vez de un mensaje genérico.
+- **Las sugerencias del chat vacío ya no se salen al estrechar el panel de Sym.** Se apilaban según el
+  ancho de la ventana, no el del panel, así que al reducir Sym el texto largo de cada tarjeta
+  desbordaba. Ahora se apilan según el ancho real del panel.
 
 ### Eliminado
 
