@@ -12,10 +12,30 @@ import {
 // al cerrar el material (decisión 7): Sym ocupa entonces todo el espacio de trabajo.
 
 const SIDEBAR_WIDTH_PX = 224;
+const SIDEBAR_RAIL_PX = 56;
 const MIN_PANEL_WIDTH_PX = 420;
 const SEPARATOR_WIDTH_PX = 12;
 const KEYBOARD_STEP_PX = 24;
 const RATIO_STORAGE_KEY = "symma.workspace.materialRatio";
+const SIDEBAR_COLLAPSED_KEY = "symma.workspace.sidebarCollapsed";
+
+// Plan de correcciones §4.2.8 / C5-13: el sidebar alterna 224px y un rail de 56px. Solo se persiste
+// ese booleano; como con el ratio, un `localStorage` bloqueado o corrupto no debe tumbar la interfaz.
+const readSidebarCollapsed = (): boolean => {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const persistSidebarCollapsed = (collapsed: boolean): void => {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "true" : "false");
+  } catch {
+    // la preferencia ya se aplica en memoria; persistir es una mejora, no un requisito
+  }
+};
 
 const readStoredRatio = (): number => {
   try {
@@ -36,7 +56,9 @@ const persistRatio = (ratio: number): void => {
 };
 
 interface AppShellProps {
-  readonly sidebar: ReactNode;
+  // `sidebar` es una función porque el estado de contraído lo posee `AppShell` (§4.2.8) y lo entrega a
+  // la barra: `material` y `chat` no lo necesitan y siguen siendo nodos.
+  readonly sidebar: (opts: { readonly collapsed: boolean; readonly onToggleCollapsed: () => void }) => ReactNode;
   readonly material: ReactNode | null;
   readonly chat: ReactNode;
 }
@@ -44,6 +66,16 @@ interface AppShellProps {
 export function AppShell({ sidebar, material, chat }: AppShellProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState(readStoredRatio);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  const sidebarWidth = sidebarCollapsed ? SIDEBAR_RAIL_PX : SIDEBAR_WIDTH_PX;
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      persistSidebarCollapsed(next);
+      return next;
+    });
+  };
   const [bounds, setBounds] = useState<SplitBounds>({
     availableWidth: 0,
     minMaterialWidth: MIN_PANEL_WIDTH_PX,
@@ -121,15 +153,15 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
   const materialPercent = Math.round(clampedRatio * 100);
 
   return (
-    <div className="grid h-screen min-h-screen overflow-hidden bg-canvas text-heading" style={{ gridTemplateColumns: `${SIDEBAR_WIDTH_PX}px minmax(0, 1fr)` }}>
-      <aside className="h-screen overflow-hidden border-border border-r bg-canvas" style={{ width: SIDEBAR_WIDTH_PX }}>
-        {sidebar}
+    <div className="grid h-screen min-h-screen overflow-hidden bg-canvas text-heading" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
+      <aside className="zone-edge-right relative z-10 h-screen overflow-hidden border-border border-r bg-surface" style={{ width: sidebarWidth }}>
+        {sidebar({ collapsed: sidebarCollapsed, onToggleCollapsed: toggleSidebarCollapsed })}
       </aside>
 
       <div ref={contentRef} className="flex h-screen min-w-0 overflow-hidden">
         {canSplit && material !== null ? (
           <>
-            <div className="h-screen min-w-0 overflow-hidden" style={{ flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }}>
+            <div className="h-screen min-w-0 overflow-hidden bg-canvas" style={{ flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }}>
               {material}
             </div>
             <div
@@ -150,18 +182,18 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
             >
               <span className="-translate-x-1/2 absolute inset-y-0 left-1/2 w-3" />
             </div>
-            <div className="h-screen min-w-0 flex-1 overflow-hidden">
+            <div className="h-screen min-w-0 flex-1 overflow-hidden bg-surface">
               {chat}
             </div>
           </>
         ) : hasMaterial ? (
           // El viewport no admite los dos mínimos: se prioriza lo que el alumno abrió explícitamente
           // (adaptación mínima, no la selección de superficie completa que llega en P3).
-          <div className="h-screen min-w-0 flex-1 overflow-hidden">
+          <div className="h-screen min-w-0 flex-1 overflow-hidden bg-canvas">
             {material}
           </div>
         ) : (
-          <div className="h-screen min-w-0 flex-1 overflow-hidden">
+          <div className="h-screen min-w-0 flex-1 overflow-hidden bg-surface">
             {chat}
           </div>
         )}

@@ -71,7 +71,7 @@ export function ChatFrame({
   }, [historyOpen]);
 
   return (
-    <div className="relative flex h-screen max-h-screen min-w-0 flex-col bg-canvas">
+    <div className="relative flex h-screen max-h-screen min-w-0 flex-col bg-surface">
       <ChatHeader
         historyToggleId={HISTORY_TOGGLE_ID}
         historyOpen={historyOpen}

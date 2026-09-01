@@ -39,7 +39,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, blocked = fa
 
   return (
     <form
-      className="flex flex-col gap-1.5 border-border border-t bg-canvas px-4 py-3"
+      className="flex flex-col gap-1.5 border-border border-t bg-surface px-4 py-3"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -59,7 +59,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, blocked = fa
           disabled={blocked}
           placeholder={blocked ? "Borra una conversación del historial para empezar otra" : "Pregúntale algo a Sym…"}
           rows={1}
-          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-sm border bg-surface px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`max-h-[152px] w-full flex-1 resize-none overflow-y-auto rounded-sm border bg-canvas px-4 py-2.5 text-heading text-sm leading-6 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
             overLimit ? "border-danger focus:ring-danger" : "border-border-strong focus:ring-brand"
           }`}
           aria-invalid={overLimit}

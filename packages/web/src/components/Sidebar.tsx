@@ -4,6 +4,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { deleteMaterialAction, materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import { UploadManager } from "./upload/UploadManager.tsx";
+import { BrandMark } from "./ui/BrandMark.tsx";
 import { Icon } from "./ui/Icon.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
@@ -11,13 +12,21 @@ import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 interface SidebarProps {
   readonly selectedMaterialId: string | null;
   readonly onSelectMaterial: (materialId: string) => void;
+  // Plan de correcciones §4.2.8 / C5-13: el estado de contraído lo posee `AppShell` y lo entrega aquí.
+  readonly collapsed: boolean;
+  readonly onToggleCollapsed: () => void;
 }
 
 // Reescrito visualmente (fase 5, §4.2): 224px fijos, sin `details` contenedor ni tarjeta por fila,
 // sin renderizar `materialsQuery` de otra forma. Los apuntes viven dentro de su material (fase 2,
 // decisión 18) y Controles/Exámenes en su pestaña "Pruebas" (fase 3, decisión 15): el sidebar solo
 // lista materiales. El aviso de artefactos ilegibles vive ahora en `SystemNoticeRegion`, no aquí.
-export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) {
+//
+// Plan de correcciones §4.2.8 / C5-13: contraído es un rail de 56px con marca `S`, control de
+// expandir, subida o progreso, un botón de documento por material (con tooltip y estado) y un único
+// control de tema. Borrar un material no se ofrece en el rail (icono destructivo sin contexto): se
+// hace al expandir.
+export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onToggleCollapsed }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
   const deleteMaterial = useAtomSet(deleteMaterialAction, { mode: "promise" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -46,10 +55,53 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
     }
   };
 
+  if (collapsed) {
+    return (
+      <div className="flex h-screen flex-col items-center gap-2 py-3">
+        <BrandMark size={28} className="shrink-0" />
+        <IconButton icon="chevron-right" label="Expandir el panel lateral" onClick={onToggleCollapsed} />
+        <UploadManager compact />
+        <div className="my-1 h-px w-6 shrink-0 bg-border" />
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
+          {AsyncResult.matchWithError(materials, {
+            onInitial: () => null,
+            onError: () => <Icon name="warning" size={16} className="text-danger-ink" />,
+            onDefect: () => <Icon name="warning" size={16} className="text-danger-ink" />,
+            onSuccess: ({ value }) => value.materials.map((material) => {
+              const selected = selectedMaterialId === material.id;
+              const indexed = material.indexState === "indexed";
+              return (
+                <span key={material.id} className="relative inline-flex">
+                  <IconButton
+                    icon="notes"
+                    label={indexed ? material.title : `${material.title} (preparándose)`}
+                    pressed={selected}
+                    onClick={() => onSelectMaterial(material.id)}
+                  />
+                  {!indexed && (
+                    <span
+                      className="pointer-events-none absolute top-0.5 right-0.5 size-2 rounded-full bg-warning"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              );
+            })
+          })}
+        </div>
+        <ThemeToggle compact />
+      </div>
+    );
+  }
+
   return (
     <div className="grid h-screen grid-rows-[48px_auto_1fr_auto]">
-      <header className="flex items-center border-border border-b px-4">
-        <strong className="text-heading">Symma</strong>
+      <header className="flex items-center justify-between border-border border-b px-4">
+        <span className="flex items-center gap-2">
+          <BrandMark size={22} className="shrink-0" />
+          <strong className="text-heading">Symma</strong>
+        </span>
+        <IconButton icon="chevron-left" label="Contraer el panel lateral" onClick={onToggleCollapsed} />
       </header>
 
       <div className="border-border border-b p-3">

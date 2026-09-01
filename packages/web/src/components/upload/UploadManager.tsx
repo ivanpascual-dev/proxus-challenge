@@ -11,6 +11,7 @@ import { describeFailure } from "../../lib/user-feedback.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { ActionButton } from "../ui/ActionButton.tsx";
+import { IconButton } from "../ui/IconButton.tsx";
 import { StatusNotice } from "../ui/StatusNotice.tsx";
 import { hasActiveWork, UploadQueue, type FileUploadState, type StagedFile } from "./UploadQueue.tsx";
 
@@ -45,7 +46,9 @@ const describeQueueRejection = (reasons: readonly QueueRejectionReason[]): { rea
 // se desmonta), así que cerrar el diálogo no interrumpe ninguna validación ni cadena en curso; solo
 // oculta su superficie. Reabrir devuelve la misma cola porque es el mismo estado de React, nunca se
 // perdió. No se persiste al recargar y la orquestación sigue en cliente (deuda conocida del plan).
-export function UploadManager() {
+// `compact` lo usa el rail contraído del sidebar (§4.2.8): mismo diálogo y misma cola, pero el
+// disparador es un icono con nombre accesible en vez del botón a lo ancho.
+export function UploadManager({ compact = false }: { readonly compact?: boolean }) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -212,19 +215,30 @@ export function UploadManager() {
     return null;
   }
 
+  const triggerLabel = noSlotsLeft ? "Ver progreso de preparación" : "Subir material";
+
   return (
     <>
-      <ActionButton
-        icon="upload"
-        variant="neutral"
-        onClick={() => setOpen(true)}
-        className="relative w-full"
-      >
-        {noSlotsLeft ? "Ver progreso de preparación" : "Subir material"}
-        {activeWork && (
-          <span className="-translate-y-1/2 absolute top-1/2 right-3 size-2 rounded-full bg-brand" aria-hidden="true" />
-        )}
-      </ActionButton>
+      {compact ? (
+        <span className="relative inline-flex">
+          <IconButton icon="upload" label={triggerLabel} onClick={() => setOpen(true)} />
+          {activeWork && (
+            <span className="pointer-events-none absolute top-0.5 right-0.5 size-2 rounded-full bg-brand" aria-hidden="true" />
+          )}
+        </span>
+      ) : (
+        <ActionButton
+          icon="upload"
+          variant="neutral"
+          onClick={() => setOpen(true)}
+          className="relative w-full"
+        >
+          {triggerLabel}
+          {activeWork && (
+            <span className="-translate-y-1/2 absolute top-1/2 right-3 size-2 rounded-full bg-brand" aria-hidden="true" />
+          )}
+        </ActionButton>
+      )}
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Subir material" widthClassName="max-w-md">
         <div className="p-5">

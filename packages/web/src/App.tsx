@@ -110,15 +110,17 @@ export function App() {
     <>
       <SystemNoticeRegion />
       <AppShell
-        sidebar={
+        sidebar={({ collapsed, onToggleCollapsed }) => (
           // Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red.
           <ErrorBoundary label="la lista de materiales">
             <Sidebar
               selectedMaterialId={selectedMaterialId}
               onSelectMaterial={setSelectedMaterialId}
+              collapsed={collapsed}
+              onToggleCollapsed={onToggleCollapsed}
             />
           </ErrorBoundary>
-        }
+        )}
         material={selectedMaterial === undefined ? null : (
           <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
             <MaterialPanel
