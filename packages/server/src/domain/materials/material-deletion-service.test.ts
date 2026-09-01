@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Effect, Layer } from "effect";
-import { ArtifactRepository, ArtifactNotFound, type Artifact, type QuizArtifact, type NoteArtifact } from "../artifacts/artifact.ts";
+import {
+  ArtifactRepository,
+  ArtifactNotFound,
+  AttemptNotFound,
+  type Artifact,
+  type ArtifactAttempt,
+  type QuizArtifact,
+  type NoteArtifact
+} from "../artifacts/artifact.ts";
 import { MaterialDeletionService, MaterialDeletionServiceLive } from "./material-deletion-service.ts";
 import { MaterialNotFound, MaterialRepository, type PdfMaterial } from "./material.ts";
 
@@ -38,6 +46,21 @@ const quiz: QuizArtifact = {
 
 const otherNote: NoteArtifact = { ...note, id: "note-other", materialId: otherMaterial.id };
 
+const attemptOf = (id: string, artifactId: string): ArtifactAttempt => ({
+  id,
+  artifactId,
+  artifactKind: "quiz",
+  mode: "practice",
+  startedAt: "2026-08-01T00:00:00.000Z",
+  timeLimitSeconds: null,
+  hintsRevealed: [],
+  answers: [],
+  connectedSeconds: 0,
+  lastHeartbeatAt: null,
+  interruptions: [],
+  status: "in-progress"
+});
+
 const fakeMaterials = (store: Set<string>) => Layer.succeed(
   MaterialRepository,
   MaterialRepository.of({
@@ -54,7 +77,7 @@ const fakeMaterials = (store: Set<string>) => Layer.succeed(
   })
 );
 
-const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
+const fakeArtifacts = (store: Artifact[], attempts: ArtifactAttempt[] = []) => Layer.succeed(
   ArtifactRepository,
   ArtifactRepository.of({
     saveArtifact: () => Effect.die("not used"),
@@ -70,18 +93,28 @@ const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
     listArtifacts: () => Effect.succeed({ artifacts: store, unreadable: [] }),
     saveAttempt: () => Effect.die("not used"),
     getAttempt: () => Effect.die("not used"),
-    listAttempts: () => Effect.succeed([])
+    listAttempts: (artifactId) => Effect.succeed(
+      artifactId === undefined ? attempts : attempts.filter((attempt) => attempt.artifactId === artifactId)
+    ),
+    deleteAttempt: (id) => {
+      const at = attempts.findIndex((candidate) => candidate.id === id);
+      if (at === -1) {
+        return Effect.fail(new AttemptNotFound({ attemptId: id }));
+      }
+      attempts.splice(at, 1);
+      return Effect.void;
+    }
   })
 );
 
-const run = (materials: Set<string>, artifacts: Artifact[], materialId: string) => Effect.runPromise(
+const run = (materials: Set<string>, artifacts: Artifact[], materialId: string, attempts: ArtifactAttempt[] = []) => Effect.runPromise(
   Effect.gen(function* () {
     const service = yield* MaterialDeletionService;
     return yield* service.remove(materialId);
   }).pipe(
     Effect.provide(MaterialDeletionServiceLive.pipe(
       Layer.provide(fakeMaterials(materials)),
-      Layer.provide(fakeArtifacts(artifacts))
+      Layer.provide(fakeArtifacts(artifacts, attempts))
     ))
   )
 );
@@ -95,6 +128,20 @@ test("borra el PDF y todos sus artefactos (apunte y control), sin tocar los de o
   assert.equal(materials.has(material.id), false);
   assert.equal(materials.has(otherMaterial.id), true);
   assert.deepEqual(artifacts.map((artifact) => artifact.id), ["note-other"]);
+});
+
+test("borra también los intentos de sus artefactos, sin tocar los de otro material (F4-10b)", async () => {
+  const materials = new Set([material.id, otherMaterial.id]);
+  const artifacts: Artifact[] = [quiz, otherNote];
+  const attempts: ArtifactAttempt[] = [
+    attemptOf("attempt-1", quiz.id),
+    attemptOf("attempt-2", quiz.id),
+    attemptOf("attempt-other", otherNote.id)
+  ];
+
+  await run(materials, artifacts, material.id, attempts);
+
+  assert.deepEqual(attempts.map((attempt) => attempt.id), ["attempt-other"]);
 });
 
 test("un material sin artefactos se borra sin más", async () => {

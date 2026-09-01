@@ -228,6 +228,12 @@ const InMemoryArtifactRepository = Layer.effect(
         )
       );
 
+    const deleteAttempt = (id: string): Effect.Effect<void, ArtifactRepositoryError> =>
+      Ref.update(ref, (state) => ({
+        ...state,
+        attempts: state.attempts.filter((candidate) => candidate.id !== id)
+      }));
+
     return ArtifactRepository.of({
       deleteArtifact,
       saveArtifact,
@@ -235,7 +241,8 @@ const InMemoryArtifactRepository = Layer.effect(
       listArtifacts,
       saveAttempt,
       getAttempt,
-      listAttempts
+      listAttempts,
+      deleteAttempt
     });
   })
 ).pipe(Layer.provideMerge(ArtifactRepositoryTestRef.layer));

@@ -539,6 +539,7 @@ export interface ArtifactRepository {
   readonly saveAttempt: (attempt: ArtifactAttempt) => Effect.Effect<void, ArtifactRepositoryError>;
   readonly getAttempt: (id: string) => Effect.Effect<ArtifactAttempt, ArtifactRepositoryError>;
   readonly listAttempts: (artifactId?: string) => Effect.Effect<readonly ArtifactAttempt[], ArtifactRepositoryError>;
+  readonly deleteAttempt: (id: string) => Effect.Effect<void, ArtifactRepositoryError>;
 }
 
 export const ArtifactRepository = Context.Service<ArtifactRepository>(

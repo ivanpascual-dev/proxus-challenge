@@ -32,7 +32,13 @@ export const make = (
     const listing = yield* artifacts.listArtifacts();
     const own = listing.artifacts.filter(ownsMaterial(materialId));
 
-    yield* Effect.forEach(own, (artifact) => artifacts.deleteArtifact(artifact.id), { discard: true });
+    // Un control o examen puede tener intentos guardados aparte (`.data/artifacts/attempts`):
+    // borrar solo el artefacto los deja huérfanos, apuntando a un artifactId que ya no existe.
+    yield* Effect.forEach(own, (artifact) => Effect.gen(function* () {
+      const attempts = yield* artifacts.listAttempts(artifact.id);
+      yield* Effect.forEach(attempts, (attempt) => artifacts.deleteAttempt(attempt.id), { discard: true });
+      yield* artifacts.deleteArtifact(artifact.id);
+    }), { discard: true });
 
     yield* materials.remove(materialId);
   });

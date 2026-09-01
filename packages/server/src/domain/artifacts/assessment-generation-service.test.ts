@@ -70,7 +70,8 @@ const fakeArtifacts = (store: Artifact[]) => Layer.succeed(
     }),
     saveAttempt: () => Effect.void,
     getAttempt: () => Effect.die("not used"),
-    listAttempts: () => Effect.succeed([])
+    listAttempts: () => Effect.succeed([]),
+    deleteAttempt: () => Effect.die("not used")
   })
 );
 
