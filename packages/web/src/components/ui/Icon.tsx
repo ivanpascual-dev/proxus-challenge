@@ -19,7 +19,10 @@ export type IconName =
   | "arrow-right"
   | "progress"
   | "history"
-  | "search";
+  | "search"
+  | "zoom-in"
+  | "zoom-out"
+  | "fit-width";
 
 interface IconProps {
   readonly name: IconName;
@@ -103,6 +106,22 @@ const iconPaths = ({ name }: { readonly name: IconName }) => {
           <path d="M20 20l-3.5-3.5" />
         </>
       );
+    case "zoom-in":
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M11 8v6M8 11h6M20 20l-3.5-3.5" />
+        </>
+      );
+    case "zoom-out":
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M8 11h6M20 20l-3.5-3.5" />
+        </>
+      );
+    case "fit-width":
+      return <path d="M3 8V6a2 2 0 0 1 2-2h2M21 8V6a2 2 0 0 0-2-2h-2M3 16v2a2 2 0 0 0 2 2h2M21 16v2a2 2 0 0 1-2 2h-2M7 12h10M7 12l2.5-2.5M7 12l2.5 2.5M17 12l-2.5-2.5M17 12l-2.5 2.5" />;
   }
 };
 

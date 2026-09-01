@@ -1,9 +1,9 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { ChatContextRef, MaterialIndex } from "@proxus/shared";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, artifactsQuery, deleteArtifactAction } from "../domain/artifacts/atoms.ts";
-import { materialIndexQuery, materialPageKey, materialPageQuery, materialsQuery } from "../domain/materials/atoms.ts";
+import { materialIndexQuery, materialsQuery } from "../domain/materials/atoms.ts";
 import { streamGenerateNotes } from "../domain/artifacts/note-generation-stream.ts";
 import { AssessmentsTab, type PendingControl } from "./assessment/AssessmentsTab.tsx";
 import { NoteWorkspace } from "./note/NoteWorkspace.tsx";
@@ -19,6 +19,8 @@ import { streamReindexMaterial } from "../domain/materials/stream.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 import { MaterialHeader } from "./material/MaterialHeader.tsx";
 import { MaterialTabs, type Tab } from "./material/MaterialTabs.tsx";
+import { PdfWorkspace } from "./material/pdf/PdfWorkspace.tsx";
+import type { PageMarker } from "./material/pdf/PdfPage.tsx";
 
 interface MaterialPanelProps {
   readonly materialId: string;
@@ -35,9 +37,6 @@ interface MaterialPanelProps {
   // muestra antes de enviar y el alumno lo puede quitar.
   readonly onContextChange: (refs: readonly ChatContextRef[]) => void;
 }
-
-// Marca de procedencia de una página, tal como la pinta el visor.
-type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
 export function MaterialPanel({ materialId, indexState, title, pageCount, onClose, onStartExam, onContextChange }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
@@ -85,8 +84,8 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onClos
 
       <div className={`min-h-0 flex-1 p-4 ${tab === "pdf" ? "flex flex-col" : "hidden"}`}>
         {indexed
-          ? <IndexedPdfViewer materialId={materialId} pageCount={pageCount} scrollTo={pendingPage} onScrolled={() => setPendingPage(null)} />
-          : <PageList materialId={materialId} pageCount={pageCount} markerFor={() => null} scrollTo={pendingPage} onScrolled={() => setPendingPage(null)} />}
+          ? <IndexedPdfWorkspace materialId={materialId} pageCount={pageCount} scrollTo={pendingPage} onScrolled={() => setPendingPage(null)} />
+          : <PdfWorkspace materialId={materialId} pageCount={pageCount} markerFor={() => null} scrollToPage={pendingPage} onScrolledToPage={() => setPendingPage(null)} />}
       </div>
 
       {indexed && (
@@ -124,7 +123,9 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onClos
 
 // --- Visor del PDF -----------------------------------------------------------
 
-function IndexedPdfViewer({
+// El índice solo se pide cuando el material ya está indexado: el mismo reparto que antes de extraer
+// `PdfWorkspace` (fase 5, §4.6), para no lanzar una consulta que el servidor no puede responder.
+function IndexedPdfWorkspace({
   materialId,
   pageCount,
   scrollTo,
@@ -151,110 +152,14 @@ function IndexedPdfViewer({
     }
   });
 
-  return <PageList materialId={materialId} pageCount={pageCount} markerFor={markerFor} scrollTo={scrollTo} onScrolled={onScrolled} />;
-}
-
-function PageList({
-  materialId,
-  pageCount,
-  markerFor,
-  scrollTo,
-  onScrolled
-}: {
-  readonly materialId: string;
-  readonly pageCount: number;
-  readonly markerFor: (page: number) => PageMarker;
-  readonly scrollTo: number | null;
-  readonly onScrolled: () => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollTo === null) {
-      return;
-    }
-    const target = containerRef.current?.querySelector(`[data-page="${scrollTo}"]`);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
-    onScrolled();
-  }, [scrollTo, onScrolled]);
-
-  const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
-
   return (
-    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-canvas p-3">
-      <div className="mx-auto flex max-w-3xl flex-col gap-5">
-        {pages.map((page) => (
-          <PdfPage key={page} materialId={materialId} page={page} marker={markerFor(page)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PdfPage({ materialId, page, marker }: { readonly materialId: string; readonly page: number; readonly marker: PageMarker }) {
-  const ref = useRef<HTMLElement>(null);
-  const [show, setShow] = useState(page <= 2);
-
-  useEffect(() => {
-    if (show || ref.current === null) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShow(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "800px 0px" }
-    );
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [show]);
-
-  return (
-    <figure ref={ref} data-page={page} className="scroll-mt-3">
-      <div className="relative">
-        {show
-          ? <PdfPageImage materialId={materialId} page={page} />
-          : <div className="grid h-[70vh] place-items-center rounded-lg border border-border bg-surface text-muted text-sm">Página {page}</div>}
-        {marker?.kind === "transcribed" && (
-          <span className="absolute top-2 right-2 rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
-            transcrito por el modelo
-          </span>
-        )}
-      </div>
-      {marker?.kind === "failed" && (
-        <figcaption className="mt-1 rounded-lg bg-danger/10 px-3 py-2 text-danger-ink text-sm">
-          Página {page}: no se pudo indexar. {marker.reason}
-        </figcaption>
-      )}
-    </figure>
-  );
-}
-
-function PdfPageImage({ materialId, page }: { readonly materialId: string; readonly page: number }) {
-  const image = useAtomValue(materialPageQuery(materialPageKey(materialId, page)));
-
-  return AsyncResult.matchWithError(image, {
-    onInitial: () => <PagePlaceholder>Cargando la página {page}…</PagePlaceholder>,
-    onError: (error) => <PageError page={page} detail={describeFailure(error, { area: "materials", action: "page" }, "MaterialPanel").description ?? ""} />,
-    onDefect: (defect) => <PageError page={page} detail={DEFECT_MESSAGE} />,
-    onSuccess: ({ value }) => (
-      <img src={value.data} alt={`Página ${page}`} className="w-full rounded-lg border border-border" loading="lazy" />
-    )
-  });
-}
-
-function PagePlaceholder({ children }: { readonly children: ReactNode }) {
-  return <div className="grid h-[70vh] place-items-center rounded-lg border border-border bg-surface text-muted text-sm">{children}</div>;
-}
-
-function PageError({ page, detail }: { readonly page: number; readonly detail: string }) {
-  return (
-    <div className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-danger-ink text-sm">
-      No se pudo renderizar la página {page}. {detail}
-    </div>
+    <PdfWorkspace
+      materialId={materialId}
+      pageCount={pageCount}
+      markerFor={markerFor}
+      scrollToPage={scrollTo}
+      onScrolledToPage={onScrolled}
+    />
   );
 }
 
