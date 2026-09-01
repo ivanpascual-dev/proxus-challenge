@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { SlashItem } from "./SlashCommand.ts";
+import { Icon } from "../ui/Icon.tsx";
 
 export interface SlashMenuHandle {
   // Devuelve true si la tecla la consume el menú (el editor no debe verla).
@@ -70,14 +71,17 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
         <button
           key={item.title}
           type="button"
-          className={`flex w-full flex-col px-3 py-2 text-left ${
+          className={`flex w-full items-start gap-2 px-3 py-2 text-left ${
             index === selected ? "bg-brand/10 text-brand" : "text-body hover:bg-surface-muted"
           }`}
           onMouseEnter={() => setSelected(index)}
           onClick={() => command(item)}
         >
-          <span className="font-semibold text-sm">{item.title}</span>
-          <span className="text-muted text-xs">{item.description}</span>
+          <Icon name="edit" size={16} className="mt-0.5 shrink-0" />
+          <span className="min-w-0">
+            <span className="block font-semibold text-sm">{item.title}</span>
+            <span className="block text-muted text-xs">{item.description}</span>
+          </span>
         </button>
       ))}
     </div>

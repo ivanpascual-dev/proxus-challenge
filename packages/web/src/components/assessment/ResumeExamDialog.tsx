@@ -2,6 +2,7 @@ import { useAtomSet } from "@effect/atom-react";
 import { useState } from "react";
 import { abandonAttemptAction } from "../../domain/assessments/atoms.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El diálogo de la decisión 19d: lo primero que se ve al arrancar la aplicación si hay un examen a
 // medias. Es también la llave de la puerta cerrada (decisión 18): elijas lo que elijas, sales del
@@ -63,22 +64,22 @@ export function ResumeExamDialog({
         )}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
+          <ActionButton
+            icon="play"
+            variant="primary"
             onClick={onResume}
             disabled={busy}
-            className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:opacity-50"
           >
             Volver al examen
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="close"
+            variant="danger"
             onClick={() => void onCancel()}
             disabled={busy}
-            className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
           >
             {busy ? "Cancelando…" : "Cancelarlo"}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

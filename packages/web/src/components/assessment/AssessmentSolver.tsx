@@ -23,6 +23,7 @@ import {
   type LocalAnswers
 } from "./question-view.tsx";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // --- Entrada al solucionador ----------------------------------------------------------------------
 
@@ -42,13 +43,14 @@ export function AssessmentSolver({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
+        <ActionButton
+          icon="chevron-left"
+          variant="brand"
+          size="compact"
           onClick={onExit}
-          className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
         >
-          ← Volver a la lista
-        </button>
+          Volver a la lista
+        </ActionButton>
       </div>
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando la prueba…</p>,
@@ -195,14 +197,15 @@ function PracticeRun({
                   Empezar cuenta como un intento (tienes {LIMITS.maxPracticeAttemptsPerAssessment} en
                   práctica por prueba). El intento se guarda aunque lo dejes a medias.
                 </p>
-                <button
-                  type="button"
-                  className="mt-4 font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                <ActionButton
+                  icon="play"
+                  variant="primary"
+                  className="mt-4"
                   onClick={() => void onStart()}
                   disabled={starting}
                 >
                   {starting ? "Empezando…" : "Empezar la práctica"}
-                </button>
+                </ActionButton>
               </div>
             </div>
           )
@@ -241,14 +244,14 @@ function PracticeRun({
                 ? "Todo respondido."
                 : `${unanswered} ${unanswered === 1 ? "pregunta sin responder" : "preguntas sin responder"} (contarán como en blanco).`}
             </p>
-            <button
-              type="button"
-              className="font-semibold text-brand transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            <ActionButton
+              icon="check-circle"
+              variant="primary"
               onClick={() => void onSubmit()}
               disabled={submitting}
             >
               {submitting ? "Corrigiendo…" : "Entregar y corregir"}
-            </button>
+            </ActionButton>
           </div>
         </footer>
       )}

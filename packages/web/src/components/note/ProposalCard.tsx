@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { acceptProposalAction, rejectProposalAction } from "../../domain/artifacts/atoms.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 interface ProposalCardProps {
   readonly artifactId: string;
@@ -126,23 +127,25 @@ export function ProposalCard({ artifactId, proposal, blocks, blocked }: Proposal
 
       <div className="flex flex-wrap gap-2">
         {!stale && (
-          <button
-            type="button"
-            className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          <ActionButton
+            icon="check"
+            variant="primary"
+            size="compact"
             disabled={!canAccept}
             onClick={() => run("accept")}
           >
             {busy === "accept" ? "Aplicando…" : "Aceptar"}
-          </button>
+          </ActionButton>
         )}
-        <button
-          type="button"
-          className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98] disabled:opacity-50"
+        <ActionButton
+          icon="trash"
+          variant="danger"
+          size="compact"
           disabled={busy !== null}
           onClick={() => run("reject")}
         >
           {busy === "reject" ? "Descartando…" : "Descartar"}
-        </button>
+        </ActionButton>
       </div>
     </section>
   );

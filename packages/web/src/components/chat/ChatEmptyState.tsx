@@ -1,5 +1,7 @@
 // Fase 5, §4.4: una frase corta, tres sugerencias ligadas a acciones que el producto puede cumplir y
 // el composer (que vive fuera, en `Chat.tsx`). Sin hero de 60px.
+import { ActionButton } from "../ui/ActionButton.tsx";
+
 const STARTER_PROMPTS = [
   "Lista mis materiales subidos",
   "Crea un quiz corto a partir de mis materiales",
@@ -14,14 +16,15 @@ export function ChatEmptyState({ onSelect }: { readonly onSelect: (prompt: strin
       </p>
       <div className="grid w-full grid-cols-3 gap-2.5 max-lg:grid-cols-1">
         {STARTER_PROMPTS.map((prompt) => (
-          <button
+          <ActionButton
             key={prompt}
-            type="button"
+            icon="arrow-right"
+            variant="neutral"
             onClick={() => onSelect(prompt)}
-            className="rounded-sm border border-border-strong bg-surface p-3.5 text-left text-body text-sm transition hover:border-brand active:scale-[0.98]"
+            className="w-full min-w-0 shrink justify-start whitespace-normal p-3.5 text-left [&>span]:min-w-0"
           >
             {prompt}
-          </button>
+          </ActionButton>
         ))}
       </div>
     </div>

@@ -19,6 +19,7 @@ import { Dialog } from "../ui/Dialog.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { StatusNotice } from "../ui/StatusNotice.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 type NoteArtifact = Extract<Artifact, { readonly kind: "note" }>;
 
@@ -211,22 +212,24 @@ export function NoteWorkspace({
               : "Cambios sin guardar."
             : "Todo guardado."}
         </span>
-        <button
-          type="button"
-          className="shrink-0 font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:cursor-not-allowed disabled:text-muted disabled:no-underline disabled:active:scale-100"
+        <ActionButton
+          icon="save"
+          variant="primary"
+          size="compact"
           disabled={!canSave}
           onClick={onSave}
         >
           {isSaving ? "Guardando…" : "Guardar apuntes"}
-        </button>
-        <button
-          type="button"
-          className="shrink-0 font-medium text-muted text-sm transition hover:text-danger-ink hover:underline active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+        </ActionButton>
+        <ActionButton
+          icon="trash"
+          variant="danger"
+          size="compact"
           onClick={onDelete}
           disabled={deleting}
         >
           {deleting ? "Borrando…" : "Borrar apunte"}
-        </button>
+        </ActionButton>
       </header>
 
       {artifact.proposals.length > 0 && (
@@ -263,20 +266,20 @@ export function NoteWorkspace({
                 <h3 className="font-bold text-heading text-xl">Estos apuntes no tienen bloques todavía.</h3>
                 <p className="mt-2 text-muted">Añade el primero para empezar a escribir.</p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
-                  <button
-                    type="button"
-                    className="font-semibold text-brand transition hover:underline active:scale-[0.98]"
+                  <ActionButton
+                    icon="plus"
+                    variant="primary"
                     onClick={addBlock}
                   >
                     Añadir bloque
-                  </button>
-                  <button
-                    type="button"
-                    className="font-semibold text-brand transition hover:underline active:scale-[0.98]"
+                  </ActionButton>
+                  <ActionButton
+                    icon="link"
+                    variant="neutral"
                     onClick={() => setUrlDialogOpen(true)}
                   >
                     Añadir desde una URL
-                  </button>
+                  </ActionButton>
                 </div>
               </div>
             </div>

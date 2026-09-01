@@ -5,6 +5,7 @@ import { conversationsQuery } from "../../domain/tutor/atoms.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // Decisión 31: el historial de conversaciones pertenece a Sym, no al sidebar global. Un panel
 // temporal con búsqueda simple, nueva conversación, selección y borrado; el sidebar de 224px sigue
@@ -72,14 +73,15 @@ export function ConversationDrawer({
       aria-label="Historial de conversaciones"
       className="absolute top-14 right-0 z-10 flex max-h-[70vh] w-80 flex-col gap-2 border border-border bg-surface p-3 shadow-lg"
     >
-      <button
-        type="button"
+      <ActionButton
+        icon="plus"
+        variant="neutral"
         onClick={onCreateNew}
         disabled={creating}
-        className="w-full rounded-sm border border-border-strong px-4 py-2 text-body text-sm transition hover:border-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+        className="w-full"
       >
-        {creating ? "Creando…" : "+ Nueva conversación"}
-      </button>
+        {creating ? "Creando…" : "Nueva conversación"}
+      </ActionButton>
 
       <label className="flex items-center gap-2 rounded-sm border border-border px-3 py-1.5 text-muted text-sm">
         <Icon name="search" size={16} />

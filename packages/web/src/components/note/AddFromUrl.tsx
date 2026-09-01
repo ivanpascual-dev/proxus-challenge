@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { fetchUrlSourceAction } from "../../domain/artifacts/atoms.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 interface AddFromUrlProps {
   readonly onAdd: (result: UrlSourceResult) => void;
@@ -53,14 +54,15 @@ export function AddFromUrl({ onAdd, onCancel }: AddFromUrlProps) {
           inputMode="url"
           autoFocus
         />
-        <button
-          type="button"
-          className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98] disabled:opacity-50"
+        <ActionButton
+          icon="link"
+          variant="primary"
+          size="compact"
           disabled={url.trim().length === 0 || isFetching}
           onClick={onFetch}
         >
           {isFetching ? "Trayendo…" : "Traer"}
-        </button>
+        </ActionButton>
       </div>
       <p className="text-muted text-xs">
         Solo `https`. El servidor descarga la página, comprueba que no apunta a una dirección interna,
@@ -104,28 +106,30 @@ export function AddFromUrl({ onAdd, onCancel }: AddFromUrlProps) {
           </details>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98]"
+            <ActionButton
+              icon="plus"
+              variant="primary"
+              size="compact"
               onClick={() => onAdd(preview)}
             >
               Añadir como bloque
-            </button>
-            <button
-              type="button"
-              className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98]"
+            </ActionButton>
+            <ActionButton
+              icon="trash"
+              variant="danger"
+              size="compact"
               onClick={() => setPreview(null)}
             >
               Descartar
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
 
       <div className="flex justify-end">
-        <button type="button" className="text-muted text-sm transition hover:text-brand hover:underline" onClick={onCancel}>
+        <ActionButton icon="close" variant="neutral" size="compact" onClick={onCancel}>
           Cancelar
-        </button>
+        </ActionButton>
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ import {
   type LocalAnswers
 } from "./question-view.tsx";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El panel de examen a pantalla completa (decisión 18, §6.11). Mientras dura el examen la aplicación
 // ES el examen: sin barra lateral, sin pestañas, sin chat (App lo pinta sobre la rejilla). Aquí solo
@@ -367,28 +368,28 @@ function ExamBody({
               )
             : (
                 <>
-                  <button
-                    type="button"
+                  <ActionButton
+                    icon="close"
+                    variant="danger"
                     onClick={() => void onCancel()}
                     disabled={busy || phase === "grading"}
-                    className=" border border-border-strong px-4 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
                   >
                     Cancelar el examen
-                  </button>
+                  </ActionButton>
                   <div className="flex items-center gap-3">
                     <p className="text-muted text-sm">
                       {unanswered === 0
                         ? "Todo respondido."
                         : `${unanswered} sin responder (contarán en blanco).`}
                     </p>
-                    <button
-                      type="button"
+                    <ActionButton
+                      icon="check-circle"
+                      variant="primary"
                       onClick={() => void doSubmit()}
                       disabled={busy || phase === "grading"}
-                      className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {phase === "grading" ? "Corrigiendo…" : "Entregar"}
-                    </button>
+                    </ActionButton>
                   </div>
                 </>
               )}
@@ -437,22 +438,22 @@ function ExamBriefing({
           <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
+          <ActionButton
+            icon="play"
+            variant="primary"
             onClick={onStart}
             disabled={busy}
-            className=" bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Empezando…" : "Empezar el examen"}
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="close"
+            variant="neutral"
             onClick={onExit}
             disabled={busy}
-            className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-brand disabled:opacity-50"
           >
             Ahora no
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Centered>
@@ -469,13 +470,13 @@ function Centered({ children }: { readonly children: React.ReactNode }) {
 
 function ExitButton({ onExit, label }: { readonly onExit: () => void; readonly label: string }) {
   return (
-    <button
-      type="button"
+    <ActionButton
+      icon="chevron-left"
+      variant="brand"
       onClick={onExit}
-      className=" border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
     >
       {label}
-    </button>
+    </ActionButton>
   );
 }
 

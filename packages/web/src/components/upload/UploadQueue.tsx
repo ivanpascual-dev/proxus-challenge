@@ -1,4 +1,5 @@
 import { IconButton } from "../ui/IconButton.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // Presentación de la cola de subida (fase 5, §4.2): `UploadManager` posee el estado, este componente
 // solo lo pinta. Dos listas separadas porque son dos fases distintas: la de prevalidación (antes de
@@ -72,18 +73,19 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
               </li>
             ))}
           </ul>
-          <button
-            type="button"
+          <ActionButton
+            icon="upload"
+            variant="primary"
             disabled={!canUpload}
             onClick={onUpload}
-            className="mt-3 w-full rounded-sm border border-border-strong bg-surface px-5 py-2 text-heading transition hover:border-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+            className="mt-3 w-full"
           >
             {canUpload
               ? `Subir ${staged.length} fichero${staged.length === 1 ? "" : "s"}`
               : anyValidating
               ? "Comprobando los ficheros…"
               : "Quita los ficheros rechazados para poder subir"}
-          </button>
+          </ActionButton>
         </div>
       )}
 

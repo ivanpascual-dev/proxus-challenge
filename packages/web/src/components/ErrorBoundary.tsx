@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { ActionButton } from "./ui/ActionButton.tsx";
 
 // La red de seguridad de render. Una excepción lanzada mientras React pinta (un `undefined` donde se
 // esperaba un objeto, un `.map` sobre algo que no es lista) desmonta el árbol entero: sin esto, la
@@ -57,20 +58,20 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
+          <ActionButton
+            icon="refresh"
+            variant="primary"
             onClick={this.reset}
-            className="rounded-sm bg-brand px-5 py-2 font-semibold text-on-brand text-sm transition hover:bg-brand/90 active:scale-[0.98]"
           >
             Reintentar
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="refresh"
+            variant="neutral"
             onClick={() => window.location.reload()}
-            className="rounded-sm border border-border-strong px-5 py-2 text-body text-sm transition hover:border-brand active:scale-[0.98]"
           >
             Recargar la página
-          </button>
+          </ActionButton>
         </div>
       </div>
     );

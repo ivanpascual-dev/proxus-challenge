@@ -143,6 +143,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Cambiado
 
+- **Los botones de acción comparten un lenguaje visual.** Guardar, borrar, cancelar, generar, volver,
+  empezar, entregar, aceptar, descartar, subir y reintentar muestran un icono del mismo sistema que el
+  resto de la aplicación, una etiqueta clara, la misma tipografía y estados coherentes de hover,
+  pulsación, foco y deshabilitado. Los selectores de origen de preguntas y modo de examen usan el
+  mismo patrón y distinguen visual y semánticamente la opción activa.
 - **Rediseño visual del escritorio de estudio.** Sidebar, chat, apuntes y pruebas comparten un
   lenguaje más plano, con menos esquinas redondeadas y más contraste en la interacción. Los apuntes
   se leen en dos paneles: un índice de bloques a la izquierda y un bloque a la vez a la derecha, con

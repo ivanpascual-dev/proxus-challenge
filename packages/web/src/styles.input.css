@@ -95,6 +95,18 @@
   }
 }
 
+/* F5-35: el movimiento reducido es una preferencia global. Los componentes no tienen que recordar
+   quitar por separado escalados, giros, highlights o transiciones al añadir una interacción nueva. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* Editor de bloque (TipTap). No hay plugin de tipografía, así que el ritmo vertical y los formatos
    del menú "/" se definen aquí, con los tokens del tema. */
 @layer components {

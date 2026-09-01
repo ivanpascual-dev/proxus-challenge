@@ -8,6 +8,7 @@ import type { DraftBlock } from "./draft.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
 import { MaterialCitation } from "../ui/MaterialCitation.tsx";
 import { blockHeading } from "./NoteOutline.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 interface SelectedNoteBlockProps {
   readonly block: DraftBlock;
@@ -96,16 +97,15 @@ export function SelectedNoteBlock({
           {block.source?.type === "material" && <span>· cita un material</span>}
           {block.source?.type === "url" && <span>· cita una URL</span>}
         </div>
-        <button
-          type="button"
-          className={`flex items-center gap-1.5 rounded-sm px-3 py-1.5 font-medium text-sm transition active:scale-[0.98] ${
-            block.emphasis ? "bg-brand-soft text-brand" : "text-muted hover:text-heading"
-          }`}
+        <ActionButton
+          icon="star"
+          variant={block.emphasis ? "selected" : "neutral"}
+          size="compact"
           onClick={onToggleEmphasis}
           aria-pressed={block.emphasis}
         >
-          <span aria-hidden>★</span> Importante
-        </button>
+          Importante
+        </ActionButton>
       </div>
 
       <div className="grid gap-1">
@@ -143,15 +143,16 @@ export function SelectedNoteBlock({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted text-xs">Reescribir con el tutor:</span>
           {(["clearer", "deeper"] as const).map((mode) => (
-            <button
+            <ActionButton
               key={mode}
-              type="button"
-              className="font-medium text-brand text-xs transition hover:underline active:scale-[0.98] disabled:opacity-40"
+              icon="edit"
+              variant="brand"
+              size="compact"
               disabled={!canRewrite || rewriting !== null}
               onClick={() => askRewrite(mode)}
             >
               {rewriting === mode ? "Reescribiendo…" : modeLabel[mode]}
-            </button>
+            </ActionButton>
           ))}
           {block.id === undefined && (
             <span className="text-muted text-xs italic">guarda el apunte primero</span>
@@ -178,20 +179,22 @@ export function SelectedNoteBlock({
               <Streamdown>{proposal.markdown}</Streamdown>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98]"
+              <ActionButton
+                icon="check"
+                variant="primary"
+                size="compact"
                 onClick={acceptProposal}
               >
                 Reemplazar el bloque
-              </button>
-              <button
-                type="button"
-                className="font-medium text-muted text-sm transition hover:text-heading hover:underline active:scale-[0.98]"
+              </ActionButton>
+              <ActionButton
+                icon="trash"
+                variant="danger"
+                size="compact"
                 onClick={() => setProposal(null)}
               >
                 Descartar
-              </button>
+              </ActionButton>
             </div>
             <p className="text-muted text-xs">
               Reemplazar solo cambia el borrador: los apuntes no se guardan hasta que pulses «Guardar apuntes».

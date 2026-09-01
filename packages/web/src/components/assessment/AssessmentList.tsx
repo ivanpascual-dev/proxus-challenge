@@ -1,5 +1,6 @@
 import type { AssessmentListEntry } from "@proxus/shared";
 import { IconButton } from "../ui/IconButton.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // Cómo se resuelve una prueba, a partir de su tipo y su modo. Un Control y un Examen de prueba se
 // resuelven en el mismo sitio (a libro abierto); un Examen real toma la aplicación entera.
@@ -126,22 +127,24 @@ function AssessmentRow({
         <div className="flex flex-wrap items-center gap-2">
           {isRealExam
             ? (
-                <button
-                  type="button"
-                  className="font-semibold text-brand text-sm transition hover:underline active:scale-[0.98]"
+                <ActionButton
+                  icon="lock"
+                  variant="brand"
+                  size="compact"
                   onClick={onStartExam}
                 >
                   Empezar el examen
-                </button>
+                </ActionButton>
               )
             : (
-                <button
-                  type="button"
-                  className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
+                <ActionButton
+                  icon="play"
+                  variant="brand"
+                  size="compact"
                   onClick={onOpen}
                 >
                   {entry.kind === "quiz" ? "Practicar" : "Abrir"}
-                </button>
+                </ActionButton>
               )}
           {entry.lastAttempt !== null && (
             <IconButton icon="history" label="Ver intentos" onClick={onHistory} />

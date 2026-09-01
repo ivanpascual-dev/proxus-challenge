@@ -5,6 +5,7 @@ import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { attemptHistoryQuery, disputeAction, solvableAssessmentQuery } from "../../domain/assessments/atoms.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { answersFromStored, AttemptSummary, type LocalAnswers, QuestionCard } from "./question-view.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El historial de una prueba (paso 23 del plan): todos sus intentos, los abandonados incluidos con su
 // motivo y sus interrupciones. Un intento corregido se abre entero con sus correcciones; uno
@@ -27,13 +28,14 @@ export function AttemptHistory({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
+        <ActionButton
+          icon="chevron-left"
+          variant="brand"
+          size="compact"
           onClick={onExit}
-          className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
         >
-          ← Volver a la lista
-        </button>
+          Volver a la lista
+        </ActionButton>
       </div>
 
       <h2 className="mb-1 font-bold text-heading text-xl">{title}</h2>
@@ -107,13 +109,14 @@ function AttemptRow({
           )}
         </div>
         {onOpen !== undefined && (
-          <button
-            type="button"
-            className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
+          <ActionButton
+            icon="arrow-right"
+            variant="brand"
+            size="compact"
             onClick={onOpen}
           >
             {attempt.status === "graded" ? "Ver correcciones" : "Ver detalle"}
-          </button>
+          </ActionButton>
         )}
       </div>
     </li>
@@ -149,13 +152,15 @@ function OpenAttempt({
 
   return (
     <article className="mx-auto max-w-3xl pb-8">
-      <button
-        type="button"
+      <ActionButton
+        icon="chevron-left"
+        variant="brand"
+        size="compact"
         onClick={onBack}
-        className="mb-4 font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
+        className="mb-4"
       >
-        ← Volver al historial
-      </button>
+        Volver al historial
+      </ActionButton>
 
       <header className="mb-5 border-border border-b pb-4">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">

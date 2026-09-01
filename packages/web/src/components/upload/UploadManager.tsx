@@ -7,6 +7,7 @@ import { streamReindexMaterial } from "../../domain/materials/stream.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { Icon } from "../ui/Icon.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 import { hasActiveWork, UploadQueue, type FileUploadState, type StagedFile } from "./UploadQueue.tsx";
 
 // Absorbe el estado que antes vivía en `UploadDropzone` (fase 5, §4.2). La diferencia real: el
@@ -152,17 +153,17 @@ export function UploadManager() {
 
   return (
     <>
-      <button
-        type="button"
+      <ActionButton
+        icon="upload"
+        variant="neutral"
         onClick={() => setOpen(true)}
-        className="relative flex w-full items-center justify-center gap-2 rounded-sm border border-border-strong bg-surface px-4 py-2 font-medium text-heading text-sm transition hover:border-brand active:scale-[0.98]"
+        className="relative w-full"
       >
-        <Icon name="upload" size={16} />
         Subir material
         {activeWork && (
           <span className="-translate-y-1/2 absolute top-1/2 right-3 size-2 rounded-full bg-brand" aria-hidden="true" />
         )}
-      </button>
+      </ActionButton>
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Subir material" widthClassName="max-w-md">
         <div className="p-5">

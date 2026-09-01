@@ -7,6 +7,7 @@ import {
   type TestAnswer,
 } from "@proxus/shared";
 import { MaterialCitation } from "../ui/MaterialCitation.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El motivo de repaso, por pregunta (§6.11, F3-33): la señal del perfil que trajo la pregunta. Nunca
 // un número resumen (invariante 5).
@@ -478,13 +479,14 @@ function ShortAnswerCorrectionBody({
       )}
       {correction.status !== "disputed" && (
         <div>
-          <button
-            type="button"
+          <ActionButton
+            icon="check-circle"
+            variant="brand"
+            size="compact"
             onClick={onDispute}
-            className="font-medium text-brand text-sm transition hover:underline active:scale-[0.98]"
           >
             Esto sí lo dije
-          </button>
+          </ActionButton>
         </div>
       )}
     </div>

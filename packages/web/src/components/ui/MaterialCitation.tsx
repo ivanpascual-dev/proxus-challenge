@@ -1,4 +1,4 @@
-import { Icon } from "./Icon.tsx";
+import { ActionButton } from "./ActionButton.tsx";
 
 // Procedencia visual común a apuntes, pruebas y chat (fase 5, decisión 26, §4.10): reemplaza
 // progresivamente `BlockCitation` y `QuestionSourceLine`. Siempre abre el material correcto, cambia a
@@ -33,14 +33,15 @@ export function MaterialCitation({ materialId, pages, transcribed = false, unanc
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <button
-        type="button"
+      <ActionButton
+        icon="book-open"
+        variant="brand"
+        size="compact"
         onClick={() => onOpen(materialId, pages[0]!)}
-        className="inline-flex items-center gap-1 border border-border-strong/60 px-2 py-0.5 text-brand text-xs hover:border-brand hover:bg-brand-soft"
+        className="min-h-7 px-2"
       >
-        <Icon name="chevron-right" size={16} />
         {text}
-      </button>
+      </ActionButton>
       {transcribed && (
         <span className="text-[0.7rem] text-muted">transcrito por el modelo</span>
       )}
