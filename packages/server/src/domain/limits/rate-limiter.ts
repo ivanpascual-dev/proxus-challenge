@@ -20,6 +20,11 @@ export interface RateLimiter {
   // techo de subidas, no la gracia misma.
   readonly grantUploadGrace: (materialId: string) => Effect.Effect<void>;
   readonly hasUploadGrace: (materialId: string) => Effect.Effect<boolean>;
+  // Revoca la gracia de un material (fase 5, ADR-028): la llama la generación de apuntes al cerrar su
+  // stream, en éxito y en fallo, para que la gracia no siga viva más allá de la preparación automática
+  // que la motivó. Revocar un material sin gracia (ya expirada, o nunca concedida) es una operación
+  // idempotente, no un error.
+  readonly revokeUploadGrace: (materialId: string) => Effect.Effect<void>;
 }
 
 export const RateLimiter = Context.Service<RateLimiter>(
@@ -165,7 +170,17 @@ export const make = (
         }),
       );
 
-    return { check, acquire, release, checkUpload, grantUploadGrace, hasUploadGrace };
+    const revokeUploadGrace: RateLimiter["revokeUploadGrace"] = (materialId) =>
+      Ref.update(uploadGraceRef, (map) => {
+        if (!map.has(materialId)) {
+          return map;
+        }
+        const next = new Map(map);
+        next.delete(materialId);
+        return next;
+      });
+
+    return { check, acquire, release, checkUpload, grantUploadGrace, hasUploadGrace, revokeUploadGrace };
   });
 
 export const layer = (now?: () => number) =>

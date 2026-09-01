@@ -197,7 +197,10 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
 
     const body = events.pipe(
       Stream.provideService(LanguageModel.LanguageModel, languageModel),
-      Stream.map(encodeIndexNdjson)
+      Stream.map(encodeIndexNdjson),
+      // Renueva la gracia al cerrar el stream (ADR-028): un indexado largo no debe consumir la
+      // ventana antes de que el cliente lance, justo después, la generación de apuntes.
+      Stream.ensuring(hasGrace ? rateLimiter.grantUploadGrace(id) : Effect.void)
     );
 
     return HttpServerResponse.stream(body, {
@@ -237,12 +240,13 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const key = yield* clientKey;
     // Genera un artefacto y hace una llamada al modelo por tema: cuenta contra el cubo `artifacts`
     // (más estricto que `messages`) y toma un permiso de concurrencia, igual que el chat, porque es
-    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (fase 4, decisión 4)
-    // salta el cubo, no la concurrencia, cuando es la primera generación de apuntes de un material
+    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (ADR-028) exime de las DOS
+    // barreras, no solo del cubo de frecuencia, cuando es la preparación automática de un material
     // recién subido: ya se cobró al decidir subir.
     const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const usesConcurrencyPermit = !hasGrace;
     const rejected = yield* (hasGrace ? Effect.void : rateLimiter.check(key, "artifacts")).pipe(
-      Effect.andThen(() => rateLimiter.acquire(key)),
+      Effect.andThen(() => usesConcurrencyPermit ? rateLimiter.acquire(key) : Effect.void),
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
     );
@@ -259,7 +263,12 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
       Effect.catchTag("NoteGenerationError", () => Effect.succeed(Option.none<string>()))
     );
     if (Option.isSome(existingNote)) {
-      yield* rateLimiter.release(key);
+      if (usesConcurrencyPermit) {
+        yield* rateLimiter.release(key);
+      }
+      if (hasGrace) {
+        yield* rateLimiter.revokeUploadGrace(id);
+      }
       return yield* HttpServerResponse.json(
         encodeNoteAlreadyExists(new NoteAlreadyExists({
           materialId: id,
@@ -296,7 +305,16 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const body = events.pipe(
       Stream.provideService(LanguageModel.LanguageModel, languageModel),
       Stream.map(encodeNoteGenNdjson),
-      Stream.ensuring(rateLimiter.release(key))
+      // Libera el permiso de concurrencia si lo tomó, y revoca la gracia si la tenía (ADR-028), en
+      // éxito y en fallo: la gracia no debe seguir viva más allá de esta preparación automática.
+      Stream.ensuring(Effect.gen(function* () {
+        if (usesConcurrencyPermit) {
+          yield* rateLimiter.release(key);
+        }
+        if (hasGrace) {
+          yield* rateLimiter.revokeUploadGrace(id);
+        }
+      }))
     );
 
     return HttpServerResponse.stream(body, {

@@ -76,3 +76,36 @@ test("RateLimiter upload grace is granted, holds within its TTL, and expires aft
   clock += LIMITS.uploadGraceMs + 1;
   assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-x")), false);
 });
+
+test("RateLimiter renewing the upload grace resets its TTL (ADR-028: no la agota un indexado largo)", async () => {
+  let clock = 0;
+  const limiter = await Effect.runPromise(make(() => clock));
+
+  await Effect.runPromise(limiter.grantUploadGrace("material-y"));
+
+  clock += LIMITS.uploadGraceMs - 1;
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-y")), true);
+
+  // Renovar (mismo `grantUploadGrace`) cuando todavía queda un instante de gracia extiende el TTL
+  // completo desde este momento, en vez de dejar que expire.
+  await Effect.runPromise(limiter.grantUploadGrace("material-y"));
+  clock += LIMITS.uploadGraceMs - 1;
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-y")), true);
+
+  clock += 2;
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-y")), false);
+});
+
+test("RateLimiter revokes the upload grace, idempotently", async () => {
+  const limiter = await Effect.runPromise(make(() => 0));
+
+  await Effect.runPromise(limiter.grantUploadGrace("material-z"));
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-z")), true);
+
+  await Effect.runPromise(limiter.revokeUploadGrace("material-z"));
+  assert.equal(await Effect.runPromise(limiter.hasUploadGrace("material-z")), false);
+
+  // Revocar un material sin gracia (ya revocada, o que nunca la tuvo) no falla.
+  await Effect.runPromise(limiter.revokeUploadGrace("material-z"));
+  await Effect.runPromise(limiter.revokeUploadGrace("material-never-had-one"));
+});
