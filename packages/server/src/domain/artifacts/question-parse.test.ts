@@ -84,10 +84,30 @@ test("array de preguntas vacío: cero preguntas, cero descartes", () => {
   assert.equal(result.dropped.length, 0);
 });
 
-test("insufficientContent se reconoce y no es un error de formato", () => {
+test("insufficientContent junto a preguntas válidas: se conservan, con la bandera puesta", () => {
+  const result = parseGeneratedQuestions(JSON.stringify({ questions: [mc()], insufficientContent: true }));
+  assert.equal(result.kind, "questions");
+  if (result.kind === "questions") {
+    assert.equal(result.questions.length, 1);
+    assert.equal(result.insufficientContent, true);
+  }
+});
+
+test("questions sin insufficientContent: la bandera queda a false", () => {
+  const result = parseGeneratedQuestions(wrap(mc()));
+  assert.equal(result.kind, "questions");
+  assert.equal(result.kind === "questions" ? result.insufficientContent : true, false);
+});
+
+test("formato antiguo {insufficientContent, maxPossible} sin `questions`: legacy-insufficient", () => {
   const result = parseGeneratedQuestions(JSON.stringify({ insufficientContent: true, maxPossible: 3 }));
-  assert.equal(result.kind, "insufficient");
-  assert.equal(result.kind === "insufficient" ? result.maxPossible : -1, 3);
+  assert.equal(result.kind, "legacy-insufficient");
+  assert.equal(result.kind === "legacy-insufficient" ? result.maxPossible : -1, 3);
+});
+
+test("formato antiguo sin maxPossible numérico: se interpreta como 0", () => {
+  const result = parseGeneratedQuestions(JSON.stringify({ insufficientContent: true }));
+  assert.equal(result.kind === "legacy-insufficient" ? result.maxPossible : -1, 0);
 });
 
 test("respuesta que no es JSON: unparseable", () => {

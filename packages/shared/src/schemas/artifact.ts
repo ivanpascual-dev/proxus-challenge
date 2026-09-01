@@ -155,7 +155,11 @@ export const QuizArtifact = Schema.Struct({
   createdAt: Schema.String,
   // El Control es siempre de práctica: no lleva `mode`. `examTimeLimitSeconds` lo deriva el código del
   // reparto de preguntas por si se practica a reloj, pero no hay penalización ni puerta cerrada.
-  examTimeLimitSeconds: Schema.Number
+  examTimeLimitSeconds: Schema.Number,
+  // Cuántas preguntas se pidieron al generar (correcciones de cierre de fase 5, decisión 10).
+  // Ausente en artefactos anteriores a este corte: se interpretan como completos, con solicitado
+  // igual a `questions.length` (`assessment-shortfall.ts`).
+  requestedQuestionCount: Schema.optional(Schema.Number)
 });
 export type QuizArtifact = typeof QuizArtifact.Type;
 
@@ -170,7 +174,11 @@ export const TestArtifact = Schema.Struct({
   examTimeLimitSeconds: Schema.Number,
   // "de prueba" (a libro abierto, con pistas) o "real" (`exam`: puerta cerrada, reloj, penalización,
   // generado sin pistas). Se elige al generar el Examen.
-  mode: AssessmentMode
+  mode: AssessmentMode,
+  // Cuántas preguntas se pidieron al generar (correcciones de cierre de fase 5, decisión 10).
+  // Ausente en artefactos anteriores a este corte: se interpretan como completos, con solicitado
+  // igual a `questions.length` (`assessment-shortfall.ts`).
+  requestedQuestionCount: Schema.optional(Schema.Number)
 });
 export type TestArtifact = typeof TestArtifact.Type;
 
@@ -198,7 +206,10 @@ export const ArtifactSummary = Schema.Struct({
   createdAt: Schema.optional(Schema.String),
   scope: Schema.optional(AssessmentScope),
   origin: Schema.optional(AssessmentOrigin),
-  questionCount: Schema.optional(Schema.Number)
+  questionCount: Schema.optional(Schema.Number),
+  // Cuántas se pidieron al generar; ausente si coincide con `questionCount` (prueba completa) o si el
+  // artefacto es un apunte.
+  requestedQuestionCount: Schema.optional(Schema.Number)
 });
 export type ArtifactSummary = typeof ArtifactSummary.Type;
 

@@ -5,6 +5,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
 import {
+  AssessmentGenerationRejected,
   AssessmentGenerationStreamEvent,
   ExamInProgress,
   GenerateAssessmentInput,
@@ -75,6 +76,7 @@ const encodeNdjson = (event: TutorChatStreamEvent) =>
 const encodeLimitExceeded = Schema.encodeSync(LimitExceeded);
 const encodeRateLimited = Schema.encodeSync(RateLimited);
 const encodeExamInProgress = Schema.encodeSync(ExamInProgress);
+const encodeAssessmentGenerationRejected = Schema.encodeSync(AssessmentGenerationRejected);
 
 // La puerta cerrada del examen (decisión 18) para las rutas NDJSON sueltas: no pasan por `HttpApi`,
 // así que el middleware `ExamLockdownGuard` no las cubre y comprueban a mano. Sale como JSON con
@@ -351,7 +353,9 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
     );
     if (request === null) {
       return yield* HttpServerResponse.json(
-        { message: "El cuerpo de la petición no tiene el formato esperado (kind, topicId, origin, questionCount)." },
+        encodeAssessmentGenerationRejected(new AssessmentGenerationRejected({
+          message: "El cuerpo de la petición no tiene el formato esperado (kind, topicId, origin, questionCount)."
+        })),
         { status: 400 }
       );
     }
@@ -372,11 +376,15 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
     const assessmentGen = yield* AssessmentGenerationService;
 
     // Precondiciones comprobadas ANTES de abrir el stream (§6.9): material inexistente, sin indexar,
-    // techo de pruebas. Salen como JSON con `message`, no como un `failed` a mitad.
+    // techo de pruebas. Salen como JSON con `_tag` reconocido (`AssessmentGenerationRejected`), no como
+    // un `failed` a mitad: así la interfaz conserva el motivo exacto en vez de caer al genérico.
     const rejection = yield* assessmentGen.precheck(id, request);
     if (Option.isSome(rejection)) {
       yield* rateLimiter.release(key);
-      return yield* HttpServerResponse.json({ message: rejection.value.message }, { status: rejection.value.status });
+      return yield* HttpServerResponse.json(
+        encodeAssessmentGenerationRejected(new AssessmentGenerationRejected({ message: rejection.value.message })),
+        { status: rejection.value.status }
+      );
     }
 
     // La capa elegida según `request.kind` (§4.2): Examen lleva el pensamiento decidido en el tramo
@@ -396,6 +404,7 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
             type: "done" as const,
             assessment: summarizeAssessment(result.artifact),
             questionCount: result.questionCount,
+            requestedQuestionCount: request.questionCount,
             retries: result.retries
           }).pipe(Effect.asVoid),
           onFailure: (error) => Queue.offer(queue, {

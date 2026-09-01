@@ -201,3 +201,15 @@ test("una prueba y un intento guardados se decodifican igual con shared y con el
     Schema.decodeUnknownSync(Schema.fromJsonString(SharedArtifactAttempt))(attemptJson)
   );
 });
+
+// Correcciones de cierre de fase 5, decisión 10: `requestedQuestionCount` es opcional (compatibilidad
+// con artefactos guardados antes de este corte) en las dos copias. Se prueba presente y ausente.
+test("requestedQuestionCount se decodifica igual con y sin el campo, en las dos copias", () => {
+  const partialQuizJson = JSON.stringify({ ...JSON.parse(quizJson), requestedQuestionCount: 6 });
+  for (const json of [quizJson, partialQuizJson]) {
+    assert.deepEqual(
+      Schema.decodeUnknownSync(Schema.fromJsonString(ServerArtifact))(json),
+      Schema.decodeUnknownSync(Schema.fromJsonString(SharedArtifact))(json)
+    );
+  }
+});

@@ -33,6 +33,7 @@ import {
   type ShortAnswerCorrection,
   type TestArtifact
 } from "./artifact.ts";
+import { requestedQuestionCount } from "./assessment-shortfall.ts";
 import { applyHeartbeat, connectedSecondsNow, remainingSeconds } from "./exam-clock.ts";
 import { findActiveExam } from "./exam-lockdown.ts";
 import { gradeInProgressAttempt } from "./grading.ts";
@@ -105,6 +106,7 @@ export const toSolvable = (artifact: Assessment): SolvableAssessment => ({
   kind: artifact.kind,
   title: artifact.title,
   examTimeLimitSeconds: artifact.examTimeLimitSeconds,
+  requestedQuestionCount: requestedQuestionCount(artifact),
   questions: artifact.questions.map((question): SolvableQuestion => {
     switch (question.type) {
       case "multiple-choice":
@@ -154,6 +156,7 @@ export const buildAssessmentListEntry = (
     origin: artifact.origin,
     createdAt: artifact.createdAt,
     questionCount: artifact.questions.length,
+    requestedQuestionCount: requestedQuestionCount(artifact),
     examTimeLimitSeconds: artifact.examTimeLimitSeconds,
     lastAttempt: last === undefined ? null : {
       id: last.id,

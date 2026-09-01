@@ -140,7 +140,14 @@ const countFromPrompt = (prompt: string, token: string): number => {
 };
 
 // El modelo falso lee cuántas preguntas de cada tipo le piden y responde según la estrategia.
-const fakeModel = (strategy: "good" | "half-then-good" | "always-broken" | "insufficient") => {
+// "insufficient" es el marcador ANTIGUO sin `questions` (question-parse.ts, kind
+// "legacy-insufficient"), siempre con la misma respuesta: sirve para probar que, si la
+// materialización tampoco produce nada, el tema aporta cero. "insufficient-new" es el formato
+// vigente: preguntas válidas junto a `insufficientContent: true`. "legacy-then-good" declara el
+// marcador antiguo en la primera llamada y responde de verdad a la petición de materialización.
+const fakeModel = (
+  strategy: "good" | "half-then-good" | "always-broken" | "insufficient" | "insufficient-new" | "legacy-then-good"
+) => {
   let call = 0;
   return Layer.effect(
     LanguageModel.LanguageModel,
@@ -155,6 +162,16 @@ const fakeModel = (strategy: "good" | "half-then-good" | "always-broken" | "insu
         const rest = () => [...goodMultipleResponse(wantMr), ...goodTrueFalse(wantTf)];
 
         if (strategy === "insufficient") {
+          return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ insufficientContent: true, maxPossible: 2 }) })]);
+        }
+        if (strategy === "insufficient-new") {
+          const half = (n: number) => Math.floor(n / 2);
+          return Effect.succeed([Response.makePart("text", { text: JSON.stringify({
+            questions: [...goodMultipleChoice(half(wantMc)), ...goodShortAnswer(half(wantSa))],
+            insufficientContent: true
+          }) })]);
+        }
+        if (strategy === "legacy-then-good" && call === 1) {
           return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ insufficientContent: true, maxPossible: 2 }) })]);
         }
         if (strategy === "always-broken") {
@@ -317,13 +334,86 @@ test("si el modelo siempre devuelve preguntas rotas, la generación falla y no g
   assert.equal(store.length, 0);
 });
 
-test("insufficientContent: falla nombrando cuántas preguntas sí daba el tema, sin guardar", async () => {
+// C5-05/C5-06: solo una insuficiencia declarada autoriza una prueba parcial; el formato antiguo sin
+// preguntas materializadas contribuye cero, y si es el único tema, la prueba entera no se guarda.
+test("marcador antiguo cuya materialización tampoco produce nada: el tema aporta cero y, al ser el único, no se guarda nada", async () => {
   const store: Artifact[] = [];
   await assert.rejects(
     generate(quizInput, store, "insufficient"),
-    (error: unknown) => /solo da para 2/.test((error as { reason: string }).reason)
+    (error: unknown) => /no da para ninguna pregunta/.test((error as { reason: string }).reason)
   );
   assert.equal(store.length, 0);
+});
+
+test("marcador antiguo cuya materialización sí produce preguntas: se guarda la parcial con el solicitado", async () => {
+  const store: Artifact[] = [];
+  const result = await generate(quizInput, store, "legacy-then-good");
+  assert.equal(result.questionCount, 2);
+  assert.equal(store.length, 1);
+  if (result.artifact.kind === "quiz") {
+    assert.equal(result.artifact.requestedQuestionCount, 6);
+    assert.equal(result.artifact.questions.length, 2);
+  }
+});
+
+test("insufficientContent junto a preguntas válidas (formato vigente): se guarda la parcial", async () => {
+  const store: Artifact[] = [];
+  const result = await generate(quizInput, store, "insufficient-new");
+  assert.ok(result.questionCount > 0 && result.questionCount < 6);
+  assert.equal(store.length, 1);
+  if (result.artifact.kind === "quiz") {
+    assert.equal(result.artifact.requestedQuestionCount, 6);
+    assert.equal(result.artifact.questions.length, result.questionCount);
+  }
+});
+
+test("insuficiencia declarada en todos los temas con cero preguntas: falla sin guardar nada (C5-06)", async () => {
+  const store: Artifact[] = [];
+  // "insufficient-new" con wantMc/wantSa tan bajos que `half()` redondea a cero en ambos tipos.
+  const zeroInsufficient = () => Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [], insufficientContent: true }) })]),
+      streamText: () => Stream.empty
+    })
+  );
+  await assert.rejects(
+    generateWithModel({ ...testInput, questionCount: 10 }, store, zeroInsufficient()),
+    (error: unknown) => /no da para ninguna pregunta/.test((error as { reason: string }).reason)
+  );
+  assert.equal(store.length, 0);
+});
+
+test("una insuficiencia declarada en un tema no impide guardar lo que dieron los demás", async () => {
+  const store: Artifact[] = [];
+  // Solo "sintaxis" declara insuficiencia; "cuantificadores" responde completo con la estrategia
+  // habitual. El Examen cubre los dos temas del índice de prueba (testInput).
+  const mixed = () => Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: (options) => {
+        const prompt = JSON.stringify(options.prompt);
+        const wantMc = countFromPrompt(prompt, "de opción única \\(multiple-choice\\)");
+        const wantMr = countFromPrompt(prompt, "de opción múltiple \\(multiple-response\\)");
+        const wantTf = countFromPrompt(prompt, "de verdadero/falso \\(true-false\\)");
+        const wantSa = countFromPrompt(prompt, "de desarrollo corto \\(short-answer\\)");
+        if (prompt.includes("Sintaxis")) {
+          return Effect.succeed([Response.makePart("text", { text: JSON.stringify({ questions: [], insufficientContent: true }) })]);
+        }
+        return Effect.succeed([Response.makePart("text", { text: JSON.stringify({
+          questions: [...goodMultipleChoice(wantMc), ...goodMultipleResponse(wantMr), ...goodTrueFalse(wantTf), ...goodShortAnswer(wantSa)]
+        }) })]);
+      },
+      streamText: () => Stream.empty
+    })
+  );
+  const result = await generateWithModel(testInput, store, mixed());
+  assert.equal(store.length, 1);
+  assert.ok(result.questionCount > 0 && result.questionCount < testInput.questionCount);
+  if (result.artifact.kind === "test") {
+    assert.ok(result.artifact.questions.every((question) => question.source.topicId === "cuantificadores"));
+    assert.equal(result.artifact.requestedQuestionCount, testInput.questionCount);
+  }
 });
 
 test("un material sin indexar falla con un motivo claro, sin crear nada", async () => {
