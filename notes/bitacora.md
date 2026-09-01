@@ -1204,3 +1204,43 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   único punto de la interfaz que ya llamaba a ese endpoint era borrar un apunte, y un apunte no tiene
   intentos. Se extrajo la cascada a `artifact-deletion.ts` y se commiteó antes que el botón, para que
   el botón nazca ya sin dejar huérfanos.
+
+## 2026-09-01 · Correcciones de cierre de fase 5 · Sesión 3 (conversaciones)
+
+- **Desviación, acordada con Iván:** el plan (§4.2.5, sesión 3 paso 6) pedía tests de componente con
+  API falsa para el borrador del chat (montaje sin POST, primer envío único, fallo 50, borrado de la
+  activa). No se escribieron: el repo no tiene ninguna infraestructura de test de componentes React
+  (cero tests con `react-dom`/`@testing-library`; `happy-dom` se usó una sola vez, para instanciar
+  TipTap en `noteBlockSchema.test.ts`). Montarla para esto (RegistryProvider + un doble de
+  `apiRuntime` + stub de `fetch` con respuestas conformes a los schemas de `@proxus/shared` +
+  streaming NDJSON + `act()`) es andamiaje frágil y primero de su clase, desproporcionado para el
+  cambio. Misma decisión que la desviación de la sesión 1. C5-08, C5-09 y C5-11 quedan para recorrido
+  manual, como el resto de procedimientos de UI del plan.
+- **Sí queda con test automático:** `sortSessionsForHistory` (`session-order.test.ts`, casos de
+  empate y fechas iguales) y su integración en `FileSessionRepository.listSessions`
+  (`file-session-repository.test.ts`, escribe ficheros de sesión con fechas controladas y comprueba
+  el orden que devuelve `listSessions`). Cubre C5-07 de extremo a extremo dentro del servidor.
+- **Refactor de `Chat.tsx`:** pasa a ser solo el propietario de un `conversationId` opcional (estado
+  `draft` | `stored`). La cáscara compartida (cabecera, drawer, mensajes, contexto, composer) se
+  extrae a `ChatFrame.tsx`; el borrador vive en `DraftConversation.tsx` y la conversación guardada en
+  `StoredConversation.tsx` (antes `ChatConversation`, dentro de `Chat.tsx`). El borrador no consulta
+  ni crea nada: la conversación nace en servidor al enviar el primer mensaje válido y ese mensaje se
+  entrega una sola vez en `StoredConversation` (ref de guarda, no el flag `cancelled` que usaba el
+  efecto de montaje anterior, que en StrictMode llegaba a crear dos sesiones). Las 34 conversaciones
+  vacías heredadas no se borran solas (sería destructivo): se listan al final y se pueden eliminar.
+- **Enmiendas de Iván al probar la fase:**
+  - El estado vacío del chat muestra "Sube tus materiales para que Sym pueda ayudarte mejor con tu
+    estudio." solo cuando `materialsQuery` devuelve cero materiales.
+  - Al alcanzar `maxConversations`, el borrador no espera al 400 del servidor: enseña el mismo aviso
+    ("Ya tienes N conversaciones…") en grande, desactiva las sugerencias y bloquea el `textarea` (no
+    solo el botón de enviar, con el nuevo prop `blocked` de `ChatComposer`). Borrar una conversación
+    del historial vuelve a habilitarlo. Sigue cumpliendo C5-09 (el historial queda operable para
+    abrir o borrar). Segunda pasada de Iván: el aviso se pinta como banda sobre el chat (en
+    `ChatFrame`, prop `limitNotice`), no bajo las tres sugerencias; `ChatEmptyState` solo recibe
+    `blocked` para desactivar los cuadrados.
+  - `ChatHeader` gana un botón "Nueva conversación" (icono `plus`) al lado del historial, para
+    empezar una conversación sin abrir el drawer. Deshabilitado cuando el chat ya es un borrador
+    (`activeId === undefined`).
+  - El chat usa el 85% del ancho de su columna (`w-[85%] max-w-5xl`) en vez de `max-w-3xl`. El
+    contenedor con `overflow-y-auto` ocupa el 100% para que la barra de scroll quede pegada al borde
+    de la ventana y no al texto; el contenido (mensajes, avisos y composer) se centra al 85%.

@@ -44,6 +44,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Varias conversaciones con el tutor, guardadas.** Una lista lateral junto al chat muestra las
   conversaciones anteriores, deja crear una nueva y borrar las que sobren; cambiar de una a otra
   recupera su historial completo.
+- **El chat no crea una conversación hasta que envías el primer mensaje.** Al abrir el chat, pulsar
+  "Nueva conversación" (un botón nuevo en la cabecera) o borrar la conversación abierta, queda un
+  borrador en blanco que no aparece en el historial. La conversación se guarda al enviar el primer
+  mensaje; si ese guardado falla, el texto escrito no se pierde.
 - **El tutor propone hasta tres preguntas de seguimiento.** Al final de cada respuesta aparecen, como
   botones, hasta tres preguntas relacionadas con lo que acaba de explicar; pulsar una la envía como si
   se hubiera escrito. Si están las tres y solo falta el cierre técnico, se recuperan; si el contenido
@@ -193,6 +197,14 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Los avisos de límite de frecuencia se leen en lenguaje humano.** Al agotar la ventana corta el
   aviso nombra los minutos que dura; al agotar el tope diario dice que se descanse y se vuelva
   mañana, en vez de hablar en segundos.
+- **El historial de conversaciones ordena primero las que tienen mensajes**, de la más reciente a la
+  más antigua, y deja al final las conversaciones vacías.
+- **Al llegar al máximo de conversaciones, el chat lo avisa antes de escribir.** Una banda sobre el
+  cuadro de texto explica que no se pueden crear más y lo bloquea, en vez de dejar escribir un mensaje
+  que fallaría al enviarse; el historial sigue disponible para borrar alguna y volver a escribir.
+- **El estado vacío del chat presenta a Sym como tutor de tus materiales, apuntes y progreso**, con
+  tres sugerencias que el tutor puede cumplir de verdad, ninguna de ellas crear Controles ni Exámenes.
+  Si todavía no has subido ningún material, lo recuerda con una línea.
 - **El chat de Sym agrupa cada turno en vez de listar mensajes sueltos.** La burbuja del alumno, la
   actividad del agente y la respuesta (o el fallo) viajan juntas. La actividad aparece resumida y
   colapsada ("Consultando el material · 2 pasos · Hecho") solo cuando el turno usó alguna
