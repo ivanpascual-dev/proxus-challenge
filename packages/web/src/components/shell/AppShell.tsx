@@ -6,7 +6,6 @@ import {
   ratioFromPointer,
   type SplitBounds
 } from "../../domain/workspace/layout.ts";
-import { IconButton } from "../ui/IconButton.tsx";
 
 // Layout visual del escritorio (fase 5, §4.2). Solo posee proporción y breakpoint: no consulta APIs,
 // no sabe qué hay dentro de cada slot. `material === null` es el estado inicial y el que se recupera
@@ -40,10 +39,9 @@ interface AppShellProps {
   readonly sidebar: ReactNode;
   readonly material: ReactNode | null;
   readonly chat: ReactNode;
-  readonly onCloseMaterial: () => void;
 }
 
-export function AppShell({ sidebar, material, chat, onCloseMaterial }: AppShellProps) {
+export function AppShell({ sidebar, material, chat }: AppShellProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState(readStoredRatio);
   const [bounds, setBounds] = useState<SplitBounds>({
@@ -131,8 +129,8 @@ export function AppShell({ sidebar, material, chat, onCloseMaterial }: AppShellP
       <div ref={contentRef} className="flex h-screen min-w-0 overflow-hidden">
         {canSplit && material !== null ? (
           <>
-            <div className="h-screen min-w-0" style={{ flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }}>
-              <MaterialPane onClose={onCloseMaterial}>{material}</MaterialPane>
+            <div className="h-screen min-w-0 overflow-hidden" style={{ flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }}>
+              {material}
             </div>
             <div
               role="separator"
@@ -159,8 +157,8 @@ export function AppShell({ sidebar, material, chat, onCloseMaterial }: AppShellP
         ) : hasMaterial ? (
           // El viewport no admite los dos mínimos: se prioriza lo que el alumno abrió explícitamente
           // (adaptación mínima, no la selección de superficie completa que llega en P3).
-          <div className="h-screen min-w-0 flex-1">
-            <MaterialPane onClose={onCloseMaterial}>{material}</MaterialPane>
+          <div className="h-screen min-w-0 flex-1 overflow-hidden">
+            {material}
           </div>
         ) : (
           <div className="h-screen min-w-0 flex-1 overflow-hidden">
@@ -168,19 +166,6 @@ export function AppShell({ sidebar, material, chat, onCloseMaterial }: AppShellP
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// Cierre explícito del material (decisión 10): vive aquí de forma provisional hasta que el paso 7 de
-// esta misma sesión extraiga `MaterialHeader`, que asumirá este control dentro de su propia cabecera.
-function MaterialPane({ children, onClose }: { readonly children: ReactNode; readonly onClose: () => void }) {
-  return (
-    <div className="relative h-screen min-w-0 overflow-hidden">
-      <div className="absolute top-2 right-2 z-10">
-        <IconButton icon="close" label="Cerrar material" onClick={onClose} />
-      </div>
-      {children}
     </div>
   );
 }

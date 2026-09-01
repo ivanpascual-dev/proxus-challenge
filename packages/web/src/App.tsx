@@ -95,7 +95,6 @@ export function App() {
     <>
       <SystemNoticeRegion />
       <AppShell
-        onCloseMaterial={() => setSelectedMaterialId(null)}
         sidebar={
           // Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red.
           <ErrorBoundary label="la lista de materiales">
@@ -112,6 +111,7 @@ export function App() {
               indexState={selectedMaterial.indexState}
               title={selectedMaterial.title}
               pageCount={selectedMaterial.pageCount}
+              onClose={() => setSelectedMaterialId(null)}
               onStartExam={(artifactId, title) =>
                 setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
               onContextChange={setScreenContext}

@@ -17,12 +17,16 @@ import {
 } from "../domain/materials/mindmap-layout.ts";
 import { streamReindexMaterial } from "../domain/materials/stream.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
+import { MaterialHeader } from "./material/MaterialHeader.tsx";
+import { MaterialTabs, type Tab } from "./material/MaterialTabs.tsx";
 
 interface MaterialPanelProps {
   readonly materialId: string;
   readonly indexState: "indexed" | "not-indexed";
   readonly title: string;
   readonly pageCount: number;
+  // Cierre explícito del material (decisión 10): vuelve a Sym a ancho completo.
+  readonly onClose: () => void;
   // Empezar un Examen real saca de aquí: la aplicación entera pasa a ser el panel del examen
   // (decisión 18).
   readonly onStartExam: (artifactId: string, title: string) => void;
@@ -32,12 +36,10 @@ interface MaterialPanelProps {
   readonly onContextChange: (refs: readonly ChatContextRef[]) => void;
 }
 
-type Tab = "pdf" | "mindmap" | "notes" | "assessments";
-
 // Marca de procedencia de una página, tal como la pinta el visor.
 type PageMarker = null | { readonly kind: "extracted" | "transcribed" } | { readonly kind: "failed"; readonly reason: string };
 
-export function MaterialPanel({ materialId, indexState, title, pageCount, onStartExam, onContextChange }: MaterialPanelProps) {
+export function MaterialPanel({ materialId, indexState, title, pageCount, onClose, onStartExam, onContextChange }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
   const [pendingPage, setPendingPage] = useState<number | null>(null);
@@ -74,32 +76,21 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onStar
   };
 
   return (
-    <main className="flex h-screen min-w-0 flex-col overflow-hidden border-border border-r bg-canvas/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
-      <header className="mb-4 shrink-0">
-        <p className="mb-1 font-bold text-brand text-xs uppercase tracking-widest">Material</p>
-        <h2 className="font-bold text-3xl text-heading">{title}</h2>
-        <p className="mt-1 text-muted text-sm">{pageCount} páginas</p>
-      </header>
+    <main className="flex h-screen min-w-0 flex-col overflow-hidden bg-canvas/60">
+      <MaterialHeader title={title} pageCount={pageCount} indexed={indexed} onClose={onClose} />
 
-      {!indexed && <ReindexBanner materialId={materialId} />}
+      {!indexed && <div className="p-4"><ReindexBanner materialId={materialId} /></div>}
 
-      {indexed && (
-        <div className="mb-4 flex shrink-0 gap-2">
-          <TabButton active={tab === "pdf"} onClick={() => setTab("pdf")}>PDF</TabButton>
-          <TabButton active={tab === "mindmap"} onClick={() => setTab("mindmap")}>Mapa mental</TabButton>
-          <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Apuntes</TabButton>
-          <TabButton active={tab === "assessments"} onClick={() => setTab("assessments")}>Pruebas</TabButton>
-        </div>
-      )}
+      {indexed && <MaterialTabs active={tab} onChange={setTab} />}
 
-      <div className={`min-h-0 flex-1 ${tab === "pdf" ? "flex flex-col" : "hidden"}`}>
+      <div className={`min-h-0 flex-1 p-4 ${tab === "pdf" ? "flex flex-col" : "hidden"}`}>
         {indexed
           ? <IndexedPdfViewer materialId={materialId} pageCount={pageCount} scrollTo={pendingPage} onScrolled={() => setPendingPage(null)} />
           : <PageList materialId={materialId} pageCount={pageCount} markerFor={() => null} scrollTo={pendingPage} onScrolled={() => setPendingPage(null)} />}
       </div>
 
       {indexed && (
-        <div className={`min-h-0 flex-1 ${tab === "mindmap" ? "flex flex-col" : "hidden"}`}>
+        <div className={`min-h-0 flex-1 p-4 ${tab === "mindmap" ? "flex flex-col" : "hidden"}`}>
           <MindMapTab
             materialId={materialId}
             title={title}
@@ -116,7 +107,7 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onStar
       )}
 
       {indexed && (
-        <div className={`min-h-0 flex-1 ${tab === "assessments" ? "flex flex-col" : "hidden"}`}>
+        <div className={`min-h-0 flex-1 p-4 ${tab === "assessments" ? "flex flex-col" : "hidden"}`}>
           <AssessmentsTab
             materialId={materialId}
             pendingControl={pendingControl}
@@ -130,19 +121,6 @@ export function MaterialPanel({ materialId, indexState, title, pageCount, onStar
   );
 }
 
-function TabButton({ active, onClick, children }: { readonly active: boolean; readonly onClick: () => void; readonly children: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-4 py-1.5 font-medium text-sm ${
-        active ? "border border-brand bg-brand-soft text-heading" : "border border-border text-muted hover:text-heading"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 // --- Visor del PDF -----------------------------------------------------------
 
