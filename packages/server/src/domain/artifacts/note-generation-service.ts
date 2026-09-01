@@ -89,8 +89,24 @@ export const make = (
       }))
     );
 
+    const truncated = response.finishReason === "length";
+    if (truncated) {
+      // Riesgo 10 / F4-37: un bloque cortado por el techo de salida no puede leerse como "sin
+      // contenido" ni como un apunte completo. Se nombra el motivo, tanto en el log como en el bloque.
+      yield* Effect.logWarning(
+        `generación de apuntes: el tema "${topic.label}" se cortó por el techo de salida del modelo (finishReason: length)`
+      );
+    }
+
     const body = response.text.trim();
-    return body.length === 0 ? `${heading}\n\n_Sin contenido redactado._` : `${heading}\n\n${body}`;
+    if (body.length === 0) {
+      return truncated
+        ? `${heading}\n\n_El modelo se cortó por el techo de salida (finishReason: length) antes de redactar nada. Vuelve a generar los apuntes._`
+        : `${heading}\n\n_Sin contenido redactado._`;
+    }
+    return truncated
+      ? `${heading}\n\n${body}\n\n_[Cortado por el techo de salida del modelo: este bloque puede quedar incompleto.]_`
+      : `${heading}\n\n${body}`;
   });
 
   const forMaterial = (materialId: string, onProgress?: NoteGenerationSink) => Effect.gen(function* () {
