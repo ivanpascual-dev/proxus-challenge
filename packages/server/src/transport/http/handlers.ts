@@ -28,6 +28,7 @@ import {
 import { deleteArtifactCascade } from "../../domain/artifacts/artifact-deletion.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts/attempt-service.ts";
+import { assessmentShortfall } from "../../domain/artifacts/assessment-shortfall.ts";
 import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
@@ -291,23 +292,28 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
   })
 );
 
-const artifactSummary = (artifact: Artifact) => ({
-  id: artifact.id,
-  kind: artifact.kind,
-  title: artifact.title,
+const artifactSummary = (artifact: Artifact) => {
   // El apunte lleva su `materialId` desde la fase 2; los Controles y Exámenes lo llevan dentro del
   // alcance, más lo que la pestaña Pruebas necesita para pintar la lista sin descargar cada prueba
   // entera (§5.4).
-  ...(artifact.kind === "note"
-    ? { materialId: artifact.materialId }
-    : {
-        materialId: artifact.scope.materialId,
-        createdAt: artifact.createdAt,
-        scope: artifact.scope,
-        origin: artifact.origin,
-        questionCount: artifact.questions.length
-      })
-});
+  if (artifact.kind === "note") {
+    return { id: artifact.id, kind: artifact.kind, title: artifact.title, materialId: artifact.materialId };
+  }
+  // `requestedQuestionCount` solo cuando la prueba salió parcial (correcciones de cierre de fase 5,
+  // decisión 10): ausente si coincide con `questionCount` o si el artefacto es anterior al corte.
+  const shortfall = assessmentShortfall(artifact);
+  return {
+    id: artifact.id,
+    kind: artifact.kind,
+    title: artifact.title,
+    materialId: artifact.scope.materialId,
+    createdAt: artifact.createdAt,
+    scope: artifact.scope,
+    origin: artifact.origin,
+    questionCount: artifact.questions.length,
+    ...(shortfall ? { requestedQuestionCount: shortfall.requested } : {})
+  };
+};
 
 // 500 con cuerpo, nunca un orDie mudo (invariante 6, F2-08). El mensaje al usuario dice qué falló,
 // no cómo: el motivo crudo (ruta del fichero, SchemaError, `_tag`) es fuga de detalle interno. Los
