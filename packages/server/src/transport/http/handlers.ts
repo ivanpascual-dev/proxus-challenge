@@ -25,6 +25,7 @@ import {
   type Artifact,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
+import { deleteArtifactCascade } from "../../domain/artifacts/artifact-deletion.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts/attempt-service.ts";
 import { StudyProfileService } from "../../domain/profile/study-profile.ts";
@@ -434,11 +435,12 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         return yield* notes.rejectProposal(params.id, params.proposalId);
       }))
       // Borrado: la única operación destructiva por HTTP de la fase 2. Cubo `artifacts` (más
-      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte.
+      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte. La cascada
+      // de intentos vive en `artifact-deletion.ts`.
       .handle("deleteArtifact", ({ params }) => Effect.gen(function* () {
         const key = yield* clientKey;
         yield* rateLimiter.check(key, "artifacts");
-        return yield* artifacts.deleteArtifact(params.id).pipe(
+        return yield* deleteArtifactCascade(artifacts, params.id).pipe(
           Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
             ? artifactNotFound(params.id)
             : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))
