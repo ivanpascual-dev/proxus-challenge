@@ -91,8 +91,11 @@ export const turnViewsFromConversation = (conversation: Conversation): readonly 
 // cliente ya no reconstruye historial, solo acumula el turno que está mandando). Estas funciones son
 // puras: `Chat.tsx` las aplica sobre su estado según llegan los eventos NDJSON.
 
+// `key` único por turno enviado (`live-…`): `MessageList` lo usa para reconciliar el mismo componente
+// cuando el turno pasa de "en vivo" a cerrado sin reiniciar el revelado (§4.2.6), y para distinguir un
+// turno de esta sesión de uno hidratado del historial (`turn-…`), que se muestra siempre completo.
 export const emptyTurnView = (input: string, context: readonly ChatContextRef[]): TurnView => ({
-  key: "live-turn",
+  key: `live-${crypto.randomUUID()}`,
   input,
   context,
   calls: [],
