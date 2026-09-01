@@ -193,6 +193,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   que ya no existía. Ahora se borran con el resto.
 - **Generar un apunte o una prueba avisa cuando el modelo se corta a media respuesta**, en vez de leerse
   como "el tema no daba para tanto" o entregarse con el bloque incompleto sin decirlo.
+- **El chat conserva los saltos de línea que escribes.** Un mensaje escrito con Shift+Enter en varias
+  líneas se guardaba bien, pero la burbuja del alumno lo enseñaba fundido en una sola línea.
 
 ### Eliminado
 

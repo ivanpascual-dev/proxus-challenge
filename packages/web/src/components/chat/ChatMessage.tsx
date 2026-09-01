@@ -10,7 +10,7 @@ import type { TurnView } from "../../domain/tutor/turn-view.ts";
 export function ChatMessage({ turn }: { readonly turn: TurnView }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="max-w-[72%] self-end rounded-2xl bg-brand-soft px-4 py-2.5 text-heading text-sm leading-6">
+      <p className="max-w-[72%] self-end whitespace-pre-wrap rounded-2xl bg-brand-soft px-4 py-2.5 text-heading text-sm leading-6">
         {turn.input}
       </p>
 
