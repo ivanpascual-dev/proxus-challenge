@@ -1192,3 +1192,15 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   (`pnpm dev` sin `--watch`, arrancado a la 01:03) y no había recargado el código nuevo; tras reiniciar
   el proceso, las 5 arrancaron. Queda como aviso para el resto del recorrido manual: reiniciar el
   servidor de desarrollo antes de probar cambios de `packages/server`.
+
+## 2026-09-01 · Correcciones de cierre de fase 5 · Sesión 2 (generación de contenido) + arreglos post-entrega
+
+- **C5-05/C5-06 verificados a mano:** Iván probó la prueba parcial contra el servidor de desarrollo
+  real (Gemini real, no simulado): un tema sin respaldo suficiente guarda la prueba con menos
+  preguntas de las pedidas y muestra el aviso; un fallo de formato agota los reintentos sin guardar
+  nada.
+- **Causa raíz (post-entrega):** el botón de borrar de Controles y Exámenes reveló que `deleteArtifact`
+  nunca borraba los intentos guardados del artefacto; el defecto era antiguo pero invisible porque el
+  único punto de la interfaz que ya llamaba a ese endpoint era borrar un apunte, y un apunte no tiene
+  intentos. Se extrajo la cascada a `artifact-deletion.ts` y se commiteó antes que el botón, para que
+  el botón nazca ya sin dejar huérfanos.

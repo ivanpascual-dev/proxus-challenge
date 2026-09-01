@@ -106,6 +106,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   con las preguntas, lo que respondió el alumno, la corrección de cada una con su cita, y el "Esto sí
   lo dije" de las de desarrollo. Un intento cancelado o caducado no se corrige: enseña por qué se
   cerró y, si el examen se interrumpió, cuántas veces y en qué franjas.
+- **Prueba parcial cuando el material no da para tanto.** Si al generar un Control o un Examen el
+  material no sostiene todas las preguntas pedidas para un tema, la prueba se guarda igual con las que
+  sí se pudieron generar y muestra "Se pidieron N preguntas; el contenido permitió M." al terminar, en
+  la lista y al abrir la prueba.
+- **Borrar un Control o un Examen.** Cada prueba de la lista tiene un botón para borrarla; se avisa de
+  que también se pierden sus intentos guardados.
 - **Pruebas de repaso.** Al generar un Control o un Examen, si el perfil del material tiene algo que
   repasar (un tema fallado, uno consultado con pista o uno marcado como importante) se puede elegir
   "De repaso" en vez de "Nuevas": las preguntas se concentran en esos temas y cada una dice por qué
@@ -235,6 +241,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Borrar un material también borra su perfil de estudio**, y su índice y las páginas ya renderizadas
   cuando ningún otro material conserva el mismo contenido. Antes solo se borraban el PDF y sus
   artefactos.
+- **El índice ya no crea temas de portadas, separadores o páginas sin contenido de estudio.** Esas
+  páginas quedan sin tema y ya no generan un bloque de apuntes de relleno ("no tiene apenas texto...").
+- **Rechazar la generación de una prueba (rango de preguntas, tope alcanzado, material sin indexar) ya
+  muestra el motivo real** en vez de un mensaje genérico.
 
 ### Eliminado
 

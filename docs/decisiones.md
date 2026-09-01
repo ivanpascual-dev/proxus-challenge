@@ -880,7 +880,9 @@ tramo 3C (el examen) esa forma se reveló equivocada:
 
 ## ADR-019 · El código pone la forma de la prueba; el modelo redacta las preguntas
 
-- **Estado:** aceptada
+- **Estado:** aceptada; la frase "O la prueba sale con las N pedidas o no sale (decisión 21)" queda
+  sustituida por ADR-026, que autoriza una prueba parcial cuando la insuficiencia de contenido es una
+  declaración válida del modelo, nunca un error de formato.
 - **Fecha:** 2026-08-30
 
 **Contexto.** El adaptador de Gemini de este repo no manda `generationConfig` en el camino vivo, así
@@ -1311,3 +1313,56 @@ Chat, pruebas manuales y generación de apuntes sin gracia mantienen las dos bar
 - La gracia sigue acotada por `uploadGraceMs` como caducidad de seguridad y por `uploadsPerWindow` como
   freno a fabricar gracia a fuerza de subir y borrar: esta decisión amplía lo que la gracia exime, no
   cuánta gracia se puede tener.
+
+---
+
+## ADR-026 · Una prueba parcial solo la autoriza una insuficiencia declarada, nunca un error de formato
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** ADR-019 dejó cerrado que "o la prueba sale con las N pedidas o no sale" (decisión 21):
+cualquier déficit, sin distinguir su causa, hacía fallar la generación entera. Al probar el cierre de
+la fase 5, esa regla castiga igual dos casos que no son lo mismo. Uno, el material de verdad no
+sostiene tantas preguntas de un tema concreto (una portada breve, un tema con dos párrafos): el modelo
+lo sabe y lo dice, pero antes no había ningún sitio donde guardar esa verdad. Dos, un fallo técnico
+(JSON roto, tipo de pregunta inesperado, salida cortada por el techo): esto sigue sin decir nada sobre
+si el material da para más, así que tratarlo igual que el caso uno colaría una prueba corta por una
+razón que ni el modelo ni el sistema pueden explicar.
+
+**Opciones consideradas.**
+
+- **Mantener el todo-o-nada de ADR-019.** Descartada: es la instrucción que Iván cambió explícitamente
+  al revisar el cierre de fase 5, y confunde "el material no da para tanto" (verificable, explicable)
+  con "el modelo se cortó" (no dice nada del material).
+- **Aceptar cualquier déficit como parcial, sin distinguir la causa.** Descartada: un JSON roto o un
+  `finishReason: length` no son una declaración de insuficiencia de contenido; guardar una prueba corta
+  por esa razón la presenta como completa hasta que alguien nota que faltan preguntas de un tipo, sin
+  ningún mensaje que lo explique (invariante 3).
+- **Reintentar indefinidamente hasta conseguir la cifra pedida.** Descartada: un material sin más
+  contenido no va a dar más preguntas por reintentar; es gasto de llamadas al modelo sin salida, y
+  retrasa un fallo o un guardado que ya se podría resolver.
+
+**Decisión.** El modelo declara la insuficiencia explícitamente, junto con las preguntas que sí puede
+sostener (`question-parse.ts`, prompt §6.2 del plan de correcciones): `{"questions":[...],
+"insufficientContent":true}`. Solo esa declaración autoriza a cerrar un tema con menos preguntas de las
+que pedía su reparto; `AssessmentGenerationService` sigue entonces con los demás temas y guarda al
+final lo que haya, con `requestedQuestionCount` (lo pedido) y `questions.length` (lo real) por
+separado. Un formato antiguo sin preguntas (`{"insufficientContent":true,"maxPossible":N}`, por si el
+modelo no sigue la instrucción nueva) se acepta como compatibilidad defensiva: se le pide una vez esa
+cantidad exacta y, si tampoco produce nada, el tema aporta cero sin más reintentos. Un error de formato,
+un tipo de pregunta inesperado o una salida cortada (`finishReason: length`) sin esa declaración
+mantienen los reintentos existentes y, al agotarlos, hacen fallar la generación completa sin guardar
+nada: siguen sin decir si el material da para más. Una parcial con cero preguntas en total tampoco se
+guarda: no hay nada que mostrar como prueba.
+
+**Consecuencias.**
+
+- La interfaz muestra `Se pidieron N preguntas; el contenido permitió M.` de forma persistente (al
+  terminar, en la lista y al abrir la prueba), nunca como error ni oculto tras recargar: la diferencia
+  entre lo pedido y lo real deja de ser invisible.
+- Los artefactos guardados antes de este corte no llevan `requestedQuestionCount`: se interpretan como
+  completos, con solicitado igual al real (`assessment-shortfall.ts`). No hace falta migrar ficheros.
+- El reparto por tipo de una prueba parcial puede no conservar los porcentajes de una completa: se
+  guarda solo lo que el material sostiene, sin fabricar preguntas de un tipo para cuadrar el reparto.
+- La corrección y la nota se calculan sobre las preguntas que existen, nunca sobre las que se pidieron.
