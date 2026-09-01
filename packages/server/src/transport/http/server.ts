@@ -91,7 +91,10 @@ const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
       return yield* HttpServerResponse.json(encodeExamInProgress(locked.value), { status: 409 });
     }
 
-    const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest);
+    // F4-11/F4-12: la sesión vive en el servidor, así que un cliente no puede mandar historial
+    // fabricado. `onExcessProperty: "error"` es lo que convierte un campo no declarado (por ejemplo
+    // `messages`) en un 400, en vez de decodificar en silencio ignorándolo (invariante 3).
+    const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest, { onExcessProperty: "error" });
 
     const limitExceeded = checkChatRequestLimits(input);
     if (Option.isSome(limitExceeded)) {
