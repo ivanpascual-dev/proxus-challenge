@@ -23,6 +23,7 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { ActionButton } from "../ui/ActionButton.tsx";
 
@@ -278,6 +279,7 @@ function ExamBody({
         kind={assessment.kind}
         title={title}
         questionCount={assessment.questions.length}
+        requestedQuestionCount={assessment.requestedQuestionCount}
         timeLimitSeconds={assessment.examTimeLimitSeconds}
         busy={busy}
         error={error}
@@ -317,6 +319,10 @@ function ExamBody({
               {assessment.kind === "quiz" ? "Control" : "Examen"} · modo examen
             </p>
             <h2 className="font-bold text-heading text-lg">{title}</h2>
+            {(() => {
+              const notice = partialAssessmentNotice(assessment.requestedQuestionCount, assessment.questions.length);
+              return notice === null ? null : <p className="text-muted text-xs">{notice}</p>;
+            })()}
           </div>
           <div className="text-right">
             {phase === "graded"
@@ -403,6 +409,7 @@ function ExamBriefing({
   kind,
   title,
   questionCount,
+  requestedQuestionCount,
   timeLimitSeconds,
   busy,
   error,
@@ -412,12 +419,14 @@ function ExamBriefing({
   readonly kind: "quiz" | "test";
   readonly title: string;
   readonly questionCount: number;
+  readonly requestedQuestionCount: number;
   readonly timeLimitSeconds: number;
   readonly busy: boolean;
   readonly error: string | undefined;
   readonly onStart: () => void;
   readonly onExit: () => void;
 }) {
+  const notice = partialAssessmentNotice(requestedQuestionCount, questionCount);
   return (
     <Centered>
       <div className="max-w-lg">
@@ -428,6 +437,7 @@ function ExamBriefing({
         <p className="mt-3 text-muted">
           {questionCount} {questionCount === 1 ? "pregunta" : "preguntas"} · {Math.round(timeLimitSeconds / 60)} minutos
         </p>
+        {notice !== null && <p className="mt-1 text-muted text-sm">{notice}</p>}
         <ul className="mt-4 grid gap-2 text-body text-sm">
           <li>· La corrección y la nota salen al entregar, no antes. No hay pistas.</li>
           <li>· El reloj solo corre mientras tengas el examen abierto: si te vas, se para y se retoma donde lo dejaste.</li>

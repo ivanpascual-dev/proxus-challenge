@@ -1,11 +1,13 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import { LIMITS, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
+import { LIMITS, type AssessmentListEntry, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
 import { useEffect, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
+import { deleteArtifactAction } from "../../domain/artifacts/atoms.ts";
 import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { groupAssessments } from "../../domain/assessments/group-assessments.ts";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
 import { AssessmentGroupTabs, type AssessmentGroup } from "./AssessmentGroupTabs.tsx";
 import { AssessmentList } from "./AssessmentList.tsx";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
@@ -64,6 +66,22 @@ export function AssessmentsTab({
   const [view, setView] = useState<View>({ kind: "list" });
   const [genTarget, setGenTarget] = useState<GenTarget | null>(null);
   const [activeGroup, setActiveGroup] = useState<AssessmentGroup>("controls");
+  const [deleteError, setDeleteError] = useState<string | undefined>();
+  const deleteArtifact = useAtomSet(deleteArtifactAction, { mode: "promise" });
+
+  const onDelete = async (entry: AssessmentListEntry) => {
+    if (!window.confirm(`¿Borrar "${entry.title}"? Se pierden también sus intentos guardados.`)) {
+      return;
+    }
+    setDeleteError(undefined);
+    try {
+      await deleteArtifact(entry.id);
+      refresh();
+    } catch (cause) {
+      const notice = describeFailure(cause, { area: "assessments", action: "delete" }, "AssessmentsTab");
+      setDeleteError(notice.description ?? notice.title);
+    }
+  };
 
   useEffect(() => {
     if (pendingControl !== null) {
@@ -150,12 +168,16 @@ export function AssessmentsTab({
                   Examen del material
                 </ActionButton>
               </div>
+              {deleteError !== undefined && (
+                <p className="mb-3 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{deleteError}</p>
+              )}
               <AssessmentList
                 entries={grouped[activeGroup]}
                 emptyMessage={EMPTY_MESSAGE[activeGroup]}
                 onOpen={(entry) => setView({ kind: "solve", id: entry.id, title: entry.title })}
                 onStartExam={(entry) => onStartExam(entry.id, entry.title)}
                 onHistory={(entry) => setView({ kind: "history", id: entry.id, title: entry.title })}
+                onDelete={(entry) => void onDelete(entry)}
               />
             </>
           );
@@ -215,10 +237,12 @@ function GenerateCard({
         } else if (event.type === "failed") {
           setError(event.message);
         } else {
+          const notice = partialAssessmentNotice(event.requestedQuestionCount, event.questionCount);
           setLines((current) => [
             ...current,
             `Prueba lista: ${event.questionCount} ${event.questionCount === 1 ? "pregunta" : "preguntas"}` +
-              (event.retries > 0 ? ` (${event.retries} ${event.retries === 1 ? "reintento" : "reintentos"})` : "")
+              (event.retries > 0 ? ` (${event.retries} ${event.retries === 1 ? "reintento" : "reintentos"})` : ""),
+            ...(notice === null ? [] : [notice])
           ]);
           setDone(true);
         }

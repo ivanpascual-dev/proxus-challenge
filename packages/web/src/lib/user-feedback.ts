@@ -20,7 +20,7 @@ export interface UserNotice {
 export type UserOperation =
   | { readonly area: "materials"; readonly action: "list" | "upload" | "delete" | "page" | "index" }
   | { readonly area: "notes"; readonly action: "load" | "generate" | "save" | "delete" | "proposal" | "source" }
-  | { readonly area: "assessments"; readonly action: "list" | "generate" | "load" | "hint" | "history" }
+  | { readonly area: "assessments"; readonly action: "list" | "generate" | "load" | "hint" | "history" | "delete" }
   | { readonly area: "attempts"; readonly action: "start" | "save" | "submit" | "resume" | "cancel" }
   | { readonly area: "profile"; readonly action: "load" }
   | { readonly area: "chat"; readonly action: "list" | "create" | "load" | "send" | "delete" };
@@ -70,7 +70,10 @@ const DOMAIN_ERROR_TAGS = new Set([
   "ConversationStorageError",
   // limit-exceeded.ts
   "LimitExceeded",
-  "RateLimited"
+  "RateLimited",
+  // assessment-generation.ts: rechazo del precheck (rango, tope, material sin indexar) o de cuerpo
+  // mal formado, antes de abrir el stream de generación.
+  "AssessmentGenerationRejected"
 ]);
 
 // Estos tags son un fallo real de infraestructura, no una condición esperada del dominio: se marcan
@@ -137,7 +140,8 @@ const OPERATION_FALLBACK: OperationFallbackMap = {
     generate: { title: "No se pudo generar la prueba.", description: GENERIC_FALLBACK },
     load: { title: "No se pudo cargar la prueba.", description: GENERIC_FALLBACK },
     hint: { title: "No se pudo pedir la pista.", description: GENERIC_FALLBACK },
-    history: { title: "No se pudo cargar el historial.", description: GENERIC_FALLBACK }
+    history: { title: "No se pudo cargar el historial.", description: GENERIC_FALLBACK },
+    delete: { title: "No se pudo borrar la prueba.", description: "La prueba sigue en tu lista. Vuelve a intentarlo." }
   },
   attempts: {
     start: { title: "No se pudo empezar el intento.", description: GENERIC_FALLBACK },

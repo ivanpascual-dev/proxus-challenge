@@ -22,6 +22,7 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { ActionButton } from "../ui/ActionButton.tsx";
 
@@ -184,6 +185,10 @@ function PracticeRun({
           En práctica no hay reloj ni penalización. Puedes abrir las pistas, mirar el material en las
           otras pestañas y preguntarle al tutor. La corrección sale al entregar.
         </p>
+        {(() => {
+          const notice = partialAssessmentNotice(assessment.requestedQuestionCount, assessment.questions.length);
+          return notice === null ? null : <p className="mt-2 text-muted text-sm">{notice}</p>;
+        })()}
       </header>
 
       {attempt === null

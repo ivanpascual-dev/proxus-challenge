@@ -1,4 +1,5 @@
 import type { AssessmentListEntry } from "@proxus/shared";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { ActionButton } from "../ui/ActionButton.tsx";
 
@@ -34,13 +35,15 @@ export function AssessmentList({
   emptyMessage,
   onOpen,
   onStartExam,
-  onHistory
+  onHistory,
+  onDelete
 }: {
   readonly entries: readonly AssessmentListEntry[];
   readonly emptyMessage: string;
   readonly onOpen: (entry: AssessmentListEntry) => void;
   readonly onStartExam: (entry: AssessmentListEntry) => void;
   readonly onHistory: (entry: AssessmentListEntry) => void;
+  readonly onDelete: (entry: AssessmentListEntry) => void;
 }) {
   if (entries.length === 0) {
     return (
@@ -68,6 +71,7 @@ export function AssessmentList({
             onOpen={() => onOpen(entry)}
             onStartExam={() => onStartExam(entry)}
             onHistory={() => onHistory(entry)}
+            onDelete={() => onDelete(entry)}
           />
         ))}
       </tbody>
@@ -79,12 +83,14 @@ function AssessmentRow({
   entry,
   onOpen,
   onStartExam,
-  onHistory
+  onHistory,
+  onDelete
 }: {
   readonly entry: AssessmentListEntry;
   readonly onOpen: () => void;
   readonly onStartExam: () => void;
   readonly onHistory: () => void;
+  readonly onDelete: () => void;
 }) {
   const isRealExam = entry.kind === "test" && entry.mode === "exam";
   const graded = entry.lastAttempt !== null && entry.lastAttempt.status === "graded" && entry.lastAttempt.displayedScore !== null
@@ -103,6 +109,10 @@ function AssessmentRow({
       </td>
       <td className="py-3 pr-4 text-body">
         {entry.questionCount} {entry.questionCount === 1 ? "pregunta" : "preguntas"}
+        {(() => {
+          const notice = partialAssessmentNotice(entry.requestedQuestionCount, entry.questionCount);
+          return notice === null ? null : <p className="mt-1 text-muted text-xs">{notice}</p>;
+        })()}
       </td>
       <td className="py-3 pr-4">
         {entry.lastAttempt === null
@@ -123,8 +133,8 @@ function AssessmentRow({
               </div>
             )}
       </td>
-      <td className="py-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <td className="py-3 pr-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {isRealExam
             ? (
                 <ActionButton
@@ -146,9 +156,12 @@ function AssessmentRow({
                   {entry.kind === "quiz" ? "Practicar" : "Abrir"}
                 </ActionButton>
               )}
-          {entry.lastAttempt !== null && (
-            <IconButton icon="history" label="Ver intentos" onClick={onHistory} />
-          )}
+          <div className="flex items-center gap-3">
+            {entry.lastAttempt !== null && (
+              <IconButton icon="history" label="Ver intentos" onClick={onHistory} />
+            )}
+            <IconButton icon="trash" label={`Borrar ${rowKindLabel(entry).toLowerCase()}`} onClick={onDelete} />
+          </div>
         </div>
       </td>
     </tr>

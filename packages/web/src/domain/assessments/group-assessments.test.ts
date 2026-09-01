@@ -11,6 +11,7 @@ const entry = (partial: Partial<AssessmentListEntry> & { readonly id: string }):
   origin: "material",
   createdAt: "2026-01-01T00:00:00.000Z",
   questionCount: 5,
+  requestedQuestionCount: 5,
   examTimeLimitSeconds: 600,
   lastAttempt: null,
   ...partial
