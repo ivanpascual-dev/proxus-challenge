@@ -116,10 +116,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
   navegador, no a la pantalla.
 - **Subir tus propios PDFs.** La barra lateral tiene una zona para arrastrar uno o varios PDFs, o
-  elegir un fichero. Cada uno sube, se indexa y genera sus apuntes en cadena, sin pulsar nada más, con
-  su propio progreso (subiendo, indexando página N de M, generando apuntes tema N de M). Un fichero
-  que no es un PDF de verdad, o que repite el nombre de un material ya subido, se rechaza nombrando el
-  motivo, sin tumbar a los demás de la misma tanda.
+  elegir un fichero. Cada uno se comprueba solo, sin escribir nada, en cuanto se suelta: un fichero
+  que no es un PDF de verdad, o que repite el nombre de un material ya subido, se avisa con su motivo y
+  una X para quitarlo. El botón "Subir" solo aparece cuando todo lo que queda en la zona está validado;
+  al pulsarlo, cada fichero sube, se indexa y genera sus apuntes en cadena, sin pulsar nada más, con su
+  propio progreso (subiendo, indexando página N de M, generando apuntes tema N de M).
 - **Borrar un material.** Cada material de la barra lateral tiene un botón para borrarlo. Antes de
   hacerlo se avisa de que también se pierden su apunte, sus controles y sus exámenes con sus intentos,
   y de que no se puede deshacer.

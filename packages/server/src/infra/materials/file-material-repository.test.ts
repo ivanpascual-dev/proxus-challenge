@@ -191,6 +191,90 @@ test("upload rechaza un nombre repetido y no sobreescribe el material original (
   });
 });
 
+test("validate acepta un PDF válido sin escribir nada a disco", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const candidatePath = join(uploadDir, "any-temp-name");
+      copyFileSync(fixturePdf, candidatePath);
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [{ fileName: "densidad.pdf", path: candidatePath }];
+      const [outcome] = await Effect.runPromise(repo.validate(candidates));
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "valid");
+      assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});
+
+test("validate rechaza un .txt que empieza por la cabecera de un PDF, igual que upload", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const candidatePath = join(uploadDir, "any-temp-name");
+      writeFileSync(candidatePath, "%PDF-1.4\nesto no es un PDF de verdad");
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [{ fileName: "fake.pdf", path: candidatePath }];
+      const [outcome] = await Effect.runPromise(repo.validate(candidates));
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "rejected");
+      if (outcome.outcome === "rejected") {
+        assert.equal(outcome.reason._tag, "UnsupportedFileType");
+      }
+      assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});
+
+test("validate rechaza un nombre que ya existe entre los materiales subidos", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      copyFileSync(fixturePdf, join(pdfDir, "densidad.pdf"));
+
+      const candidatePath = join(uploadDir, "any-temp-name");
+      copyFileSync(fixturePdf, candidatePath);
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [{ fileName: "densidad.pdf", path: candidatePath }];
+      const [outcome] = await Effect.runPromise(repo.validate(candidates));
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "rejected");
+      if (outcome.outcome === "rejected") {
+        assert.equal(outcome.reason._tag, "MaterialAlreadyExists");
+      }
+    });
+  });
+});
+
+test("validate rechaza dos ficheros del mismo lote con el mismo nombre, sin que el primero lo esconda", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const firstPath = join(uploadDir, "first");
+      const secondPath = join(uploadDir, "second");
+      copyFileSync(fixturePdf, firstPath);
+      copyFileSync(fixturePdf, secondPath);
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [
+        { fileName: "densidad.pdf", path: firstPath },
+        { fileName: "densidad.pdf", path: secondPath }
+      ];
+      const [first, second] = await Effect.runPromise(repo.validate(candidates));
+      assert.ok(first && second, "expected two outcomes");
+
+      assert.equal(first.outcome, "valid");
+      assert.equal(second.outcome, "rejected");
+      if (second.outcome === "rejected") {
+        assert.equal(second.reason._tag, "MaterialAlreadyExists");
+      }
+      assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});
+
 test("upload aborta la petición entera cuando pasa de maxMaterials, antes de escribir nada (F4-04)", async () => {
   await withDirs(async (pdfDir, indexDir) => {
     await withUploadDir(async (uploadDir) => {

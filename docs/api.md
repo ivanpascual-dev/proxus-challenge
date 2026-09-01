@@ -49,6 +49,7 @@ La ruta streaming está implementada manualmente para soportar eventos increment
 ```http
 GET    /api/materials/
 POST   /api/materials/
+POST   /api/materials/validate
 GET    /api/materials/:id
 DELETE /api/materials/:id
 GET    /api/materials/:id/index
@@ -67,6 +68,12 @@ PDF (fase 4, decisión 2); al subir, cada material se indexa y se le generan los
 pulsar nada más (decisión 3). El fallo de un fichero concreto (tipo, nombre duplicado) va dentro de la
 respuesta, uno por fichero; solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
 abortan la subida entera, antes de escribir nada.
+
+`POST /validate` (cierre de fase 4) comprueba el mismo lote (multipart, mismo `UploadPayload`) sin
+escribir nada: mismo sniff de cabecera + `pdfinfo` y misma comprobación de nombre duplicado que `POST
+/`, pero en modo consulta. La interfaz la llama sola al soltar los ficheros, antes de ofrecer el botón
+de subir de verdad; no comprueba `maxMaterials` (fallo agregado de `upload`) y no cuenta contra
+`uploadsPerWindow` (ese techo es de subidas reales, decisión 4).
 
 `DELETE /:id` borra el PDF y, en cascada, sus artefactos (apunte, Controles y Exámenes con sus
 intentos): dejarlos huérfanos era lo que producía el choque al resubir el mismo PDF, porque el

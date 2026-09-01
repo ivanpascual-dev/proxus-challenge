@@ -47,8 +47,11 @@ export const CLOSED_ROUTES: readonly string[] = [
   "GET /api/tutor/conversations/:id",
   "DELETE /api/tutor/conversations/:id",
   // Subir un material nuevo (fase 4) da acceso a material que no estaba en el examen: se cierra igual
-  // que el resto de rutas que tocan materiales.
+  // que el resto de rutas que tocan materiales. Validar antes de subir es el mismo camino en modo
+  // consulta (cierre de fase 4): abrirlo dejaría comprobar ficheros de fuera durante el examen aunque
+  // no llegaran a crearse.
   "POST /api/materials",
+  "POST /api/materials/validate",
   // Borrar un material se lleva sus artefactos (fase 4): tanto acceso a material como el propio
   // borrado de artefactos, así que se cierra por las dos razones a la vez.
   "DELETE /api/materials/:id",

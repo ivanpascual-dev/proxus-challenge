@@ -2,7 +2,13 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { Multipart } from "effect/unstable/http";
 import { LIMITS } from "../limits.ts";
-import { MaterialListResponse, MaterialUploadResponse, PageImage, PdfMaterial } from "../schemas/material.ts";
+import {
+  MaterialListResponse,
+  MaterialUploadResponse,
+  MaterialValidationResponse,
+  PageImage,
+  PdfMaterial
+} from "../schemas/material.ts";
 import { MaterialIndex } from "../schemas/material-index.ts";
 import { MaterialAssessmentsResponse } from "../schemas/attempt-api.ts";
 import { StudyProfile } from "../schemas/study-profile.ts";
@@ -15,15 +21,23 @@ import {
 } from "../errors/material-errors.ts";
 import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
+import { MultipartLimitGuard } from "./multipart-limit-guard.ts";
 
 // Multipart en buffer (no en stream): el fichero entero tiene que estar en disco antes de que
 // `pdfinfo` lo compruebe (sección 4.2 del plan de fase 4). `maxFileSize` es el techo por fichero
 // (`maxUploadBytes`); `maxTotalSize` es el caso peor de un lote al límite (`maxFilesPerUpload`
 // ficheros, cada uno al techo).
+//
+// `maxParts` va con un fichero de holgura (`+ 1`), a propósito: el parser de multipart de esta beta
+// (`multipasta`) no rechaza un lote que pasa de `maxParts`, lo trunca en silencio a los primeros N
+// sin avisar (verificado contra la API real). Con el techo exacto, un lote de 6 llegaría al servidor
+// como si fueran 5, sin ningún rechazo (F4-03, invariante 3: nada de fallo silencioso). Con la
+// holgura, el sexto fichero sí llega, y es `checkFileCount` en `handlers.ts` quien lo rechaza en voz
+// alta nombrando el techo real y lo recibido.
 const UploadPayload = Schema.Struct({
   files: Multipart.FilesSchema
 }).pipe(HttpApiSchema.asMultipart({
-  maxParts: LIMITS.maxFilesPerUpload,
+  maxParts: LIMITS.maxFilesPerUpload + 1,
   maxFileSize: LIMITS.maxUploadBytes,
   maxTotalSize: LIMITS.maxFilesPerUpload * LIMITS.maxUploadBytes
 }));
@@ -47,6 +61,19 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
         // Fallo de disco al listar los materiales existentes o al escribir uno nuevo. No estaba en
         // el contrato original del tramo 4B; sin él, un fallo de almacenamiento en la subida solo
         // podría mapearse con `Effect.orDie` (invariante 6).
+        MaterialStorageError.pipe(HttpApiSchema.status(500))
+      ]
+    }),
+    // Comprueba un lote de PDFs (tipo, nombre duplicado) sin escribir nada: la interfaz lo llama al
+    // soltar los ficheros, antes de que la persona vea el botón "Subir" (cierre de fase 4, punto 5 de
+    // la revisión de fiel-al-plan). No comprueba `maxMaterials`: eso es un fallo agregado de `upload`,
+    // no algo que dependa de qué fichero se está mirando. Sin `RateLimited`: no cuenta contra
+    // `uploadsPerWindow`, que es el techo de subidas reales (decisión 4), no de comprobaciones.
+    HttpApiEndpoint.post("validate", "/validate", {
+      payload: UploadPayload,
+      success: MaterialValidationResponse,
+      error: [
+        LimitExceeded.pipe(HttpApiSchema.status(400)),
         MaterialStorageError.pipe(HttpApiSchema.status(500))
       ]
     }),
@@ -122,5 +149,6 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
     })
   )
   .middleware(ExamLockdownGuard)
+  .middleware(MultipartLimitGuard)
   .prefix("/materials")
 {}

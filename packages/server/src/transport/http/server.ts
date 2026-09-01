@@ -53,12 +53,14 @@ import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter, layer as RateLimiterLive } from "../../domain/limits/rate-limiter.ts";
 import { clientKey, HttpHandlersLive } from "./handlers.ts";
 import { ExamLockdownGuardLive, rawRouteLockdownRejection } from "./exam-lockdown-guard.ts";
+import { MultipartLimitGuardLive } from "./multipart-limit-guard.ts";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
 }).pipe(
   Layer.provide(HttpHandlersLive),
-  Layer.provide(ExamLockdownGuardLive)
+  Layer.provide(ExamLockdownGuardLive),
+  Layer.provide(MultipartLimitGuardLive)
 );
 
 const DocsRoute = HttpApiScalar.layer(ProxusApi, {

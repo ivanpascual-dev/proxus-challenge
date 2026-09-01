@@ -54,6 +54,21 @@ export const uploadMaterialsAction = apiRuntime.fn(
   { reactivityKeys: ["materials"] }
 );
 
+// Comprueba un lote de PDFs (tipo, nombre duplicado) sin subir nada: la zona de arrastre lo llama
+// sola al soltar los ficheros, antes de ofrecer el botón "Subir". Sin `reactivityKeys`: no crea ni
+// cambia ningún material, así que no hay nada que invalidar.
+export const validateMaterialsAction = apiRuntime.fn(
+  (files: readonly File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+    return ApiClient.use((client) =>
+      client.materials.validate({ payload: formData })
+    ).pipe(Effect.withSpan("materials.validate", { kind: "client" }));
+  }
+);
+
 // Borra el PDF y, en cascada, su apunte, controles y exámenes (ADR-011: el materialId sale del
 // nombre del fichero, así que un huérfano choca al resubir el mismo PDF). Invalida ambas etiquetas:
 // la lista de materiales y la de artefactos.

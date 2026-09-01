@@ -61,3 +61,24 @@ export const MaterialUploadResponse = Schema.Struct({
   results: Schema.Array(MaterialUploadResult)
 });
 export type MaterialUploadResponse = typeof MaterialUploadResponse.Type;
+
+// El mismo rechazo por fichero que `MaterialUploadResult`, para comprobar antes de subir sin escribir
+// nada (fase 4, cierre, punto 5 de la revisión de fiel-al-plan). "valid" no trae `material`: nada se
+// ha creado todavía.
+export const MaterialValidationResult = Schema.Union([
+  Schema.Struct({
+    fileName: Schema.String,
+    outcome: Schema.Literal("valid")
+  }),
+  Schema.Struct({
+    fileName: Schema.String,
+    outcome: Schema.Literal("rejected"),
+    reason: Schema.Union([UnsupportedFileType, MaterialAlreadyExists])
+  })
+]);
+export type MaterialValidationResult = typeof MaterialValidationResult.Type;
+
+export const MaterialValidationResponse = Schema.Struct({
+  results: Schema.Array(MaterialValidationResult)
+});
+export type MaterialValidationResponse = typeof MaterialValidationResponse.Type;

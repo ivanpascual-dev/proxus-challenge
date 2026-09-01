@@ -466,6 +466,10 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
   rechazarla nombrando cuántos materiales caben y cuántos hay.
 - **F4-05.** SI el nombre de un fichero subido coincide con el de un material existente, ENTONCES EL
   sistema DEBERÁ rechazarlo nombrando el conflicto y NO DEBERÁ sobrescribir el material existente.
+- **F4-05b.** CUANDO la persona suelte o elija ficheros antes de subirlos, EL sistema DEBERÁ comprobar
+  cada uno (tipo real de PDF, nombre duplicado) sin escribir nada en disco y sin que la persona tenga
+  que pulsar nada para disparar la comprobación, y DEBERÁ ofrecer el botón de subir solo cuando ningún
+  fichero de la zona esté rechazado (cierre de fase 4).
 - **F4-06.** CUANDO la persona supere `uploadsPerWindow` subidas en su ventana, EL sistema DEBERÁ
   rechazar la subida con 429 diciendo cuánto falta para poder reintentar.
 - **F4-07.** CUANDO una subida termine correctamente, EL sistema DEBERÁ indexar cada material subido y,

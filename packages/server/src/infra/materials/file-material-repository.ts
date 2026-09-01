@@ -12,6 +12,7 @@ import {
   UnsupportedFileType,
   type MaterialRepository as MaterialRepositoryType,
   type MaterialUploadOutcome,
+  type MaterialValidationOutcome,
   type PdfMaterial,
   type RenderedPage,
   type UploadCandidate
@@ -201,6 +202,61 @@ export const FileMaterialRepository = {
       return extension.toLowerCase() === ".pdf" ? baseName.slice(0, baseName.length - extension.length) : baseName;
     };
 
+    // El mismo rechazo por fichero (nombre duplicado, tipo) que hacía `upload` en línea, factorizado
+    // para que `validate` lo corra sin escribir nada. `knownIds` es mutable y compartido con quien
+    // llama para que, dentro del mismo lote, un segundo fichero con el mismo nombre que un hermano ya
+    // aceptado en ESTE lote también se rechace como duplicado, igual que hacía `upload`.
+    const checkCandidate = (
+      candidate: UploadCandidate,
+      knownIds: Set<string>
+    ): Effect.Effect<
+      { readonly ok: true; readonly id: string; readonly bytes: Uint8Array; readonly pageCount: number }
+      | { readonly ok: false; readonly reason: UnsupportedFileType | MaterialAlreadyExists },
+      MaterialRepositoryError
+    > => Effect.gen(function* () {
+      const id = idFor(candidate.fileName);
+
+      // Barato primero (sección 4.2 del plan): un nombre repetido no gasta el sniff ni pdfinfo.
+      if (knownIds.has(id)) {
+        return {
+          ok: false,
+          reason: new MaterialAlreadyExists({ fileName: candidate.fileName, materialId: id })
+        };
+      }
+
+      const bytes = yield* fs.readFile(candidate.path).pipe(Effect.mapError(mapError));
+      if (!looksLikePdf(bytes)) {
+        return {
+          ok: false,
+          reason: new UnsupportedFileType({
+            fileName: candidate.fileName,
+            reason: "El fichero no empieza con la cabecera de un PDF."
+          })
+        };
+      }
+
+      // pdfinfo tumba lo que pasó el sniff sin ser un PDF de verdad (un .txt que empieza por
+      // "%PDF-"). Falla como rechazo de ESTE fichero, nunca como fallo de la petición entera.
+      // `catchCause`, no `catch`: cuando pdfinfo no imprime una línea "Pages:" reconocible,
+      // `poppler-pdf-service.ts` lanza dentro de un `Effect.map` y eso llega como defecto, no
+      // como el `PdfServiceError` tipado que un `catch` normal esperaría.
+      const pageCount: number | null = yield* pdf.pageCount(candidate.path).pipe(
+        Effect.map((count): number | null => count),
+        Effect.catchCause(() => Effect.succeed(null))
+      );
+      if (pageCount === null) {
+        return {
+          ok: false,
+          reason: new UnsupportedFileType({
+            fileName: candidate.fileName,
+            reason: "pdfinfo no pudo leer este fichero como PDF."
+          })
+        };
+      }
+
+      return { ok: true, id, bytes, pageCount };
+    });
+
     const upload = (
       candidates: readonly UploadCandidate[]
     ): Effect.Effect<readonly MaterialUploadOutcome[], TooManyMaterials | MaterialRepositoryError> => Effect.gen(function* () {
@@ -219,55 +275,16 @@ export const FileMaterialRepository = {
       const results: MaterialUploadOutcome[] = [];
 
       for (const candidate of candidates) {
-        const id = idFor(candidate.fileName);
-
-        // Barato primero (sección 4.2 del plan): un nombre repetido no gasta el sniff ni pdfinfo.
-        if (knownIds.has(id)) {
-          results.push({
-            fileName: candidate.fileName,
-            outcome: "rejected",
-            reason: new MaterialAlreadyExists({ fileName: candidate.fileName, materialId: id })
-          });
-          continue;
-        }
-
-        const bytes = yield* fs.readFile(candidate.path).pipe(Effect.mapError(mapError));
-        if (!looksLikePdf(bytes)) {
-          results.push({
-            fileName: candidate.fileName,
-            outcome: "rejected",
-            reason: new UnsupportedFileType({
-              fileName: candidate.fileName,
-              reason: "El fichero no empieza con la cabecera de un PDF."
-            })
-          });
-          continue;
-        }
-
-        // pdfinfo tumba lo que pasó el sniff sin ser un PDF de verdad (un .txt que empieza por
-        // "%PDF-"). Falla como rechazo de ESTE fichero, nunca como fallo de la petición entera.
-        // `catchCause`, no `catch`: cuando pdfinfo no imprime una línea "Pages:" reconocible,
-        // `poppler-pdf-service.ts` lanza dentro de un `Effect.map` y eso llega como defecto, no
-        // como el `PdfServiceError` tipado que un `catch` normal esperaría.
-        const pageCount: number | null = yield* pdf.pageCount(candidate.path).pipe(
-          Effect.map((count): number | null => count),
-          Effect.catchCause(() => Effect.succeed(null))
-        );
-        if (pageCount === null) {
-          results.push({
-            fileName: candidate.fileName,
-            outcome: "rejected",
-            reason: new UnsupportedFileType({
-              fileName: candidate.fileName,
-              reason: "pdfinfo no pudo leer este fichero como PDF."
-            })
-          });
+        const checked = yield* checkCandidate(candidate, knownIds);
+        if (!checked.ok) {
+          results.push({ fileName: candidate.fileName, outcome: "rejected", reason: checked.reason });
           continue;
         }
 
         // La copia va al final y a partir de los bytes ya leídos (sección 4.2: "la trampa
         // verificada"; `candidate.path` solo existe mientras dura esta petición, así que se
         // resuelve entera aquí, no se difiere).
+        const { id, bytes, pageCount } = checked;
         const fileName = `${id}.pdf`;
         yield* fs.writeFile(pdfPath(fileName), bytes).pipe(Effect.mapError(mapError));
 
@@ -286,12 +303,32 @@ export const FileMaterialRepository = {
       return results;
     });
 
+    const validate = (
+      candidates: readonly UploadCandidate[]
+    ): Effect.Effect<readonly MaterialValidationOutcome[], MaterialRepositoryError> => Effect.gen(function* () {
+      const existingFiles = yield* listFiles();
+      const knownIds = new Set(existingFiles.map((file) => file.material.id));
+      const results: MaterialValidationOutcome[] = [];
+
+      for (const candidate of candidates) {
+        const checked = yield* checkCandidate(candidate, knownIds);
+        if (!checked.ok) {
+          results.push({ fileName: candidate.fileName, outcome: "rejected", reason: checked.reason });
+          continue;
+        }
+        results.push({ fileName: candidate.fileName, outcome: "valid" });
+        knownIds.add(checked.id);
+      }
+
+      return results;
+    });
+
     const remove = (id: string): Effect.Effect<void, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
       const file = yield* getFile(id);
       yield* fs.remove(file.path).pipe(Effect.mapError(mapError));
     });
 
-    return { list, get, renderPage, getIndex, reindex, upload, remove };
+    return { list, get, renderPage, getIndex, reindex, upload, validate, remove };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };

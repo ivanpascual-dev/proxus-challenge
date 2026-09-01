@@ -5,6 +5,8 @@ import {
   ArtifactNotFound as ApiArtifactNotFound,
   ArtifactStorageError as ApiArtifactStorageError,
   BlockNotFound as ApiBlockNotFound,
+  LIMITS,
+  LimitExceeded,
   MaterialAlreadyExists as ApiMaterialAlreadyExists,
   MaterialNotFound as ApiMaterialNotFound,
   MaterialNotIndexed as ApiMaterialNotIndexed,
@@ -13,7 +15,8 @@ import {
   ProxusApi,
   TooManyMaterials as ApiTooManyMaterials,
   UnsupportedFileType as ApiUnsupportedFileType,
-  type MaterialUploadResult
+  type MaterialUploadResult,
+  type MaterialValidationResult
 } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { GeminiJudgeLanguageModelLive } from "../../domain/agents/gemini.ts";
@@ -27,7 +30,11 @@ import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts
 import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
-import { MaterialRepository, type MaterialUploadOutcome } from "../../domain/materials/material.ts";
+import {
+  MaterialRepository,
+  type MaterialUploadOutcome,
+  type MaterialValidationOutcome
+} from "../../domain/materials/material.ts";
 import { MaterialDeletionService } from "../../domain/materials/material-deletion-service.ts";
 import { checkChatRequestLimits } from "../../domain/limits/chat-limits.ts";
 import { RateLimiter } from "../../domain/limits/rate-limiter.ts";
@@ -93,6 +100,37 @@ const logAndFailStorage = (materialId: string, reason: unknown) =>
     Effect.andThen(Effect.fail(storageError(materialId)))
   );
 
+// El rechazo por fichero, del domain (`UnsupportedFileType` / `MaterialAlreadyExists`) al del
+// contrato, compartido entre `upload` (que sí escribió) y `validate` (que solo miró).
+const toApiRejectionReason = (
+  reason: Extract<MaterialUploadOutcome, { readonly outcome: "rejected" }>["reason"],
+  verb: "subir" | "validar"
+) =>
+  reason._tag === "UnsupportedFileType"
+    ? new ApiUnsupportedFileType({
+        fileName: reason.fileName,
+        message: `"${reason.fileName}" no se pudo ${verb}: ${reason.reason}`
+      })
+    : new ApiMaterialAlreadyExists({
+        fileName: reason.fileName,
+        materialId: reason.materialId,
+        message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
+      });
+
+// `maxParts` en el contrato lleva un fichero de holgura sobre `maxFilesPerUpload` (ver el comentario
+// en `packages/shared/src/api/materials.ts`): el parser de multipart de esta beta trunca en silencio
+// un lote por encima de su techo en vez de rechazarlo, así que el rechazo en voz alta (F4-03) tiene
+// que hacerlo este código, con el número de ficheros que de verdad llegó.
+const checkFileCount = (received: number) =>
+  received > LIMITS.maxFilesPerUpload
+    ? Effect.fail(new LimitExceeded({
+        limit: "maxFilesPerUpload",
+        ceiling: LIMITS.maxFilesPerUpload,
+        received,
+        message: `Como mucho se pueden subir ${LIMITS.maxFilesPerUpload} ficheros a la vez, se han enviado ${received}.`
+      }))
+    : Effect.void;
+
 // El resultado de la subida, por fichero: el domain trae sus propios `UnsupportedFileType` /
 // `MaterialAlreadyExists`, y aquí se traducen a los del contrato (mismo patrón que `notFound` /
 // `storageError` arriba para el resto de errores de materiales).
@@ -100,21 +138,16 @@ const toApiUploadResult = (outcome: MaterialUploadOutcome): MaterialUploadResult
   if (outcome.outcome === "created") {
     return { fileName: outcome.fileName, outcome: "created", material: outcome.material };
   }
-  const { reason } = outcome;
-  return {
-    fileName: outcome.fileName,
-    outcome: "rejected",
-    reason: reason._tag === "UnsupportedFileType"
-      ? new ApiUnsupportedFileType({
-          fileName: reason.fileName,
-          message: `"${reason.fileName}" no se pudo subir: ${reason.reason}`
-        })
-      : new ApiMaterialAlreadyExists({
-          fileName: reason.fileName,
-          materialId: reason.materialId,
-          message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
-        })
-  };
+  return { fileName: outcome.fileName, outcome: "rejected", reason: toApiRejectionReason(outcome.reason, "subir") };
+};
+
+// El mismo mapeo que `toApiUploadResult`, para el resultado de `validate` (sin `material`: nada se
+// creó).
+const toApiValidationResult = (outcome: MaterialValidationOutcome): MaterialValidationResult => {
+  if (outcome.outcome === "valid") {
+    return { fileName: outcome.fileName, outcome: "valid" };
+  }
+  return { fileName: outcome.fileName, outcome: "rejected", reason: toApiRejectionReason(outcome.reason, "validar") };
 };
 
 export const MaterialsHttpHandlers = HttpApiBuilder.group(
@@ -140,6 +173,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
       .handle("upload", ({ payload }) => Effect.gen(function* () {
         const key = yield* clientKey;
         yield* rateLimiter.checkUpload(key);
+        yield* checkFileCount(payload.files.length);
 
         const candidates = payload.files.map((file) => ({ fileName: file.name, path: file.path }));
 
@@ -167,6 +201,27 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         );
 
         return { results: outcomes.map(toApiUploadResult) };
+      }))
+      // Comprueba un lote de PDFs sin escribir nada (F4-02 en modo consulta): la interfaz lo llama al
+      // soltar los ficheros, antes de ofrecer el botón "Subir". Sin `checkUpload`: no cuenta contra el
+      // techo de subidas reales.
+      .handle("validate", ({ payload }) => Effect.gen(function* () {
+        yield* checkFileCount(payload.files.length);
+
+        const candidates = payload.files.map((file) => ({ fileName: file.name, path: file.path }));
+
+        const outcomes = yield* materials.validate(candidates).pipe(
+          Effect.catchTag("MaterialRepositoryError", (error) => Effect.logWarning(
+            `fallo de almacenamiento al validar una subida: ${String(error.reason)}`
+          ).pipe(
+            Effect.andThen(Effect.fail(new ApiMaterialStorageError({
+              materialId: "validate",
+              message: "No se pudieron comprobar los ficheros. Vuelve a intentarlo en un momento."
+            })))
+          ))
+        );
+
+        return { results: outcomes.map(toApiValidationResult) };
       }))
       // Controles y Exámenes del material, con su último intento (§5.6). Verifica que el material
       // existe; la prueba anclada a un material sin índice es un caso del riesgo 5, no un error aquí.

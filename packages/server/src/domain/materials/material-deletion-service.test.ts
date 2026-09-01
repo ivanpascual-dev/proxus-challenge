@@ -47,6 +47,7 @@ const fakeMaterials = (store: Set<string>) => Layer.succeed(
     getIndex: () => Effect.die("not used"),
     reindex: () => Effect.die("not used"),
     upload: () => Effect.die("not used"),
+    validate: () => Effect.die("not used"),
     remove: (id) => store.has(id)
       ? Effect.sync(() => { store.delete(id); })
       : Effect.fail(new MaterialNotFound({ materialId: id }))

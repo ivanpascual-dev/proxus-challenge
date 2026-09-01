@@ -85,6 +85,18 @@ export type MaterialUploadOutcome =
       readonly reason: UnsupportedFileType | MaterialAlreadyExists;
     };
 
+// El mismo rechazo por fichero que `upload` (tipo, nombre duplicado), pero sin escribir nada a disco:
+// deja que la interfaz avise antes de que la persona pulse "Subir" (fase 4, cierre, punto 5 de la
+// revisión de fiel-al-plan). No comprueba `maxMaterials` (fallo agregado, no por fichero): ese techo
+// se comprueba en `upload`, que es quien de verdad va a crear los materiales.
+export type MaterialValidationOutcome =
+  | { readonly fileName: string; readonly outcome: "valid" }
+  | {
+      readonly fileName: string;
+      readonly outcome: "rejected";
+      readonly reason: UnsupportedFileType | MaterialAlreadyExists;
+    };
+
 export interface RenderedPage {
   readonly material: PdfMaterial;
   readonly image: PageImage;
@@ -118,6 +130,10 @@ export interface MaterialRepository {
   readonly upload: (
     candidates: readonly UploadCandidate[]
   ) => Effect.Effect<readonly MaterialUploadOutcome[], TooManyMaterials | MaterialRepositoryError>;
+  // Los mismos rechazos por fichero que `upload` comprobaría, en modo consulta: nada se escribe.
+  readonly validate: (
+    candidates: readonly UploadCandidate[]
+  ) => Effect.Effect<readonly MaterialValidationOutcome[], MaterialRepositoryError>;
   // Borra el PDF. Solo el fichero: el índice cacheado por huella de contenido se queda (es una
   // optimización compartida, no algo del usuario) y los artefactos del material los borra
   // `MaterialDeletionService`, que orquesta las dos cosas.
