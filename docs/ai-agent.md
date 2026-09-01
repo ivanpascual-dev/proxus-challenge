@@ -133,7 +133,10 @@ de enviar y se puede quitar. El servidor lo añade al final del mensaje del usua
 prompt (`renderScreenContext`, `harness/screen-context.ts`), para no romper la caché del prefijo
 estable. Toda respuesta del tutor cierra con un bloque `<<<FOLLOW-UP>>>` de exactamente tres preguntas
 en español, que el servidor recorta del texto (`extractFollowUp`); si el bloque falta o viene mal
-formado, no se completa ni se inventa ninguna pregunta (invariante 3).
+formado, no se completa ni se inventa ninguna pregunta (invariante 3). La única tolerancia es un
+cierre omitido: si después de la apertura hay exactamente tres líneas válidas hasta el final de la
+respuesta, se recuperan esas mismas preguntas. En todos los casos, los delimitadores se retiran del
+texto visible.
 
 ## Idioma (decisión 9)
 

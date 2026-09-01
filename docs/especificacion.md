@@ -564,9 +564,11 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 
 - **F4-34.** EL sistema DEBERÁ elegir la configuración del modelo (temperatura, formato de respuesta y
   nivel de razonamiento) según el camino que la invoca, sin consultar a ningún modelo para decidirlo.
-- **F4-35.** EL sistema DEBERÁ usar razonamiento extendido en la generación de apuntes, en la
-  generación de Exámenes y en el juez de respuesta abierta, y NO DEBERÁ usarlo en la generación de
-  Controles, en la indexación ni en el chat del tutor.
+- **F4-35.** EL sistema DEBERÁ elegir el nivel de razonamiento de cada camino midiéndolo con las evals
+  del propio camino, no por suposición: hoy razonamiento alto en la generación de apuntes, bajo en la
+  generación de Exámenes, y ninguno en el juez de respuesta abierta, en la generación de Controles, en
+  la indexación ni en el chat del tutor (ADR-025). NO DEBERÁ fijar el nivel de un camino sin volver a
+  correr su eval cuando cambie el modelo o el fixture.
 - **F4-36.** EL sistema DEBERÁ declarar el techo de tokens de salida **por camino**, dimensionado sobre
   lo que ese camino tiene que producir más su razonamiento, y NO DEBERÁ usar un único techo para todos.
 - **F4-37.** SI una llamada al modelo termina por agotar su techo de tokens de salida, ENTONCES EL

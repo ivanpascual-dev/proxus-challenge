@@ -129,8 +129,9 @@ el servidor y el historial deja de venir en la petición. Es la barrera 3 del AD
 8. **Las tres preguntas de seguimiento salen en la misma respuesta**, en un bloque delimitado que el
    servidor recorta. Motivo: una segunda llamada útil necesitaría reenviarle el historial entero, con
    lo que no sería barata; y en la misma respuesta el modelo ya tiene delante lo que acaba de leer.
-   **Si el bloque no aparece o viene mal formado, no se pinta ninguna pregunta**: nunca se inventan
-   (invariante 3).
+   **Si el cuerpo no contiene exactamente tres preguntas válidas, no se pinta ninguna**: nunca se
+   inventan (invariante 3). Si las tres están completas al final y solo falta el delimitador de
+   cierre, se recuperan sin inventar contenido.
 9. **Todos los prompts que van al modelo pasan a inglés, midiendo antes y después.** Se re-corre
    `open-answer-judge.eval.ts` y la batería de guardarraíles, y se comparan resultados. **Todo lo que
    lee el alumno sigue en español**, declarado explícitamente en cada prompt.
@@ -345,17 +346,18 @@ mismo objeto; el resto de roles pasan intactos.
 
 ```ts
 // Recorta el bloque de seguimiento del texto del modelo. Devuelve el texto limpio y las preguntas.
-// Si el bloque falta, está a medias, trae menos de 3 o más de 3, o alguna pasa del techo de
-// caracteres, devuelve `questions: []` y el texto tal cual: nunca se completa ni se inventa.
+// Si no hay tres preguntas validables o alguna pasa del techo, devuelve `questions: []`: nunca
+// completa ni inventa. Si las tres están completas y solo falta el cierre, recupera esas mismas.
+// Siempre retira del texto visible el sufijo técnico abierto fuera de un bloque de código.
 export const extractFollowUp: (text: string) => {
   readonly text: string;
   readonly questions: readonly string[];
 };
 ```
 
-Tests: bloque bien formado; bloque ausente; bloque sin cerrar; dos preguntas en vez de tres; una
-pregunta por encima de `maxFollowUpQuestionCharacters`; texto que contiene el delimitador dentro de
-un bloque de código.
+Tests: bloque bien formado; bloque ausente; tres preguntas con cierre omitido; bloque sin cerrar con
+dos preguntas; dos preguntas en vez de tres; una pregunta por encima de
+`maxFollowUpQuestionCharacters`; texto que contiene el delimitador dentro de un bloque de código.
 
 **`packages/server/src/domain/materials/pdf-sniff.ts`** (nuevo). La asunción A1.
 
@@ -763,9 +765,9 @@ bitácora y a `NOTES.md`.
     comprobables por código y sin juez:
     - **Idioma (decisión 9, el riesgo mayor de la traducción):** el prompt pasa a inglés y la respuesta
       tiene que seguir en español. Se comprueba sobre el texto de salida.
-    - **Preguntas de seguimiento (decisión 8, F4-28 y F4-29):** que salgan tres, en español, y que
-      cuando el bloque no venga o venga mal formado **no se pinte ninguna**. La mitad que importa es la
-      segunda: que no se inventen.
+    - **Preguntas de seguimiento (decisión 8, F4-28 y F4-29):** que salgan tres, en español, que un
+      cierre omitido no pierda tres preguntas completas y que, cuando el cuerpo no sea validable, no
+      se pinte ninguna. La mitad que importa es la última: que no se inventen.
     - **Elección de skill (decisión 17):** ahora son cinco y el riesgo es que cargue la que no toca.
       Se mira la traza de `tool-call`, no el texto: "¿qué llevo peor?" carga `review-progress`,
       "enséñame el Examen 3" carga `read-assessments`.
@@ -859,7 +861,7 @@ por eso miden en vez de aprobar.
 | F4-25               | Quitar el chip y enviar la misma pregunta                                                                           | Nada del material viaja; el tutor pregunta a qué se refiere                                                    |
 | F4-27               | Abrir material, artefacto y bloques hasta pasar `maxContextRefs`                                                    | Rechazo nombrando el techo                                                                                     |
 | F4-28, F4-30        | Cualquier respuesta                                                                                                 | Tres botones en español; el delimitador **no** aparece en el texto                                             |
-| F4-29               | Forzar una respuesta sin bloque (o con dos preguntas)                                                               | Ningún botón, y ninguna pregunta inventada                                                                     |
+| F4-29               | Forzar una respuesta sin bloque o con dos preguntas; repetir con tres válidas y solo el cierre omitido              | Cero botones en los dos casos inválidos; tres botones en el recuperable; ninguna pregunta inventada            |
 | F4-31, F4-33        | `STRICT=1 pnpm test:guardarrailes`                                                                                  | B1-B9 en verde, incluida la inyección desde el PDF                                                             |
 | F4-31               | Generar unos apuntes y una prueba tras la traducción                                                                | Salen en español y con el vocabulario del material sin traducir                                                |
 | F4-34, F4-35        | Generar un Control y un Examen del mismo material                                                                   | El Examen registra tokens de pensamiento; el Control, cero                                                     |

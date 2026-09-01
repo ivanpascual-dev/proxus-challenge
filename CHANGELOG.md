@@ -42,7 +42,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   recupera su historial completo.
 - **El tutor propone hasta tres preguntas de seguimiento.** Al final de cada respuesta aparecen, como
   botones, hasta tres preguntas relacionadas con lo que acaba de explicar; pulsar una la envía como si
-  se hubiera escrito. Si no puede ofrecer las tres, o vienen a medias, no aparece ninguna.
+  se hubiera escrito. Si están las tres y solo falta el cierre técnico, se recuperan; si el contenido
+  no permite validar las tres, no aparece ninguna. Los marcadores internos nunca se enseñan.
 - **El tutor ve lo que tienes abierto, y se enseña antes de enviar.** Con un material abierto, y su
   apunte o su prueba a la vista, aparece como una etiqueta encima del cuadro de texto; se puede quitar
   con la "×" antes de enviar y solo lleva el título y el identificador, nunca el contenido.
