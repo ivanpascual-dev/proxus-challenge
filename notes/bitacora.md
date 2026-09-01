@@ -1077,3 +1077,10 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
   borde de UX para cerrar fase 4 y se mueve al último nivel de prioridad de fase 5: si hay tiempo, se
   revalida toda la cola staged cada vez que se añadan ficheros, se invalidan respuestas asíncronas
   antiguas y se prueban duplicado y techo repartidos entre dos selecciones.
+
+## 2026-09-01 · Fase 5 · Sesión P0.1, cierre (pasos 6-7)
+
+- **Causa raíz:** el diálogo de subida (`<dialog>` nativo) no quedaba centrado en pantalla al
+  probarlo en el navegador. No era un bug de layout del propio diálogo: el reset de Tailwind anula
+  el `margin: auto` con el que `<dialog>` se centra por defecto. Se fuerza `fixed inset-0 m-auto
+  h-fit` en `Dialog.tsx` para recuperarlo.
