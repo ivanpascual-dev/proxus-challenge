@@ -2,6 +2,7 @@ import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
 import { ChatContextRef } from "@proxus/shared";
 import { degradeHistory } from "../../domain/agents/harness/message-degrade.ts";
 import { migrateStoredTurns } from "../../domain/agents/harness/session-migration.ts";
+import { sortSessionsForHistory } from "../../domain/agents/harness/session-order.ts";
 import {
   SessionAlreadyExists,
   SessionNotFound,
@@ -227,7 +228,11 @@ export const FileSessionRepository = {
         );
       });
 
-      return sessions.map((session): StoredAgentSessionSummary => ({
+      // C5-07: el orden del historial se decide aquí, en servidor, sobre las sesiones completas (que
+      // sí traen `turns`), para que todos los clientes reciban la misma cronología. El resumen que
+      // viaja por HTTP no lleva `turns`, así que `ConversationDrawer` no podría reordenar aunque
+      // quisiera.
+      return sortSessionsForHistory(sessions).map((session): StoredAgentSessionSummary => ({
         id: session.id,
         title: session.title,
         createdAt: session.createdAt,
