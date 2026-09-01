@@ -17,6 +17,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Añadido
 
+- **Foco visible en toda la interfaz.** Al navegar con teclado, cualquier botón, enlace o campo marca
+  con un anillo de 2px dónde está el foco, no solo los tres controles que ya lo tenían.
 - **Tema claro y oscuro.** El selector tiene tres opciones: sistema (por defecto), claro y oscuro. En
   "sistema" la aplicación sigue la preferencia del sistema operativo y reacciona si esa preferencia
   cambia; al elegir claro u oscuro la elección se recuerda y no la pisa el sistema.

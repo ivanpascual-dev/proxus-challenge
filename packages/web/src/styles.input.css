@@ -79,6 +79,20 @@
   textarea {
     font: inherit;
   }
+
+  /* §4.11: foco visible de 2px con offset en todo control interactivo, no solo en IconButton. Los
+     componentes que ya declaran su propio focus-visible (utilidad de Tailwind, más específica) ganan
+     por cascada de capas sin necesidad de excepción aquí. */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }
 
 /* Editor de bloque (TipTap). No hay plugin de tipografía, así que el ritmo vertical y los formatos
