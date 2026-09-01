@@ -604,7 +604,7 @@ un commit propio. No se empieza la sesión siguiente con la anterior en rojo.
    como mucho 1,5 segundos; historial y movimiento reducido aparecen completos.
 3. Añadir el rail global de 56px en `AppShell.tsx` y `Sidebar.tsx`, con preferencia local, controles con
    nombre accesible y borrado disponible solo al expandir.
-4. Añadir el rail de bloques de 48px en `NoteWorkspace.tsx` y `NoteOutline.tsx`, sin desmontar el editor,
+4. Añadir el rail de bloques de 56px en `NoteWorkspace.tsx` y `NoteOutline.tsx`, sin desmontar el editor,
    cambiar la selección ni descartar el borrador.
 5. Ejecutar los procedimientos C5-10, C5-12, C5-13 y C5-14 a 1280x720, 1440x900 y 1920x1080, con
    teclado, zoom 200 por ciento, ambos temas y movimiento reducido.
