@@ -6,6 +6,8 @@ import { Chat } from "./components/Chat.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { MaterialPanel } from "./components/MaterialPanel.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { AppShell } from "./components/shell/AppShell.tsx";
+import { SystemNoticeRegion } from "./components/shell/SystemNoticeRegion.tsx";
 import { ExamRun } from "./components/assessment/ExamRun.tsx";
 import { ResumeExamDialog } from "./components/assessment/ResumeExamDialog.tsx";
 import { activeAttemptQuery } from "./domain/assessments/atoms.ts";
@@ -90,37 +92,38 @@ export function App() {
   const hasMiddlePanel = selectedMaterial !== undefined;
 
   return (
-    <div
-      className="grid h-screen min-h-screen overflow-hidden bg-canvas text-heading"
-      style={{
-        gridTemplateColumns: hasMiddlePanel
-          ? "340px minmax(0, 1fr) 420px"
-          : "340px minmax(0, 1fr)"
-      }}
-    >
-      {/* Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red. */}
-      <ErrorBoundary label="la lista de materiales">
-        <Sidebar
-          selectedMaterialId={selectedMaterialId}
-          onSelectMaterial={setSelectedMaterialId}
-        />
-      </ErrorBoundary>
-      {selectedMaterial !== undefined && (
-        <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
-          <MaterialPanel
-            materialId={selectedMaterial.id}
-            indexState={selectedMaterial.indexState}
-            title={selectedMaterial.title}
-            pageCount={selectedMaterial.pageCount}
-            onStartExam={(artifactId, title) =>
-              setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
-            onContextChange={setScreenContext}
-          />
-        </ErrorBoundary>
-      )}
-      <ErrorBoundary label="el chat">
-        <Chat proposedContext={hasMiddlePanel ? screenContext : []} />
-      </ErrorBoundary>
-    </div>
+    <>
+      <SystemNoticeRegion />
+      <AppShell
+        onCloseMaterial={() => setSelectedMaterialId(null)}
+        sidebar={
+          // Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red.
+          <ErrorBoundary label="la lista de materiales">
+            <Sidebar
+              selectedMaterialId={selectedMaterialId}
+              onSelectMaterial={setSelectedMaterialId}
+            />
+          </ErrorBoundary>
+        }
+        material={selectedMaterial === undefined ? null : (
+          <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
+            <MaterialPanel
+              materialId={selectedMaterial.id}
+              indexState={selectedMaterial.indexState}
+              title={selectedMaterial.title}
+              pageCount={selectedMaterial.pageCount}
+              onStartExam={(artifactId, title) =>
+                setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
+              onContextChange={setScreenContext}
+            />
+          </ErrorBoundary>
+        )}
+        chat={
+          <ErrorBoundary label="el chat">
+            <Chat proposedContext={hasMiddlePanel ? screenContext : []} />
+          </ErrorBoundary>
+        }
+      />
+    </>
   );
 }
