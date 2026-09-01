@@ -50,6 +50,9 @@ export function NoteWorkspace({
   const [selectedKey, setSelectedKey] = useState<string | null>(() => draftFromArtifact(artifact).blocks[0]?.key ?? null);
   const [noteTargetNotice, setNoteTargetNotice] = useState<string | null>(null);
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  // Plan de correcciones §4.2.8 / C5-14: el rail del índice de bloques. No se persiste (dura mientras
+  // este workspace esté montado) y contraer no desmonta el editor ni toca `draft` ni la selección.
+  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const save = useAtomSet(saveNoteAction, { mode: "promise" });
 
   // Cuando el artefacto cambia por debajo (aceptar o descartar una propuesta refresca el apunte) y
@@ -293,6 +296,8 @@ export function NoteWorkspace({
                 onAdd={addBlock}
                 onAddFromUrl={() => setUrlDialogOpen(true)}
                 onDelete={deleteBlock}
+                collapsed={outlineCollapsed}
+                onToggleCollapsed={() => setOutlineCollapsed((current) => !current)}
               />
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 {selectedBlock !== undefined && (
