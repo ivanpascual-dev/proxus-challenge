@@ -178,6 +178,14 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   faltarle el número de páginas pedía la lectura sin rango y el comando la rechazaba. Ahora pide
   directamente el máximo de páginas permitido; si el material tiene menos, el propio comando le dice
   cuántas tiene y responde con el contenido en la misma llamada.
+- **Subir más ficheros de la cuenta ya no responde con un error genérico.** Una tanda por encima del
+  máximo permitido, o un fichero por encima de su tamaño, terminaba en un error sin motivo. Ahora se
+  rechaza nombrando el techo real y cuántos se enviaron, igual que el resto de rechazos de la subida.
+- **Borrar un material ya no deja intentos huérfanos de sus controles y exámenes.** Se borraban el PDF
+  y sus artefactos, pero los intentos guardados de esos artefactos se quedaban apuntando a un artefacto
+  que ya no existía. Ahora se borran con el resto.
+- **Generar un apunte o una prueba avisa cuando el modelo se corta a media respuesta**, en vez de leerse
+  como "el tema no daba para tanto" o entregarse con el bloque incompleto sin decirlo.
 
 ### Eliminado
 

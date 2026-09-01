@@ -1021,3 +1021,59 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
       `attempts`/`list`) es una decisión de producto (qué se corta y cómo se avisa) que le toca a Iván,
       no algo que este tramo decida por su cuenta. Los tres quedan reportados como hueco real y
       pendiente, no como "no aplica" (a diferencia de `maxPastedCharactersPerTurn`, arriba).
+
+## 2026-09-01 · Fase 4 · cierre, arreglos de la revisión de `@fiel-al-plan`
+
+`@fiel-al-plan` contra `notes/plans/fase4-el-agente.md` dio veredicto ⚠️ DERIVA: cinco hallazgos, uno
+ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
+
+- **`finishReason` ahora se lee en producción (F4-37, riesgo 10).** `assessment-generation-service.ts`
+  y `note-generation-service.ts` registran con `Effect.logWarning` cuando una llamada se corta por el
+  techo de salida (`finishReason: "length"`) y lo nombran en el mensaje de error o en el propio bloque,
+  en vez de dejar que se confunda con "el tema no daba" o con un apunte sin más. Antes solo lo leían
+  las evals.
+- **`Chat.tsx` sigue volcando el `result` crudo en un `<pre>` (megas de base64 posibles): aplazado a
+  propósito, no arreglado.** Decisión de Iván al revisar los hallazgos: se aborda con el rediseño de
+  la vista de apuntes/chat ya anotado para después de cerrar las fases
+  ([[rediseno-vista-apuntes]] en la memoria del agente), no como parche suelto ahora.
+- **`docs/especificacion.md` sincronizado con ADR-025 y con la retirada de `TurnCost`.** F4-35 ya no
+  dice que el Juez usa pensamiento extendido (lo tenía así desde antes de medir con las evals del
+  tramo 4G, y el commit que "sincronizó la documentación" al cerrar 4G no lo tocó); ahora describe el
+  mecanismo de medición, no un nivel fijo por suposición. F4-18/F4-19 dicen "registrar", no "mostrar":
+  el coste del turno es dato de logs, nunca algo que el alumno vea en pantalla.
+- **Subir un PDF ya no escribe nada hasta que el fichero está validado (nuevo, a petición de Iván,
+  más allá de lo que pedía el plan original).** Al soltar o elegir ficheros en `UploadDropzone.tsx`,
+  cada uno se manda solo (sin botón) a la nueva ruta `POST /api/materials/validate`, que corre el
+  mismo sniff de cabecera + `pdfinfo` y la misma comprobación de nombre duplicado que `upload`, pero
+  sin escribir a disco (`MaterialRepository.validate`, `checkCandidate` factorizado de `upload` en
+  `file-material-repository.ts`). Un rechazo se avisa con su motivo y una X para quitarlo; la X está
+  disponible en cualquier fichero de la zona, no solo en los rechazados (un PDF válido que ya no se
+  quiera subir también se puede quitar). El botón "Subir N ficheros" solo se habilita cuando no queda
+  ningún fichero en `validating` ni `rejected`. La ruta nueva va en `CLOSED_ROUTES` de
+  `exam-lockdown.ts`, igual que `upload`, y no cuenta contra `uploadsPerWindow` (decisión 4: ese techo
+  es de subidas reales, no de comprobaciones). Probado a mano en el navegador por Iván: PDF válido,
+  fichero no-PDF, y el mismo nombre repetido en dos lotes.
+- **El contrato de errores de `upload` en `packages/shared` (hallazgo 5, no literal al plan) se deja
+  como está.** Ya estaba resuelto con criterio y documentado antes de esta pasada
+  (`UnsupportedFileType`/`MaterialAlreadyExists` viajan en el 200, no como error HTTP, para que un
+  fichero inválido no tumbe el resto del lote); no hacía falta tocar nada, solo constaba en el informe
+  del agente.
+- **El caso real de tres follow-ups sin delimitador de cierre se recupera, no se pierde.** La sesión
+  observada traía `<<<FOLLOW-UP>>>` y exactamente tres preguntas válidas hasta EOF, pero no
+  `<<<END FOLLOW-UP>>>`; el extractor anterior dejaba todo el sufijo como texto y Streamdown ocultaba
+  parcialmente los marcadores como si fueran tags. El primer arreglo garantizaba F4-30 recortando el
+  sufijo, pero también descartaba las tres preguntas. El cierre definitivo distingue formato de
+  contenido: recupera esas mismas tres cuando solo falta el cierre. La misma sesión descubrió que dos
+  medían 125 y 165 caracteres frente a un techo de 120 que el prompt no comunicaba. El techo explícito
+  pasa a 200 y se incluye en el system prompt; una pregunta de 201 sigue invalidando el bloque entero.
+  Ante dos preguntas, una línea extra, una pregunta fuera de techo o un cierre deformado devuelve cero.
+  Nunca recorta, completa ni inventa.
+- **Revisión posible de fase 5, no bloquea el cierre: la prevalidación solo ve el último FileList.**
+  Dos nombres iguales dentro de una misma selección se detectan, pero si se añade `tema.pdf`, termina
+  su validación y después se añade otro `tema.pdf`, las dos llamadas comprueban lotes separados y las
+  dos filas pueden quedar como válidas. Por el mismo camino se pueden acumular más de
+  `maxFilesPerUpload` ficheros mediante selecciones sucesivas. `upload` vuelve a validar y rechaza en
+  voz alta, así que no hay sobrescritura, pérdida de datos ni rotura de la aplicación. Se acepta como
+  borde de UX para cerrar fase 4 y se mueve al último nivel de prioridad de fase 5: si hay tiempo, se
+  revalida toda la cola staged cada vez que se añadan ficheros, se invalidan respuestas asíncronas
+  antiguas y se prueban duplicado y techo repartidos entre dos selecciones.

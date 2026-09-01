@@ -506,10 +506,11 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 - **F4-17.** SI el modelo o el enrutado de herramientas falla en un paso, ENTONCES EL sistema DEBERÁ
   registrar el error como error del turno y mostrarlo como tal, y NO DEBERÁ presentarlo como una
   respuesta del tutor.
-- **F4-18.** CUANDO un turno termine, EL sistema DEBERÁ mostrar su coste en tokens de entrada, de
-  caché y de salida.
-- **F4-19.** SI el modelo no devuelve información de consumo, ENTONCES EL sistema DEBERÁ mostrar que no
-  hay dato, y NO DEBERÁ mostrar cero ni ninguna estimación.
+- **F4-18.** CUANDO un turno termine, EL sistema DEBERÁ registrar su coste en tokens de entrada, de
+  caché y de salida. Es un dato de logs/servidor, no de interfaz: el alumno NO DEBERÁ verlo en
+  pantalla.
+- **F4-19.** SI el modelo no devuelve información de consumo, ENTONCES EL sistema DEBERÁ registrar que
+  no hay dato, y NO DEBERÁ registrar cero ni ninguna estimación.
 
 #### Coste del contexto
 
@@ -541,10 +542,13 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 
 - **F4-28.** CUANDO el tutor termine una respuesta, EL sistema DEBERÁ ofrecer hasta `followUpQuestions`
   preguntas de seguimiento en español, sin realizar ninguna llamada adicional al modelo.
-- **F4-29.** SI la respuesta del modelo no contiene el bloque de seguimiento, lo contiene incompleto,
-  trae un número distinto de `followUpQuestions` preguntas o alguna supera
-  `maxFollowUpQuestionCharacters`, ENTONCES EL sistema NO DEBERÁ mostrar ninguna pregunta y NO DEBERÁ
-  completar ni inventar las que falten.
+- **F4-29.** SI la respuesta del modelo no contiene un cuerpo validable con exactamente
+  `followUpQuestions` preguntas o alguna supera `maxFollowUpQuestionCharacters`, ENTONCES EL sistema
+  NO DEBERÁ mostrar ninguna pregunta y NO DEBERÁ completar ni inventar las que falten.
+- **F4-29b.** SI el modelo abre el bloque de seguimiento, escribe exactamente
+  `followUpQuestions` preguntas válidas hasta el final de la respuesta y omite únicamente el
+  delimitador de cierre, ENTONCES EL sistema DEBERÁ recuperar esas mismas preguntas sin inventar
+  contenido y mostrarlas mediante el componente de seguimiento.
 - **F4-30.** EL sistema NO DEBERÁ mostrar los delimitadores del bloque de seguimiento en el texto de la
   respuesta.
 
