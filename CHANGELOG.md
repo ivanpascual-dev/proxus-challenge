@@ -161,6 +161,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Los avisos de límite de frecuencia se leen en lenguaje humano.** Al agotar la ventana corta el
   aviso nombra los minutos que dura; al agotar el tope diario dice que se descanse y se vuelva
   mañana, en vez de hablar en segundos.
+- **El chat de Sym agrupa cada turno en vez de listar mensajes sueltos.** La burbuja del alumno, la
+  actividad del agente y la respuesta (o el fallo) viajan juntas. La actividad aparece resumida y
+  colapsada ("Consultando el material · 2 pasos · Hecho") solo cuando el turno usó alguna
+  herramienta; abierta, cada paso tiene una etiqueta humana ("Leyendo el material") y un segundo
+  nivel con el detalle técnico, con las claves, tokens y bloques largos ya filtrados. El historial de
+  conversaciones deja de ser una columna fija y se abre desde un icono en la cabecera del chat.
 
 ### Corregido
 

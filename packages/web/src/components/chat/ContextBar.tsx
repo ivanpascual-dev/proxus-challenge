@@ -1,7 +1,9 @@
 import type { ChatContextRef } from "@proxus/shared";
+import { Icon } from "../ui/Icon.tsx";
 
-// Invariante 9 llevada a la interfaz (fase 4, decisión 5, enmienda ADR-006): lo que el tutor va a
-// recibir sin que el alumno lo haya escrito se ve aquí, antes de enviar, y se puede quitar con la ×.
+// Invariante 9 llevada a la interfaz (fase 4, decisión 5, enmienda ADR-006; fase 5, §4.4: "ContextBar
+// aparece encima del composer"). Lo que el tutor va a recibir sin que el alumno lo haya escrito se ve
+// aquí, antes de enviar, y se puede quitar con la ×. Adjuntar nunca envía por sí mismo.
 export function contextRefKey(ref: ChatContextRef): string {
   switch (ref.type) {
     case "material":
@@ -24,7 +26,7 @@ function contextRefLabel(ref: ChatContextRef): string {
   }
 }
 
-export function ChatContextBar({
+export function ContextBar({
   refs,
   onRemove
 }: {
@@ -36,8 +38,8 @@ export function ChatContextBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-border border-b px-6 py-3" aria-label="Contexto que ve el tutor">
-      <span className="text-muted text-xs">El tutor ve:</span>
+    <div className="flex flex-wrap items-center gap-2 border-border border-t px-4 pt-3" aria-label="Contexto que ve Sym">
+      <span className="text-muted text-xs">Sym ve:</span>
       {refs.map((ref) => (
         <span
           key={contextRefKey(ref)}
@@ -46,11 +48,11 @@ export function ChatContextBar({
           {contextRefLabel(ref)}
           <button
             type="button"
-            className="text-muted hover:text-danger-ink"
-            aria-label={`Quitar ${contextRefLabel(ref)} del contexto`}
             onClick={() => onRemove(ref)}
+            aria-label={`Quitar ${contextRefLabel(ref)} del contexto`}
+            className="text-muted hover:text-danger-ink"
           >
-            ×
+            <Icon name="close" size={16} />
           </button>
         </span>
       ))}

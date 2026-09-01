@@ -22,6 +22,10 @@ export const LIMITS = {
   maxContextRefs: 3,
   maxConversations: 50,
   maxConversationTitleCharacters: 80,
+  // Fase 5, §5.4: techo visual del segundo nivel (técnico) de la actividad del agente. No recorta lo
+  // persistido (`AgentMessage.result` sigue completo en `Conversation.messages`), solo lo que se
+  // pinta: sin este techo, un resultado con páginas en base64 podría volcar megabytes al DOM.
+  maxActivityDetailCharacters: 4_000,
   followUpQuestions: 3,
   // Medido sobre la conversación real de cierre de fase 4: preguntas específicas y útiles llegaron
   // a 125 y 165 caracteres. 120 las descartaba aunque el prompt nunca había comunicado ese techo.

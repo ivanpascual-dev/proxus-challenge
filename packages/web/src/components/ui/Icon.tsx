@@ -17,7 +17,9 @@ export type IconName =
   | "chevron-right"
   | "chevron-left"
   | "arrow-right"
-  | "progress";
+  | "progress"
+  | "history"
+  | "search";
 
 interface IconProps {
   readonly name: IconName;
@@ -84,6 +86,21 @@ const iconPaths = ({ name }: { readonly name: IconName }) => {
       return (
         <>
           <path d="M4 20V10M12 20V4M20 20v-6" />
+        </>
+      );
+    case "history":
+      return (
+        <>
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 4v5h5" />
+          <path d="M12 7v5l3 3" />
+        </>
+      );
+    case "search":
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
         </>
       );
   }

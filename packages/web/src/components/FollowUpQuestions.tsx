@@ -14,7 +14,7 @@ export function FollowUpQuestions({
   }
 
   return (
-    <div className="flex flex-col gap-2 px-6 pb-3" aria-label="Preguntas de seguimiento">
+    <div className="flex flex-col gap-2" aria-label="Preguntas de seguimiento">
       {questions.map((question) => (
         <button
           key={question}

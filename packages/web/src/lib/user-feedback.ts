@@ -182,11 +182,12 @@ export const toUserNotice = (cause: unknown, operation: UserOperation): UserNoti
 };
 
 // Claves, tokens y cuerpos binarios que nunca deben llegar a un log de navegador, aunque vengan
-// dentro de una causa desconocida.
-const REDACT_KEY_PATTERN = /key|token|secret|password|authorization|cookie/i;
-const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/]{200,}={0,2}$/;
+// dentro de una causa desconocida. Se reutiliza también en `activity-detail.ts` (fase 5, §4.4): el
+// segundo nivel de la actividad del agente tiene el mismo problema con el `result` de una herramienta.
+export const REDACT_KEY_PATTERN = /key|token|secret|password|authorization|cookie/i;
+export const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/]{200,}={0,2}$/;
 
-const redactForLog = (value: unknown, depth = 0): unknown => {
+export const redactForLog = (value: unknown, depth = 0): unknown => {
   if (depth > 4) return "[omitido]";
   if (typeof value === "string") {
     return BASE64_LIKE_PATTERN.test(value) ? "[binario omitido]" : value;
