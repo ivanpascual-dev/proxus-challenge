@@ -40,7 +40,16 @@ export const FileStudyProfileRepository = {
         yield* fs.writeFileString(profilePath(profile.materialId), `${json}\n`).pipe(Effect.mapError(mapError));
       });
 
-      return { load, save };
+      const remove = (materialId: string) => Effect.gen(function* () {
+        const filePath = profilePath(materialId);
+        const exists = yield* fs.exists(filePath).pipe(Effect.mapError(mapError));
+        if (!exists) {
+          return;
+        }
+        yield* fs.remove(filePath).pipe(Effect.mapError(mapError));
+      });
+
+      return { load, save, remove };
     }),
   layer: (directory: string) => Layer.effect(StudyProfileRepository)(FileStudyProfileRepository.make(directory))
 };

@@ -323,8 +323,37 @@ export const FileMaterialRepository = {
       return results;
     });
 
+    // Borra el PDF y, solo si era la última referencia viva a su huella, el índice y las páginas
+    // cacheadas que comparten esa huella (ADR-027). Dos PDF de nombre distinto y bytes idénticos
+    // comparten huella (ADR-011); borrar uno de los dos no debe dejar al otro sin índice ni caché.
     const remove = (id: string): Effect.Effect<void, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
       const file = yield* getFile(id);
+      const hash = yield* contentHash(file.path);
+
+      const others = yield* listFiles();
+      const otherHashes = yield* Effect.forEach(
+        others.filter((other) => other.material.id !== id),
+        (other) => contentHash(other.path),
+        { concurrency: 4 }
+      );
+      const isLastReference = !otherHashes.includes(hash);
+
+      if (isLastReference) {
+        yield* indexRepository.removeByHash(hash).pipe(Effect.mapError(mapError));
+
+        const pagesExist = yield* fs.exists(pagesCacheDirectory).pipe(Effect.mapError(mapError));
+        if (pagesExist) {
+          const entries = yield* fs.readDirectory(pagesCacheDirectory).pipe(Effect.mapError(mapError));
+          const prefix = `${hash}-`;
+          yield* Effect.forEach(
+            entries.filter((entry) => entry.startsWith(prefix)),
+            (entry) => fs.remove(path.join(pagesCacheDirectory, entry)).pipe(Effect.mapError(mapError)),
+            { discard: true }
+          );
+        }
+      }
+
+      // El PDF se borra el último: si un paso anterior falla, el material sigue visible y reintentable.
       yield* fs.remove(file.path).pipe(Effect.mapError(mapError));
     });
 

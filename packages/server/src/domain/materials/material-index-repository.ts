@@ -18,6 +18,9 @@ export interface MaterialIndexRepository {
   readonly prune: (
     liveHashes: readonly string[]
   ) => Effect.Effect<readonly string[], MaterialIndexRepositoryError>;
+  // Borra el índice archivado de una única huella (ADR-027): lo llama el borrado de un material cuando
+  // era la última referencia viva a esa huella. La ausencia del fichero es éxito idempotente.
+  readonly removeByHash: (contentHash: string) => Effect.Effect<void, MaterialIndexRepositoryError>;
 }
 
 export const MaterialIndexRepository = Context.Service<MaterialIndexRepository>(

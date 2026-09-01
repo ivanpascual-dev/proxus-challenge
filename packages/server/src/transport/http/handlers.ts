@@ -264,8 +264,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         return yield* deletion.remove(params.id);
       }).pipe(
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
-        Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
-        Effect.catch((error) => logAndFailStorage(params.id, error))
+        Effect.catchTag("MaterialDeletionError", (error) => logAndFailStorage(params.id, error.reason))
       ))
       .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),

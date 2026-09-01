@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { Effect, Exit, Layer } from "effect";
 import type { MaterialIndexContent } from "@proxus/shared";
@@ -271,6 +271,63 @@ test("validate rechaza dos ficheros del mismo lote con el mismo nombre, sin que 
         assert.equal(second.reason._tag, "MaterialAlreadyExists");
       }
       assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});
+
+// `pagesCacheDirectory` es hermano de `pdfDir` (`file-material-repository.ts`, comentario de
+// `pagesCacheDirectory`), así que aquí es `dirname(pdfDir)/pages`: bajo `os.tmpdir()` directamente,
+// compartido entre tests de este fichero. Cada test usa un hash propio (bytes distintos), así que los
+// nombres de fichero no chocan; se limpia solo el fichero propio, nunca el directorio entero.
+const pagesDirFor = (pdfDir: string) => join(dirname(pdfDir), "pages");
+
+const withCachedPage = async (pdfDir: string, hash: string, page: number, body: () => Promise<void>) => {
+  const pagesDir = pagesDirFor(pdfDir);
+  mkdirSync(pagesDir, { recursive: true });
+  const pagePath = join(pagesDir, `${hash}-${page}.png`);
+  writeFileSync(pagePath, Buffer.from("fake-png"));
+  try {
+    await body();
+  } finally {
+    if (existsSync(pagePath)) {
+      rmSync(pagePath, { force: true });
+    }
+  }
+};
+
+test("remove borra el PDF, el índice y las páginas cacheadas cuando era la última referencia a su huella (ADR-027)", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    const pdfPath = join(pdfDir, "solo.pdf");
+    copyFileSync(fixturePdf, pdfPath);
+    const hash = hashContent(readFileSync(pdfPath));
+    await putIndex(indexDir, storedContent(hash, 4));
+
+    await withCachedPage(pdfDir, hash, 1, async () => {
+      const repo = await materialRepo(pdfDir, indexDir);
+      await Effect.runPromise(repo.remove("solo"));
+
+      assert.deepEqual(readdirSync(pdfDir), []);
+      assert.equal(existsSync(join(indexDir, `${hash}.json`)), false);
+      assert.equal(existsSync(join(pagesDirFor(pdfDir), `${hash}-1.png`)), false);
+    });
+  });
+});
+
+test("remove conserva el índice y las páginas cacheadas cuando otro PDF comparte la misma huella (ADR-027)", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    const bytes = readFileSync(fixturePdf);
+    const hash = hashContent(bytes);
+    writeFileSync(join(pdfDir, "primero.pdf"), bytes);
+    writeFileSync(join(pdfDir, "segundo.pdf"), bytes);
+    await putIndex(indexDir, storedContent(hash, 4));
+
+    await withCachedPage(pdfDir, hash, 1, async () => {
+      const repo = await materialRepo(pdfDir, indexDir);
+      await Effect.runPromise(repo.remove("primero"));
+
+      assert.deepEqual(readdirSync(pdfDir), ["segundo.pdf"]);
+      assert.equal(existsSync(join(indexDir, `${hash}.json`)), true);
+      assert.equal(existsSync(join(pagesDirFor(pdfDir), `${hash}-1.png`)), true);
     });
   });
 });

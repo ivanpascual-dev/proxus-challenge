@@ -40,6 +40,15 @@ export const FileMaterialIndexRepository = {
       );
     });
 
+    const removeByHash = (contentHash: string) => Effect.gen(function* () {
+      const target = filePath(contentHash);
+      const exists = yield* fs.exists(target).pipe(Effect.mapError(mapError));
+      if (!exists) {
+        return;
+      }
+      yield* fs.remove(target).pipe(Effect.mapError(mapError));
+    });
+
     const prune = (liveHashes: readonly string[]) => Effect.gen(function* () {
       const exists = yield* fs.exists(directory).pipe(Effect.mapError(mapError));
       if (!exists) {
@@ -61,7 +70,7 @@ export const FileMaterialIndexRepository = {
       return pruned;
     });
 
-    return { getByHash, put, prune };
+    return { getByHash, put, prune, removeByHash };
   }),
   layer: (directory: string) => Layer.effect(MaterialIndexRepository)(FileMaterialIndexRepository.make(directory))
 };
