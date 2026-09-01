@@ -1,7 +1,8 @@
 import { IconButton } from "../ui/IconButton.tsx";
+import { SymAvatar } from "../ui/SymAvatar.tsx";
 
-// Cabecera de 56px (fase 5, §4.4): "Sym", descriptor "Tutor académico", historial y papelera. No dice
-// que la sesión sea efímera ni muestra proveedor, modelo o tecnología (decisión 21).
+// Cabecera de 56px (fase 5, §4.4): avatar de Sym, "Sym", descriptor "Tutor académico", historial y
+// papelera. No dice que la sesión sea efímera ni muestra proveedor, modelo o tecnología (decisión 21).
 interface ChatHeaderProps {
   readonly historyToggleId: string;
   readonly historyOpen: boolean;
@@ -18,9 +19,12 @@ interface ChatHeaderProps {
 export function ChatHeader({ historyToggleId, historyOpen, onToggleHistory, onCreateNew, onDeleteConversation, deleting, createDisabled = false, deleteDisabled = false }: ChatHeaderProps) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-border border-b px-4">
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-heading text-base leading-tight">Sym</p>
-        <p className="text-muted text-xs leading-tight">Tutor académico</p>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <SymAvatar size={32} />
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-heading text-base leading-tight">Sym</p>
+          <p className="text-muted text-xs leading-tight">Tutor académico</p>
+        </div>
       </div>
       <div className="flex items-center gap-1">
         <IconButton
