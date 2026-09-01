@@ -45,8 +45,8 @@ test("en práctica la penalización es 0 aunque haya fallos", () => {
   assert.equal(penalty(corrections, "practice"), 0);
 });
 
-test("displayedScore escala a 10 y tiene suelo en 0", () => {
-  assert.equal(displayedScore(70, 0, 90), (70 / 90) * 10);
+test("displayedScore escala a 10, tiene suelo en 0 y redondea a dos decimales", () => {
+  assert.equal(displayedScore(70, 0, 90), 7.78); // (70/90)*10 = 7.777... redondeado
   assert.equal(displayedScore(5, 20, 10), 0); // más penalización que aciertos → 0, no negativo
   assert.equal(displayedScore(10, 0, 10), 10);
 });
