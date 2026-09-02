@@ -246,6 +246,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   pantalla previa sin crear el intento ni arrancar el reloj, sin tener que ir a buscarlo a la lista.
   Subir un único PDF sin tener otro material abierto lo deja seleccionado y en la pestaña Mapa en
   cuanto termina de prepararse; indexar a mano el material que ya tienes abierto hace lo mismo.
+- **La pantalla previa al examen real se rediseña.** Queda centrada y los cuatro avisos (sin pistas,
+  el reloj solo corre dentro, cada salida se registra, el resto de la aplicación queda cerrado) se ven
+  en tarjetas con icono en vez de en una lista de puntos.
 
 ### Corregido
 

@@ -26,6 +26,7 @@ import {
 import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { ActionButton } from "../ui/ActionButton.tsx";
+import { Icon, type IconName } from "../ui/Icon.tsx";
 
 // El panel de examen a pantalla completa (decisión 18, §6.11). Mientras dura el examen la aplicación
 // ES el examen: sin barra lateral, sin pestañas, sin chat (App lo pinta sobre la rejilla). Aquí solo
@@ -429,25 +430,33 @@ function ExamBriefing({
   const notice = partialAssessmentNotice(requestedQuestionCount, questionCount);
   return (
     <Centered>
-      <div className="max-w-lg">
+      <div className="max-w-xl text-center">
         <p className="font-bold text-brand text-xs uppercase tracking-widest">
-          {kind === "quiz" ? "Control" : "Examen"} · modo examen
+          {kind === "quiz" ? "CONTROL · MODO EXAMEN" : "EXAMEN REAL · A PUERTA CERRADA"}
         </p>
-        <h2 className="mt-1 font-bold text-heading text-2xl">{title}</h2>
-        <p className="mt-3 text-muted">
+        <h2 className="mt-2 font-bold text-heading text-2xl">{title}</h2>
+        <p className="mt-3 font-medium text-body text-lg">
           {questionCount} {questionCount === 1 ? "pregunta" : "preguntas"} · {Math.round(timeLimitSeconds / 60)} minutos
         </p>
+        {/* Prueba parcial: el mismo aviso que en la lista y en el solver, sin tocarlo (§11.5). */}
         {notice !== null && <p className="mt-1 text-muted text-sm">{notice}</p>}
-        <ul className="mt-4 grid gap-2 text-body text-sm">
-          <li>· La corrección y la nota salen al entregar, no antes. No hay pistas.</li>
-          <li>· El reloj solo corre mientras tengas el examen abierto: si te vas, se para y se retoma donde lo dejaste.</li>
-          <li>· Cada rato fuera queda registrado como una interrupción y se ve en el historial.</li>
-          <li>· Mientras dure, el resto de la aplicación (material, apuntes, tutor) queda cerrado.</li>
+
+        {/* Los avisos que exige F3-39d, en rejilla de dos columnas en vez de una lista de puntos.
+            El texto es el canónico de §11.10 y no se reescribe. */}
+        <ul className="mt-6 grid gap-3 text-left sm:grid-cols-2">
+          {BRIEFING_NOTES.map((item) => (
+            <li key={item.title} className="border border-border bg-surface/60 p-3">
+              <Icon name={item.icon} size={18} className="text-brand" />
+              <p className="mt-2 font-semibold text-heading text-sm">{item.title}</p>
+              <p className="mt-1 text-muted text-sm">{item.body}</p>
+            </li>
+          ))}
         </ul>
+
         {error !== undefined && (
-          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-left text-danger-ink text-sm">{error}</p>
         )}
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <ActionButton
             icon="play"
             variant="primary"
@@ -469,6 +478,35 @@ function ExamBriefing({
     </Centered>
   );
 }
+
+// Texto canónico de §11.10, literal. Los tres primeros son los avisos que F3-39d exige antes de
+// arrancar el reloj; el cuarto explica el aislamiento de la pantalla.
+const BRIEFING_NOTES: ReadonlyArray<{
+  readonly icon: IconName;
+  readonly title: string;
+  readonly body: string;
+}> = [
+  {
+    icon: "lightbulb",
+    title: "Sin pistas",
+    body: "La corrección y la nota salen al entregar, no antes."
+  },
+  {
+    icon: "history",
+    title: "El reloj solo corre dentro",
+    body: "Si te vas, se para y se retoma donde lo dejaste."
+  },
+  {
+    icon: "notes",
+    title: "Cada salida queda registrada",
+    body: "Se guarda como una interrupción y se ve en el historial."
+  },
+  {
+    icon: "lock",
+    title: "El resto queda cerrado",
+    body: "Material, apuntes y tutor no están disponibles mientras dure."
+  }
+];
 
 function Centered({ children }: { readonly children: React.ReactNode }) {
   return (
