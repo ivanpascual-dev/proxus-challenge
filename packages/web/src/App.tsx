@@ -188,6 +188,7 @@ export function App() {
           <ErrorBoundary label="el chat">
             <Chat
               proposedContext={hasMiddlePanel ? screenContext : []}
+              onOpenCitation={openCitation}
               onContextDismissed={(ref) => {
                 // Retirar el chip de la página es soltar el adjunto, no solo esconderlo: si no,
                 // volver a pulsar `Preguntar a Sym` en la misma página no traería nada de vuelta.

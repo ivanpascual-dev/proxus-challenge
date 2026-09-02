@@ -6,6 +6,7 @@ import {
   emptyTurnView,
   turnViewsFromConversation,
   withFollowUpQuestions,
+  withSource,
   withTurnFailure
 } from "./turn-view.ts";
 
@@ -26,7 +27,7 @@ test("turnViewsFromConversation: un turno directo, sin herramientas, corta por m
   ];
   const conversation = baseConversation({
     messages,
-    turns: [{ startedAt: "t0", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "Hola", context: [], messageCount: 2, followUpQuestions: [] }]
+    turns: [{ startedAt: "t0", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "Hola", context: [], messageCount: 2, followUpQuestions: [], sources: [] }]
   });
 
   const [turn] = turnViewsFromConversation(conversation);
@@ -53,7 +54,8 @@ test("turnViewsFromConversation: empareja tool-call con el siguiente tool-result
       input: "Lee mis materiales",
       context: [],
       messageCount: 6,
-      followUpQuestions: []
+      followUpQuestions: [],
+      sources: []
     }]
   });
 
@@ -78,7 +80,8 @@ test("turnViewsFromConversation: un turno fallido no tiene mensaje de asistente 
       input: "Explícame el tema 3",
       context: [],
       messageCount: 1,
-      followUpQuestions: []
+      followUpQuestions: [],
+      sources: []
     }]
   });
 
@@ -100,8 +103,8 @@ test("turnViewsFromConversation: varios turnos se cortan cada uno en su propio h
   const conversation = baseConversation({
     messages,
     turns: [
-      { startedAt: "t0", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "Hola", context: [], messageCount: 2, followUpQuestions: [] },
-      { startedAt: "t1", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "¿Qué materiales tengo?", context: [], messageCount: 4, followUpQuestions: ["¿Quieres verlo?"] }
+      { startedAt: "t0", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "Hola", context: [], messageCount: 2, followUpQuestions: [], sources: [] },
+      { startedAt: "t1", steps: [{ index: 0, usage: {}, toolCalls: [] }], input: "¿Qué materiales tengo?", context: [], messageCount: 4, followUpQuestions: ["¿Quieres verlo?"], sources: [] }
     ]
   });
 
@@ -146,4 +149,38 @@ test("turno en curso: un fallo se marca sin inventar una respuesta", () => {
   assert.equal(turn.status, "failure");
   assert.equal(turn.errorMessage, "No se pudo completar la petición.");
   assert.equal(turn.assistantText, null);
+});
+
+test("turnViewsFromConversation: las fuentes del turno se leen del contrato, no del texto", () => {
+  const messages: readonly AgentMessage[] = [
+    { role: "user", content: "¿Qué dice la página 3?" },
+    { role: "assistant", content: "Dice esto." }
+  ];
+  const conversation = baseConversation({
+    messages,
+    turns: [{
+      startedAt: "t0",
+      steps: [{ index: 0, usage: {}, toolCalls: [] }],
+      input: "¿Qué dice la página 3?",
+      context: [],
+      messageCount: 2,
+      followUpQuestions: [],
+      sources: [{ materialId: "m1", title: "Álgebra", pages: [3], transcribedPages: [3] }]
+    }]
+  });
+
+  const [turn] = turnViewsFromConversation(conversation);
+  assert.deepEqual(turn!.sources, [{ materialId: "m1", title: "Álgebra", pages: [3], transcribedPages: [3] }]);
+});
+
+test("turno en curso: una fuente del mismo material sustituye a la anterior en vez de duplicarla", () => {
+  let turn = emptyTurnView("Explícame el tema 2", []);
+  assert.deepEqual(turn.sources, []);
+
+  turn = withSource(turn, { materialId: "m1", title: "Álgebra", pages: [3], transcribedPages: [] });
+  turn = withSource(turn, { materialId: "m1", title: "Álgebra", pages: [3, 4], transcribedPages: [] });
+  turn = withSource(turn, { materialId: "m2", title: "Cálculo", pages: [10], transcribedPages: [] });
+
+  assert.deepEqual(turn.sources.map((source) => source.materialId), ["m1", "m2"]);
+  assert.deepEqual(turn.sources[0]!.pages, [3, 4]);
 });

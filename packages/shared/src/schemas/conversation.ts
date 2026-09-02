@@ -33,6 +33,19 @@ export const ConversationStep = Schema.Struct({
 });
 export type ConversationStep = typeof ConversationStep.Type;
 
+// Fase 5, §5.3: la procedencia del chat. La deriva el servidor de una llamada completada con éxito a
+// `materials read` o `materials view`, con el material y las páginas que el repositorio sirvió de
+// verdad: nunca se acepta una cita escrita por el modelo ni se parsea el texto de la respuesta.
+// `transcribedPages` es el subconjunto de `pages` cuyo texto indexado es transcripción del modelo
+// (invariante 8: el texto indexado no es la fuente de verdad, la página sí).
+export const ConversationSource = Schema.Struct({
+  materialId: Schema.String,
+  title: Schema.String,
+  pages: Schema.Array(Schema.Number),
+  transcribedPages: Schema.Array(Schema.Number)
+});
+export type ConversationSource = typeof ConversationSource.Type;
+
 // Fase 5, §5.1: el turno visible separado del prompt del modelo. `input` es el texto literal escrito
 // por el alumno (nunca el bloque `SCREEN CONTEXT` concatenado); `context` son las referencias
 // aceptadas al enviar; `messageCount` corta la secuencia plana de `Conversation.messages` en el turno
@@ -45,7 +58,10 @@ export const ConversationTurn = Schema.Struct({
   input: Schema.String,
   context: Schema.Array(ChatContextRef),
   messageCount: Schema.Number,
-  followUpQuestions: Schema.Array(Schema.String)
+  followUpQuestions: Schema.Array(Schema.String),
+  // §5.3: los materiales y páginas que el agente consultó de verdad en este turno. Un turno antiguo
+  // sin este campo en disco se lee como lista vacía: no se reconstruye a posteriori desde el texto.
+  sources: Schema.Array(ConversationSource)
 });
 export type ConversationTurn = typeof ConversationTurn.Type;
 

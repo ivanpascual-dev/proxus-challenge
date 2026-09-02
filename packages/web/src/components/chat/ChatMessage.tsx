@@ -3,6 +3,7 @@ import "streamdown/styles.css";
 import { Icon } from "../ui/Icon.tsx";
 import { SymAvatar } from "../ui/SymAvatar.tsx";
 import { AgentActivity } from "./AgentActivity.tsx";
+import { TurnSources } from "./TurnSources.tsx";
 import { useAssistantReveal } from "./useAssistantReveal.ts";
 import type { TurnView } from "../../domain/tutor/turn-view.ts";
 
@@ -13,7 +14,13 @@ import type { TurnView } from "../../domain/tutor/turn-view.ts";
 // Plan de correcciones §4.2.6 / C5-10: `reveal` solo lo activa `MessageList` para el turno vivo (o el
 // recién cerrado que sigue siendo el último). Con `reveal` la respuesta nueva se revela progresivamente
 // durante como mucho 1,5s; los turnos hidratados del historial no lo llevan y se muestran completos.
-export function ChatMessage({ turn, reveal = false }: { readonly turn: TurnView; readonly reveal?: boolean }) {
+export function ChatMessage({ turn, reveal = false, onOpenCitation }: {
+  readonly turn: TurnView;
+  readonly reveal?: boolean;
+  // §5.3: abrir una fuente es lo mismo que abrir una cita de un apunte (decisión 26): material
+  // correcto, pestaña PDF y primera página. Quien lo resuelve es `App`, no este componente.
+  readonly onOpenCitation: (materialId: string, page: number) => void;
+}) {
   const { visibleText, animating, didAnimate } = useAssistantReveal(turn.assistantText, reveal);
 
   return (
@@ -40,6 +47,8 @@ export function ChatMessage({ turn, reveal = false }: { readonly turn: TurnView;
           </div>
         </div>
       )}
+
+      <TurnSources sources={turn.sources} onOpenCitation={onOpenCitation} />
 
       {turn.status === "failure" && turn.assistantText === null && (
         <div className="flex max-w-[820px] gap-3">

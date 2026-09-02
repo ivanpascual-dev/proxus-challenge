@@ -3,6 +3,7 @@ import { ChatContextRef, LIMITS, type StudyProfile } from "@proxus/shared";
 import { GeminiModel } from "../../gemini.ts";
 import { AgentSession, renderScreenContext } from "../../harness/index.ts";
 import { resolveScreenContext } from "../screen-context-resolver.ts";
+import { noopTurnSourceRecorder } from "../turn-sources.ts";
 import { type AgentMessage } from "../../harness/message.ts";
 import { makeAcademicTutorHarness } from "../../academic-tutor.ts";
 import {
@@ -587,7 +588,10 @@ const runEvalCase = (
   const studyProfileService = yield* StudyProfileService;
   const budgetRef = yield* Ref.make(initialTurnBudgetState);
   const rateLimiter = yield* makeRateLimiter();
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval");
+  // El eval mide comportamiento del tutor, no la procedencia del chat: registra las fuentes en el
+  // vacío (§5.3), igual que el CLI de demostración.
+  const sources = yield* noopTurnSourceRecorder;
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval", sources);
   const session = AgentSession.make(harness);
 
   // Mismo ensamblado que `tutor-chat-service.ts`: el contexto de pantalla se resuelve contra los

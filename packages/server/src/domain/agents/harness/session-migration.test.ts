@@ -43,7 +43,8 @@ test("migrateStoredTurns: un turno sin campos nuevos se completa a partir de la 
     input: "Hola",
     context: [],
     messageCount: 2,
-    followUpQuestions: []
+    followUpQuestions: [],
+    sources: []
   }]);
 });
 
@@ -63,7 +64,25 @@ test("migrateStoredTurns: un turno ya con el contrato nuevo se conserva sin rein
 
   const migrated = migrateStoredTurns(messages, [turn]);
   assert.ok(Option.isSome(migrated));
-  assert.deepEqual(migrated.value[0], turn);
+  assert.deepEqual(migrated.value[0], { ...turn, sources: [] });
+});
+
+// Fase 5, §5.3: las fuentes de un turno anterior a este campo no se reconstruyen. Deducirlas del texto
+// ya escrito sería exactamente la cita inventada que el contrato prohíbe.
+test("migrateStoredTurns: un turno anterior a las fuentes se lee con la lista vacía, y uno nuevo la conserva", () => {
+  const messages: readonly AgentMessage[] = [
+    { role: "user", content: "¿Qué dice la página 3?" },
+    { role: "assistant", content: "Dice esto." }
+  ];
+  const sources = [{ materialId: "m1", title: "Álgebra", pages: [3], transcribedPages: [] }];
+
+  const old = migrateStoredTurns(messages, [{ startedAt: "t0", steps: [step(0)] }]);
+  assert.ok(Option.isSome(old));
+  assert.deepEqual(old.value[0]!.sources, []);
+
+  const fresh = migrateStoredTurns(messages, [{ startedAt: "t0", steps: [step(0)], sources }]);
+  assert.ok(Option.isSome(fresh));
+  assert.deepEqual(fresh.value[0]!.sources, sources);
 });
 
 test("migrateStoredTurns: messageCount explícito que no coincide con la frontera real es una sesión corrupta", () => {

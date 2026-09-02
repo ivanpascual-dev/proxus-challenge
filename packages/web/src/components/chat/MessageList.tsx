@@ -15,9 +15,10 @@ interface MessageListProps {
   readonly liveTurn: TurnView | null;
   readonly onSelectFollowUp: (question: string) => void;
   readonly sending: boolean;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }
 
-export function MessageList({ turns, liveTurn, onSelectFollowUp, sending }: MessageListProps) {
+export function MessageList({ turns, liveTurn, onSelectFollowUp, sending, onOpenCitation }: MessageListProps) {
   const allTurns = liveTurn === null ? turns : [...turns, liveTurn];
   const newest = allTurns.at(-1);
   const revealKey = newest !== undefined && newest.key.startsWith("live-") ? newest.key : undefined;
@@ -27,7 +28,7 @@ export function MessageList({ turns, liveTurn, onSelectFollowUp, sending }: Mess
   return (
     <div className="flex flex-col gap-6">
       {allTurns.map((turn) => (
-        <ChatMessage key={turn.key} turn={turn} reveal={turn.key === revealKey} />
+        <ChatMessage key={turn.key} turn={turn} reveal={turn.key === revealKey} onOpenCitation={onOpenCitation} />
       ))}
 
       {lastTerminatedTurn !== undefined && lastTerminatedTurn.followUpQuestions.length > 0 && (

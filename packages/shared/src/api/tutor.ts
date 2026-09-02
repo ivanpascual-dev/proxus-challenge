@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { AgentMessage } from "../schemas/agent-message.ts";
 import { ChatContextRef } from "../schemas/chat-context.ts";
-import { Conversation, ConversationSummary, TurnUsage } from "../schemas/conversation.ts";
+import { Conversation, ConversationSource, ConversationSummary, TurnUsage } from "../schemas/conversation.ts";
 import { ConversationNotFound, ConversationStorageError, InvalidScreenContext } from "../errors/conversation-errors.ts";
 import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
@@ -39,6 +39,13 @@ export const TutorChatStreamEvent = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("usage"),
     usage: TurnUsage
+  }),
+  // Fase 5, §5.3: una fuente confirmada durante el turno. Llega cuando una lectura o vista de material
+  // sirvió páginas de verdad, con lo que el repositorio devolvió; el mismo material vuelve a emitirse
+  // con sus páginas ya fusionadas, así que el cliente sustituye por `materialId` en vez de acumular.
+  Schema.Struct({
+    type: Schema.Literal("source"),
+    source: ConversationSource
   }),
   Schema.Struct({
     type: Schema.Literal("warning"),

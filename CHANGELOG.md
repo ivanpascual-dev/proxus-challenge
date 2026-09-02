@@ -182,6 +182,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Botón `Plegar todo` / `Desplegar todo` en la cabecera del material.** Pegado al siguiente paso de
   estudio, pliega o despliega de una vez la barra lateral, Sym y el índice de bloques del apunte
   abierto; plegar o desplegar una de esas superficies por separado no mueve a las demás.
+- **Fuentes consultadas bajo cada respuesta del tutor.** Cuando Sym lee o visualiza páginas de un
+  material para responder, aparecen debajo como "Fuentes consultadas": el material y las páginas de
+  verdad, con la misma cita navegable de siempre y un aviso si el texto es transcripción del modelo.
+  Se ven en directo mientras responde y siguen ahí al recargar la conversación; una llamada que falla
+  no crea fuente, y no se inventa una cita a partir de lo que el modelo escribe en la respuesta.
 
 ### Cambiado
 

@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
-import { ChatContextRef } from "@proxus/shared";
+import { ChatContextRef, ConversationSource } from "@proxus/shared";
 import { degradeHistory } from "../../domain/agents/harness/message-degrade.ts";
 import { migrateStoredTurns } from "../../domain/agents/harness/session-migration.ts";
 import { sortSessionsForHistory } from "../../domain/agents/harness/session-order.ts";
@@ -82,7 +82,9 @@ const StoredTurnSchema = Schema.Struct({
   input: Schema.optional(Schema.String),
   context: Schema.optional(Schema.Array(ChatContextRef)),
   messageCount: Schema.optional(Schema.Number),
-  followUpQuestions: Schema.optional(Schema.Array(Schema.String))
+  followUpQuestions: Schema.optional(Schema.Array(Schema.String)),
+  // §5.3: opcional por el mismo motivo, un fichero escrito antes de las fuentes decodifica igual.
+  sources: Schema.optional(Schema.Array(ConversationSource))
 });
 
 const StoredAgentSessionSchema = Schema.Struct({

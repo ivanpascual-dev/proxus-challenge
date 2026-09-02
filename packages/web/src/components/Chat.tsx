@@ -13,9 +13,13 @@ type ChatState =
 
 export function Chat({
   proposedContext,
-  onContextDismissed
+  onContextDismissed,
+  onOpenCitation
 }: {
   readonly proposedContext: readonly ChatContextRef[];
+  // Abrir una fuente consultada por Sym (§5.3) es el mismo gesto que abrir la cita de un apunte: lo
+  // resuelve `App`, que es quien sabe seleccionar material y navegar a la página.
+  readonly onOpenCitation: (materialId: string, page: number) => void;
   // Se avisa a quien propuso el contexto de que el alumno ha retirado un chip (invariante 9): hay
   // referencias, como la página del PDF, que se adjuntan a mano y hay que soltar en su origen.
   readonly onContextDismissed: (ref: ChatContextRef) => void;
@@ -42,6 +46,7 @@ export function Chat({
       pending={state.pending}
       proposedContext={proposedContext}
       onContextDismissed={onContextDismissed}
+      onOpenCitation={onOpenCitation}
       onResetToDraft={() => setState({ kind: "draft" })}
       onSelectConversation={(conversationId) =>
         setState({ kind: "stored", conversationId, pending: undefined })}

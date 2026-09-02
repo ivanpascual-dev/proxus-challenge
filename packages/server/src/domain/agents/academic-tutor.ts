@@ -24,6 +24,7 @@ import {
 import { FileStudyProfileRepository } from "../../infra/profile/file-study-profile-repository.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills/index.ts";
 import { initialTurnBudgetState, type TurnBudgetState } from "../limits/turn-budget.ts";
+import { noopTurnSourceRecorder, type TurnSourceRecorder } from "./academic-tutor/turn-sources.ts";
 import { make as makeRateLimiter, type RateLimiter } from "../limits/rate-limiter.ts";
 
 export const makeAcademicTutorHarness = (
@@ -32,7 +33,10 @@ export const makeAcademicTutorHarness = (
   studyProfileService: StudyProfileService,
   budgetRef: Ref.Ref<TurnBudgetState>,
   rateLimiter: RateLimiter,
-  clientKey: string
+  clientKey: string,
+  // Fase 5, §5.3: dónde se apunta qué material y qué páginas consultó de verdad este turno. Lo crea
+  // quien ejecuta el turno, no el arnés: así el chat puede emitirlas en directo y guardarlas.
+  sources: TurnSourceRecorder
 ) => AgentHarness.make({
   // Texto canónico literal, fase 5, sección 6.2: se copia tal cual, no se "mejora" la redacción.
   systemPromptTemplate: `You are Sym, the academic tutor inside Symma. Symma is the student's study workspace for their own
@@ -114,7 +118,7 @@ and something the student could ask you next about what you just explained. Spec
 conversation, never generic. If you have nothing worth asking, omit the whole block: never pad it.`,
   skills: AcademicTutorSkills,
   commands: [
-    makeMaterialCommands(materialRepository, budgetRef),
+    makeMaterialCommands(materialRepository, budgetRef, sources),
     makeArtifactCommands(
       artifactRepository,
       makeNoteService(artifactRepository, materialRepository),
@@ -141,7 +145,10 @@ export const academicTutorAgent = Effect.gen(function* () {
 
   const budgetRef = yield* Ref.make(initialTurnBudgetState);
   const rateLimiter = yield* makeRateLimiter();
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, sessionId);
+  // El CLI de demostración no guarda turnos ni tiene stream que alimentar: registra las fuentes en el
+  // vacío en vez de fingir una superficie donde enseñarlas.
+  const sources = yield* noopTurnSourceRecorder;
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, sessionId, sources);
   const session = AgentSession.make(harness);
 
   console.log(`Provider: ${provider}`);

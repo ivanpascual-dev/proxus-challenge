@@ -12,6 +12,7 @@ import {
   emptyTurnView,
   turnViewsFromConversation,
   withFollowUpQuestions,
+  withSource,
   withTurnFailure,
   type TurnView
 } from "../../domain/tutor/turn-view.ts";
@@ -36,6 +37,7 @@ interface StoredConversationProps {
   readonly onContextDismissed: (ref: ChatContextRef) => void;
   readonly onResetToDraft: () => void;
   readonly onSelectConversation: (conversationId: string) => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }
 
 export function StoredConversation({
@@ -44,7 +46,8 @@ export function StoredConversation({
   proposedContext,
   onContextDismissed,
   onResetToDraft,
-  onSelectConversation
+  onSelectConversation,
+  onOpenCitation
 }: StoredConversationProps) {
   const detail = useAtomValue(conversationQuery(conversationId));
   const refreshConversationList = useAtomRefresh(conversationsQuery);
@@ -123,6 +126,14 @@ export function StoredConversation({
         }
 
         if (event.type === "usage") {
+          continue;
+        }
+
+        // §5.3: la fuente llega confirmada por el servidor, con las páginas que sirvió de verdad. El
+        // cliente la coloca en su turno tal cual: ni la deduce del texto ni la completa.
+        if (event.type === "source") {
+          workingTurn = withSource(workingTurn, event.source);
+          setLiveTurn(workingTurn);
           continue;
         }
 
@@ -245,6 +256,7 @@ export function StoredConversation({
                 liveTurn={liveTurn}
                 onSelectFollowUp={(question) => void submit(question)}
                 sending={isSending}
+                onOpenCitation={onOpenCitation}
               />
             </div>
           )}

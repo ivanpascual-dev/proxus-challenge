@@ -1,5 +1,5 @@
 import { Context, Data, Effect } from "effect";
-import type { ChatContextRef } from "@proxus/shared";
+import type { ChatContextRef, ConversationSource } from "@proxus/shared";
 import type { AgentMessage } from "./message.ts";
 
 // La observabilidad por paso (fase 4, decisión 7): el coste y los errores del modelo viven en el
@@ -40,6 +40,9 @@ export interface StoredTurn {
   readonly context: readonly ChatContextRef[];
   readonly messageCount: number;
   readonly followUpQuestions: readonly string[];
+  // Fase 5, §5.3: los materiales y páginas que el agente consultó en el turno, derivados de comandos
+  // que completaron. Un turno anterior a este campo se lee como lista vacía.
+  readonly sources: readonly ConversationSource[];
 }
 
 export interface StoredAgentSession {

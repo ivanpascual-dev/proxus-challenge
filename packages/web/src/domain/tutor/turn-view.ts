@@ -1,4 +1,4 @@
-import type { AgentMessage, ChatContextRef, Conversation } from "@proxus/shared";
+import type { AgentMessage, ChatContextRef, Conversation, ConversationSource } from "@proxus/shared";
 
 // Fase 5, §4.4: un turno agrupa su actividad antes de la respuesta final. `TurnView` es la forma que
 // consume `MessageList`/`AgentActivity`, tanto para un turno ya cerrado (reconstruido desde
@@ -27,6 +27,9 @@ export interface TurnView {
   readonly followUpQuestions: readonly string[];
   readonly status: TurnStatus;
   readonly errorMessage: string | null;
+  // Fase 5, §5.3: los materiales que el agente consultó de verdad en este turno. Llegan del servidor,
+  // ya validados y deduplicados: el cliente nunca las deduce del Markdown de la respuesta.
+  readonly sources: readonly ConversationSource[];
 }
 
 const pendingCall = (name: string, input: unknown): ActivityCall => ({
@@ -82,7 +85,8 @@ export const turnViewsFromConversation = (conversation: Conversation): readonly 
       assistantText,
       followUpQuestions: turn.followUpQuestions,
       status: lastStepError !== undefined ? "failure" : "success",
-      errorMessage: lastStepError?.message ?? null
+      errorMessage: lastStepError?.message ?? null,
+      sources: turn.sources
     } satisfies TurnView;
   });
 };
@@ -102,7 +106,8 @@ export const emptyTurnView = (input: string, context: readonly ChatContextRef[])
   assistantText: null,
   followUpQuestions: [],
   status: "running",
-  errorMessage: null
+  errorMessage: null,
+  sources: []
 });
 
 export const applyMessageToTurnView = (turn: TurnView, message: AgentMessage): TurnView => {
@@ -125,6 +130,18 @@ export const applyMessageToTurnView = (turn: TurnView, message: AgentMessage): T
       return { ...turn, calls };
     }
   }
+};
+
+// El evento `source` trae la entrada del material ya fusionada en servidor, así que se sustituye la
+// que hubiera de ese `materialId` en vez de acumular una segunda con las mismas páginas.
+export const withSource = (turn: TurnView, source: ConversationSource): TurnView => {
+  const index = turn.sources.findIndex((current) => current.materialId === source.materialId);
+  if (index === -1) {
+    return { ...turn, sources: [...turn.sources, source] };
+  }
+  const sources = [...turn.sources];
+  sources[index] = source;
+  return { ...turn, sources };
 };
 
 export const withFollowUpQuestions = (turn: TurnView, questions: readonly string[]): TurnView => ({

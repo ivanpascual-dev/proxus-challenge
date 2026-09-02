@@ -149,6 +149,17 @@ cierre omitido: si después de la apertura hay exactamente tres líneas válidas
 respuesta, se recuperan esas mismas preguntas. En todos los casos, los delimitadores se retiran del
 texto visible.
 
+## Fuentes consultadas (fase 5, §5.3)
+
+Cada turno guarda en `ConversationTurn.sources` qué materiales y qué páginas leyó el agente de verdad.
+La fuente no sale del texto de la respuesta ni de una cita que escriba el modelo: la apuntan los
+propios comandos (`academic-tutor/material-commands.ts`) con lo que el repositorio sirvió, sobre un
+registro por turno (`academic-tutor/turn-sources.ts`, el mismo patrón que el presupuesto de turno).
+Una llamada que falla o que no sirve ninguna página no crea fuente, y las páginas se deduplican por
+material, así que leer dos veces la misma no la duplica. `transcribedPages` marca las páginas cuyo
+texto indexado es transcripción del modelo (invariante 8), y la interfaz las presenta bajo la respuesta
+como `Fuentes consultadas`, con la misma cita navegable que apuntes y pruebas.
+
 ## Idioma (decisión 9)
 
 El tutor piensa y trabaja en inglés (los seis prompts que van al modelo están en inglés desde el tramo
@@ -165,6 +176,8 @@ vocabulario propio del material nunca se traduce: si dice "set", el tutor dice "
    - `{ type: "message", message }`
    - `{ type: "follow-up", questions }`
    - `{ type: "usage", usage }`
+   - `{ type: "source", source }`: una fuente confirmada del turno (fase 5, §5.3), emitida en cuanto
+     `materials read` o `materials view` sirve páginas de verdad
    - `{ type: "warning", message }`: al 75% del techo de historial de la conversación
      (`maxConversationHistoryTokens`), informativo, no corta el turno
    - `{ type: "error", message }`: el fallo del modelo tal cual, sin disfrazarlo de respuesta

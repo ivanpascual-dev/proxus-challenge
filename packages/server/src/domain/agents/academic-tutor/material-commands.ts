@@ -14,6 +14,7 @@ import {
 } from "../../materials/material.ts";
 import { explainStop, planIndexRead, planRender, type TurnBudgetState } from "../../limits/turn-budget.ts";
 import { classifyRequestedPages, renderIndexRead } from "../../materials/index-read.ts";
+import type { TurnSourceRecorder } from "./turn-sources.ts";
 
 const renderMaterialError = (error: MaterialNotFound | MaterialNotIndexed | InvalidPageRange | TooManyPages | { readonly _tag: "MaterialRepositoryError"; readonly reason: unknown }) => {
   switch (error._tag) {
@@ -38,6 +39,7 @@ const base64ByteSize = (dataUrl: string): number => {
 const renderWithBudget = (
   repository: MaterialRepository,
   budgetRef: Ref.Ref<TurnBudgetState>,
+  sources: TurnSourceRecorder,
   materialId: string,
   pages: readonly number[]
 ): Effect.Effect<MaterialPageImages, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
@@ -66,6 +68,15 @@ const renderWithBudget = (
     return yield* new MaterialNotFound({ materialId });
   }
 
+  // §5.3: la fuente son las páginas que el repositorio renderizó de verdad, no las que pidió el
+  // modelo. Una vista es la página real, así que ninguna de ellas es transcripción (invariante 8).
+  yield* sources.record({
+    materialId: material.id,
+    title: material.title,
+    pages: rendered.map((page) => page.page),
+    transcribedPages: []
+  });
+
   return notice === null
     ? { type: "material-page-images" as const, material, pages: rendered }
     : { type: "material-page-images" as const, material, pages: rendered, notice };
@@ -77,6 +88,7 @@ const renderWithBudget = (
 const readIndexWithBudget = (
   repository: MaterialRepository,
   budgetRef: Ref.Ref<TurnBudgetState>,
+  sources: TurnSourceRecorder,
   materialId: string,
   pages: readonly number[]
 ): Effect.Effect<string, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
@@ -104,18 +116,32 @@ const readIndexWithBudget = (
   );
   yield* Ref.set(budgetRef, plan.nextState);
 
+  // §5.3: solo las páginas que entraron en el presupuesto llegan a la respuesta, así que solo esas son
+  // fuente. Las que el índice no supo leer y las que el techo de caracteres dejó fuera no lo son.
+  const served = readable.slice(0, plan.served);
+  yield* sources.record({
+    materialId: material.id,
+    title: material.title,
+    pages: served.map((page) => page.page),
+    transcribedPages: served.filter((page) => page.provenance === "transcribed").map((page) => page.page)
+  });
+
   return renderIndexRead({
     materialId,
     title: material.title,
     topics: lookup.index.topics,
-    served: readable.slice(0, plan.served),
+    served,
     problems,
     droppedPages: readable.slice(plan.served).map((page) => page.page),
     notice: plan.notice
   });
 });
 
-export const makeMaterialCommands = (repository: MaterialRepository, budgetRef: Ref.Ref<TurnBudgetState>) => {
+export const makeMaterialCommands = (
+  repository: MaterialRepository,
+  budgetRef: Ref.Ref<TurnBudgetState>,
+  sources: TurnSourceRecorder
+) => {
   const list = AgentCli.Command.withExamples([
     { command: "materials list", description: "List all uploaded PDF materials" }
   ])(
@@ -154,7 +180,7 @@ export const makeMaterialCommands = (repository: MaterialRepository, budgetRef: 
         )
       }, ({ materialId, pages }) =>
         parsePageSelection(pages).pipe(
-          Effect.andThen((parsedPages) => renderWithBudget(repository, budgetRef, materialId, parsedPages)),
+          Effect.andThen((parsedPages) => renderWithBudget(repository, budgetRef, sources, materialId, parsedPages)),
           Effect.catch((error) => Effect.succeed(renderMaterialError(error)))
         )
       )
@@ -178,7 +204,7 @@ export const makeMaterialCommands = (repository: MaterialRepository, budgetRef: 
         )
       }, ({ materialId, pages }) =>
         parsePageSelection(pages).pipe(
-          Effect.andThen((parsedPages) => readIndexWithBudget(repository, budgetRef, materialId, parsedPages)),
+          Effect.andThen((parsedPages) => readIndexWithBudget(repository, budgetRef, sources, materialId, parsedPages)),
           Effect.catch((error) => Effect.succeed(renderMaterialError(error)))
         )
       )

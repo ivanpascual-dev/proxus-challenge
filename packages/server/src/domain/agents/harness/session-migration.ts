@@ -1,5 +1,5 @@
 import { Option } from "effect";
-import type { ChatContextRef } from "@proxus/shared";
+import type { ChatContextRef, ConversationSource } from "@proxus/shared";
 import { extractFollowUp } from "./follow-up.ts";
 import type { AgentMessage } from "./message.ts";
 import type { StoredStep, StoredTurn } from "./session-repository.ts";
@@ -15,6 +15,7 @@ export interface RawStoredTurn {
   readonly context?: readonly ChatContextRef[] | undefined;
   readonly messageCount?: number | undefined;
   readonly followUpQuestions?: readonly string[] | undefined;
+  readonly sources?: readonly ConversationSource[] | undefined;
 }
 
 // El texto exacto que escribe `renderScreenContext` (fase 4, decisión 11): `${input}\n\n${bloque}`.
@@ -92,7 +93,10 @@ export const migrateStoredTurns = (
       input,
       context: turn.context ?? [],
       messageCount,
-      followUpQuestions
+      followUpQuestions,
+      // §5.3: una conversación anterior a las fuentes no las tiene y no se inventan. Reconstruirlas
+      // exigiría releer el texto de la respuesta, que es justo lo que el contrato prohíbe.
+      sources: turn.sources ?? []
     });
 
     cursor += messageCount;
