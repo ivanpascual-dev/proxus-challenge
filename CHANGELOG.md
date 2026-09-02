@@ -60,6 +60,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
   guardar se bloquea si alguno se pasa. Al guardar se manda el apunte entero y gana el último que
   guarda.
+- **Encabezado H1 ("Título grande") en los apuntes.** El menú de formato de un bloque, con "/" o la
+  barra flotante, ofrece ahora un encabezado principal más grande que el H2 existente.
 - **Ficheros de apunte ilegibles a la vista.** Si un fichero de artefacto guardado no se puede
   decodificar, la barra lateral lista los demás y avisa del que falla con su motivo, en vez de
   quedarse sin barra lateral.

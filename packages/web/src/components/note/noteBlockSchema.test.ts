@@ -33,6 +33,7 @@ const CASES: ReadonlyArray<readonly [name: string, markdown: string]> = [
   ["negrita", "Un texto con **negrita** dentro."],
   ["cursiva", "Un texto con *cursiva* dentro."],
   ["enlace", "Ver la [página del tema](https://example.com/tema) para más."],
+  ["encabezado H1", "# Título grande del bloque"],
   ["encabezado H2", "## Título de sección"],
   ["encabezado H3", "### Subtítulo"],
   ["encabezado H4", "#### Apartado"],
@@ -71,6 +72,13 @@ for (const [name, markdown] of CASES) {
     }
   });
 }
+
+// F5-50: el H1 tiene que volver siendo H1. Si `tiptap-markdown` lo degradara a otro nivel, el bucle
+// de arriba seguiría en verde (sigue empezando por "#") y el apunte perdería el encabezado principal
+// en silencio al guardar y recargar.
+test("el H1 conserva su nivel al guardar y volver a leer", () => {
+  assert.equal(roundTrip("# Título grande del bloque").trim(), "# Título grande del bloque");
+});
 
 test("un formato que solo se representa con HTML no está en el esquema del bloque (F2-41)", () => {
   // Subrayado y color solo se guardan como `<u>` / `<span style>`; `tiptap-markdown` los perdería en

@@ -131,6 +131,15 @@
     margin-top: 0.9em;
   }
 
+  /* F5-50: el H1 es el encabezado principal de un bloque y tiene que verse mayor que el H2. Sin esta
+     regla se serializaría como `#` pero se leería igual que el texto normal. */
+  .tiptap-block h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-heading);
+  }
+
   .tiptap-block h2 {
     font-size: 1.5rem;
     font-weight: 700;
