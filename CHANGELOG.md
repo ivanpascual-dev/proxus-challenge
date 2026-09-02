@@ -55,6 +55,13 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **El tutor ve lo que tienes abierto, y se enseña antes de enviar.** Con un material abierto, y su
   apunte o su prueba a la vista, aparece como una etiqueta encima del cuadro de texto; se puede quitar
   con la "×" antes de enviar y solo lleva el título y el identificador, nunca el contenido.
+- **Sym sabe en qué pestaña estás, y en qué bloque o prueba.** La etiqueta de contexto dice ahora la
+  superficie que tienes delante (PDF, Mapa, Apuntes o Pruebas), el bloque de apuntes seleccionado y la
+  prueba abierta con su vista (resolviéndola o su historial). Si le preguntas dónde estás, nombra solo
+  eso: nunca un intento ni una pregunta concreta, y nada en absoluto si retiras la etiqueta.
+- **Preguntar a Sym por la página que estás leyendo.** El pie del visor de PDF tiene un botón que
+  adjunta la página actual como etiqueta y despliega el chat si estaba plegado. Adjuntar otra página
+  reemplaza a la anterior, la "×" la suelta de verdad, y salir del PDF la retira sola.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
   un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de

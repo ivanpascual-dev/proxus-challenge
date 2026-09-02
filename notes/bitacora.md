@@ -1340,3 +1340,26 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   recalculaba también el índice aunque nadie lo hubiera pedido. Se sustituyó por una orden explícita
   con marca (`FoldAllCommand`, con `seq`) que el índice solo obedece cuando llega una orden nueva; ver
   ADR-031.
+
+## 2026-09-02 · Fase 5 · tramo P3c (contexto de pantalla ampliado)
+
+- **Desviación:** `surface` queda opcional en `MaterialContextRef`, aunque §5.2 del plan la escribe
+  como requerida. El mismo esquema decodifica los turnos ya guardados en `.data`, así que hacerla
+  obligatoria dejaría ilegible cualquier conversación anterior a esta fase. La interfaz siempre la
+  manda; sin ella, el bloque describe el material y no afirma pestaña alguna. Ver ADR-032.
+- **Desviación:** se construyó también el chip de bloque de apuntes. `BlockContextRef` estaba en el
+  contrato desde fase 4 sin nadie que lo produjera, y sin él no se podía cubrir el caso de bloque que
+  pide §6.4 ni cerrar F5-44 para Apuntes.
+- **Decisión sobre la marcha:** la página adjunta vive en `App`, no en `MaterialPanel`, porque quien la
+  retira es la × de su chip, que está en el chat. De ahí el callback `onContextDismissed`: sin él, la ×
+  solo escondía el chip y volver a pulsar `Preguntar a Sym` en la misma página no traía nada.
+- **Decisión sobre la marcha:** adjuntar desde el PDF despliega a Sym si estaba plegado
+  (`onRevealChat`). Un chip propuesto detrás del rail no se puede ver ni retirar, y eso incumple la
+  invariante 9.
+- **Causa raíz:** ocho tests del resolutor daban `undefined` al comprobar el error. Sacaban el fallo del
+  `Exit` con `(exit.cause as { error }).error`, que no es la forma de un `Cause` en esta beta. Lo
+  correcto es `Cause.squash`, patrón que ya estaba en `packages/server/src/domain/materials/material.test.ts:9`.
+- **Deuda:** F5-17 nombra el tema como origen de contexto, pero el popover del mapa nunca tuvo
+  `Preguntar a Sym` (era acabado de §4.10, no se construyó en P1 ni en P2) y §5.2 no define ninguna
+  referencia de tema. Queda cubierto para material, página, apunte, bloque y prueba. Desbloquearlo pide
+  decidir antes qué referencia describe un tema.

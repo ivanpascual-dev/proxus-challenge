@@ -1511,3 +1511,47 @@ propio rail sin que nada se lo vuelva a imponer.
   desplegado, igual que antes de que existiera el botón.
 - Cualquier otra superficie que en el futuro se sume a `Plegar todo` sigue el mismo patrón: lee
   `foldAll` y compara `seq`, no deriva su plegado del de sus vecinas.
+
+---
+
+## ADR-032 · El servidor comprueba el contexto de pantalla contra los datos reales antes de describirlo
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Hasta fase 5, el bloque `SCREEN CONTEXT` se armaba copiando lo que mandaba el navegador:
+tipo, id y título. Con la ampliación de F5-17, F5-40 y F5-44 el contexto pasa a decir cosas mucho más
+comprometidas (en qué pestaña está el alumno, qué página lee, si lo que tiene abierto es un Control, un
+Examen de prueba o un Examen real, y si lo está resolviendo o mirando su historial), y F5-44 exige que
+Sym nombre únicamente la ubicación presente en el contexto. Un título es texto que el cliente elige: un
+apunte llamado `Examen final de derivadas` describiría al modelo una prueba que no existe.
+
+**Opciones consideradas.**
+
+- **Confiar en lo que manda el cliente.** Descartada: convierte un campo de texto en la fuente de
+  verdad sobre dónde está el alumno, y la respuesta de Sym a "¿dónde estoy?" pasaría a depender de algo
+  que no se ha comprobado. Choca con la invariante 3.
+- **Ignorar en silencio la referencia que no cuadre.** Descartada por la invariante 11: el alumno vio
+  el chip antes de enviar y creería que Sym sabe dónde está. Si algo no cuadra, se dice.
+
+**Decisión.** El cliente manda referencias mínimas (`type`, ids, superficie y vista) y el servidor las
+resuelve contra sus repositorios antes de renderizar nada
+(`domain/agents/academic-tutor/screen-context-resolver.ts`): el material tiene que existir, la página
+ser entera y estar dentro de `pageCount`, la prueba ser un artefacto de tipo `quiz` o `test` del
+material abierto y el bloque existir dentro del apunte. Los títulos que llegan al modelo son los del
+repositorio, y el rótulo de la prueba (`Control`, `Examen de prueba`, `Examen real`) se deriva del
+artefacto, nunca de su título. Lo que no se puede comprobar se rechaza en voz alta con
+`InvalidScreenContext` (400, declarado en `packages/shared`), y el render (`harness/screen-context.ts`)
+queda como función pura sobre referencias ya resueltas.
+
+**Consecuencias.**
+
+- `renderScreenContext` ya no acepta `ChatContextRef`: recibe `ResolvedScreenRef`. Cualquier camino que
+  quiera armar el bloque (el servicio de chat, el eval del tutor) pasa antes por el resolutor, así que
+  no hay dos formas distintas de describir la pantalla.
+- `surface` es opcional en `MaterialContextRef` aunque la interfaz siempre la manda: el mismo esquema
+  decodifica los turnos ya guardados en disco, y hacerla obligatoria dejaría ilegibles las
+  conversaciones anteriores a esta fase. Sin superficie, el bloque describe el material y no afirma
+  ninguna pestaña, que es exactamente lo que pide la invariante 3.
+- El coste es una lectura por referencia adjunta (como máximo tres) antes de llamar al modelo. Se
+  aceptó a cambio de que Sym no pueda afirmar una ubicación que nadie ha comprobado.
