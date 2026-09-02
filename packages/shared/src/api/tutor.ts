@@ -9,12 +9,19 @@ import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 // La sesión vive en el servidor (fase 4, decisión 6): el cliente ya no manda el historial, solo el
 // turno nuevo. `context` viaja por referencia (decisión 5), nunca como texto pegado.
+//
+// `parseOptions` vive en el esquema y no en cada llamada porque el chat tiene DOS entradas HTTP: la
+// ruta cruda `/api/tutor/chat/stream` y el endpoint `chat` de `HttpApi`. `HttpApiBuilder` decodifica
+// el payload sin opciones (`HttpApiBuilder.ts:562`), así que una opción pasada a mano solo protegía la
+// primera y la otra aceptaba un `messages` fabricado con un 200 mudo. Anotado aquí, el parser mezcla
+// estas opciones sobre las del llamador (`SchemaParser.ts:872-882`) y las dos rutas devuelven 400 ante
+// un campo no declarado, en vez de decodificar en silencio ignorándolo (invariante 3).
 export const TutorChatRequest = Schema.Struct({
   conversationId: Schema.String,
   input: Schema.String,
   context: Schema.Array(ChatContextRef),
   maxSteps: Schema.optional(Schema.Number)
-});
+}).annotate({ parseOptions: { onExcessProperty: "error" } });
 export type TutorChatRequest = typeof TutorChatRequest.Type;
 
 export const TutorChatResponse = Schema.Struct({
