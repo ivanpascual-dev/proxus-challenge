@@ -293,6 +293,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   caja hasta sacar una barra de scroll horizontal. Ahora se recorta con puntos suspensivos, con el
   nombre completo disponible al pasar el ratón por encima; en el panel lateral aprovecha antes las dos
   líneas de la fila.
+- **El tooltip de un botón dentro de un diálogo ya se ve por delante.** Se pintaba por detrás del
+  diálogo, que es justo donde no se puede leer, y su texto se salía de la burbuja cuando llevaba un
+  nombre de fichero dentro.
 - **Borrar el material que tienes abierto ya no rompe la apertura automática del siguiente que
   subas.** El panel desaparecía y la pantalla quedaba bien, pero por dentro la aplicación seguía
   creyendo que ese material estaba abierto. Como no abre nada automáticamente cuando ya estás mirando

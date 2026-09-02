@@ -57,6 +57,15 @@ export function Tooltip({ label, children }: TooltipProps) {
     setPlacement(null);
   };
 
+  // Dónde se monta la burbuja. `document.body` sirve para todo menos para un `<dialog>` abierto con
+  // `showModal()`: ese vive en la top layer del navegador, que está por encima de TODO el contenido
+  // normal del documento y donde el z-index no participa. Un tooltip portalizado al body se pintaba
+  // entonces por detrás del diálogo, que es justo donde no se puede leer. Montándolo dentro del
+  // propio diálogo entra en la misma capa. Se resuelve al hacerse visible, cuando el trigger lleva
+  // renders montado, así que el ref ya apunta a algo.
+  const portalTarget = (): Element =>
+    triggerRef.current?.closest("dialog[open]") ?? document.body;
+
   return (
     <span
       ref={triggerRef}
@@ -72,7 +81,10 @@ export function Tooltip({ label, children }: TooltipProps) {
           ref={bubbleRef}
           id={id}
           role="tooltip"
-          className="pointer-events-none fixed z-50 bg-heading px-2 py-1 text-canvas text-xs"
+          // `break-words`: el label suele llevar dentro un nombre de fichero o de material, que
+          // puede no tener ningún punto de corte. Sin esto el texto se salía de la burbuja por la
+          // derecha y se leía encima de lo que hubiera detrás, `maxWidth` incluido.
+          className="pointer-events-none fixed z-50 break-words bg-heading px-2 py-1 text-canvas text-xs"
           style={{
             top: placement?.top ?? 0,
             left: placement?.left ?? 0,
@@ -83,7 +95,7 @@ export function Tooltip({ label, children }: TooltipProps) {
         >
           {label}
         </div>,
-        document.body
+        portalTarget()
       )}
     </span>
   );
