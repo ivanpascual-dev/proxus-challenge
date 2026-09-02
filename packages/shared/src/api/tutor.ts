@@ -3,7 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/ht
 import { AgentMessage } from "../schemas/agent-message.ts";
 import { ChatContextRef } from "../schemas/chat-context.ts";
 import { Conversation, ConversationSummary, TurnUsage } from "../schemas/conversation.ts";
-import { ConversationNotFound, ConversationStorageError } from "../errors/conversation-errors.ts";
+import { ConversationNotFound, ConversationStorageError, InvalidScreenContext } from "../errors/conversation-errors.ts";
 import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
@@ -62,6 +62,9 @@ export class TutorApi extends HttpApiGroup.make("tutor")
       error: [
         ConversationNotFound.pipe(HttpApiSchema.status(404)),
         LimitExceeded.pipe(HttpApiSchema.status(400)),
+        // El contexto de pantalla que ya no describe nada real (fase 5, §5.2): la petición es la que
+        // está mal, así que 400 con su texto, nunca un 500 mudo (invariante 6).
+        InvalidScreenContext.pipe(HttpApiSchema.status(400)),
         RateLimited.pipe(HttpApiSchema.status(429)),
         ConversationStorageError.pipe(HttpApiSchema.status(500))
       ]
