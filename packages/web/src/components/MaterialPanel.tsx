@@ -30,6 +30,7 @@ import {
   noteProgressLine,
   type ProgressLine,
 } from "../domain/progress/progress-line.ts";
+import type { FoldAllCommand } from "../domain/workspace/layout.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 import { NextStudyAction } from "./assessment/NextStudyAction.tsx";
 import { StudyProfilePanel } from "./assessment/StudyProfilePanel.tsx";
@@ -69,6 +70,12 @@ interface MaterialPanelProps {
     readonly tab: Tab;
   } | null;
   readonly onLandingConsumed: () => void;
+  // Plegar todo y desplegar todo (§11.8, extensión pedida por Iván): el estado vive en `AppShell`, que
+  // es quien posee los dos plegados; aquí solo se ofrece el control, porque es leyendo el material
+  // donde molestan las dos superficies laterales.
+  readonly focusMode: boolean;
+  readonly onToggleFocusMode: () => void;
+  readonly foldAll: FoldAllCommand | null;
 }
 
 type NoteAvailability =
@@ -89,6 +96,9 @@ export function MaterialPanel({
   onCitationConsumed,
   landingTarget,
   onLandingConsumed,
+  focusMode,
+  onToggleFocusMode,
+  foldAll,
 }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
@@ -247,6 +257,8 @@ export function MaterialPanel({
               />
             )}
         onOpenProgress={() => setProgressOpen(true)}
+        focusMode={focusMode}
+        onToggleFocusMode={onToggleFocusMode}
       />
 
       <StudyProfilePanel
@@ -310,6 +322,7 @@ export function MaterialPanel({
             onOpenCitation={onOpenCitation}
             requestedTopicPages={pendingNoteTopicPages}
             onRequestedTopicPagesConsumed={() => setPendingNoteTopicPages(null)}
+            foldAll={foldAll}
           />
         </div>
       )}
@@ -529,11 +542,13 @@ function NotesTab({
   onOpenCitation,
   requestedTopicPages,
   onRequestedTopicPagesConsumed,
+  foldAll,
 }: {
   readonly materialId: string;
   readonly onOpenCitation: (materialId: string, page: number) => void;
   readonly requestedTopicPages: readonly number[] | null;
   readonly onRequestedTopicPagesConsumed: () => void;
+  readonly foldAll: FoldAllCommand | null;
 }) {
   const artifacts = useAtomValue(artifactsQuery);
 
@@ -569,6 +584,7 @@ function NotesTab({
               onOpenCitation={onOpenCitation}
               requestedTopicPages={requestedTopicPages}
               onRequestedTopicPagesConsumed={onRequestedTopicPagesConsumed}
+              foldAll={foldAll}
             />
           );
         },
@@ -648,11 +664,13 @@ function ExistingNote({
   onOpenCitation,
   requestedTopicPages,
   onRequestedTopicPagesConsumed,
+  foldAll,
 }: {
   readonly noteId: string;
   readonly onOpenCitation: (materialId: string, page: number) => void;
   readonly requestedTopicPages: readonly number[] | null;
   readonly onRequestedTopicPagesConsumed: () => void;
+  readonly foldAll: FoldAllCommand | null;
 }) {
   const note = useAtomValue(artifactQuery(noteId));
   const deleteArtifact = useAtomSet(deleteArtifactAction, { mode: "promise" });
@@ -720,6 +738,7 @@ function ExistingNote({
             onOpenCitation={onOpenCitation}
             requestedTopicPages={requestedTopicPages}
             onRequestedTopicPagesConsumed={onRequestedTopicPagesConsumed}
+            foldAll={foldAll}
           />
         </div>
       ),

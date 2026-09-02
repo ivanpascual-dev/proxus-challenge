@@ -150,9 +150,12 @@ export function App() {
             />
           </ErrorBoundary>
         )}
-        material={selectedMaterial === undefined ? null : (
+        material={selectedMaterial === undefined ? null : ({ focusMode, onToggleFocusMode, foldAll }) => (
           <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
             <MaterialPanel
+              focusMode={focusMode}
+              onToggleFocusMode={onToggleFocusMode}
+              foldAll={foldAll}
               materialId={selectedMaterial.id}
               indexState={selectedMaterial.indexState}
               title={selectedMaterial.title}

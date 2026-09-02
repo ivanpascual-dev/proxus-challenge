@@ -840,6 +840,15 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
   conversación ni contenido educativo; SI el almacenamiento local falla o está bloqueado, ENTONCES la
   interfaz DEBERÁ seguir funcionando con los valores por defecto.
 
+#### Plegar todo el escritorio
+
+- **F5-53 · P3.** LA cabecera del material DEBERÁ ofrecer, junto al siguiente paso de estudio, un
+  control `Plegar todo` / `Desplegar todo` que alterne su texto y su `aria-pressed` según el estado
+  resultante; en un único gesto DEBERÁ plegar o desplegar a la vez la barra lateral, Sym y, si hay un
+  apunte abierto, su índice de bloques. Plegar o desplegar por separado cualquiera de esas superficies
+  (la agarradera de Sym, el rail de la barra lateral o el rail del índice de bloques) NO DEBERÁ
+  arrastrar a las demás ni disparar el gesto de `Plegar todo`.
+
 ### Correcciones de cierre de fase 5
 
 Plan y procedimiento de prueba de cada criterio:

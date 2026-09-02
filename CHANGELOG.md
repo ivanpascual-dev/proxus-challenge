@@ -167,6 +167,14 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Symma tiene marca propia y Sym tiene avatar.** Una "S" bicolor identifica a Symma en la barra
   lateral y en el icono de la pestaña del navegador; un disco con una chispa identifica a Sym en la
   cabecera del chat, en cada respuesta y en el estado vacío.
+- **La agarradera del separador entre Material y Sym se ve y se puede pulsar.** Arrastrarla
+  redimensiona los dos paneles respetando el mínimo de 420px; pulsarla sin arrastrar (o Enter y
+  Espacio con el foco encima) pliega a Sym a un rail de 56px con un botón para restaurarlo. Una
+  flecha dentro de la píldora marca hacia dónde se pliega. El borrador del chat, el contexto adjunto
+  y una respuesta en curso sobreviven al plegado.
+- **Botón `Plegar todo` / `Desplegar todo` en la cabecera del material.** Pegado al siguiente paso de
+  estudio, pliega o despliega de una vez la barra lateral, Sym y el índice de bloques del apunte
+  abierto; plegar o desplegar una de esas superficies por separado no mueve a las demás.
 
 ### Cambiado
 

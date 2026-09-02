@@ -11,6 +11,10 @@ interface MaterialHeaderProps {
   readonly onClose: () => void;
   readonly nextStudyAction: ReactNode;
   readonly onOpenProgress: () => void;
+  // Plegar todo: barra lateral y Sym a la vez, para leer el material a solas. El estado lo posee
+  // `AppShell`; aquí solo se pinta el control y se dice en qué estado está.
+  readonly focusMode: boolean;
+  readonly onToggleFocusMode: () => void;
 }
 
 export function MaterialHeader({
@@ -20,6 +24,8 @@ export function MaterialHeader({
   onClose,
   nextStudyAction,
   onOpenProgress,
+  focusMode,
+  onToggleFocusMode,
 }: MaterialHeaderProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-border border-b px-4">
@@ -35,6 +41,17 @@ export function MaterialHeader({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {/* Pegado al siguiente paso, no centrado en la cabecera: así el grupo de acciones queda
+            entero y nada compite por el hueco del título (feedback de Iván). */}
+        <ActionButton
+          icon={focusMode ? "zoom-out" : "fit-width"}
+          size="compact"
+          variant={focusMode ? "selected" : "neutral"}
+          aria-pressed={focusMode}
+          onClick={onToggleFocusMode}
+        >
+          {focusMode ? "Desplegar todo" : "Plegar todo"}
+        </ActionButton>
         {nextStudyAction}
         <ActionButton
           icon="progress"

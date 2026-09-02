@@ -1326,3 +1326,17 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   `MaterialPanel`) solo cambia de pestaña si el material ya está indexado; sin índice no hay pestañas
   que enseñar y cambiar dejaría al alumno en una superficie inexistente. En cualquier caso se consume
   una sola vez, indexado o no, para no dejarlo pendiente de un indexado futuro.
+
+## 2026-09-02 · Fase 5 · tramo P3b (separador con agarradera y plegado de Sym)
+
+- **Decisión sobre la marcha:** el umbral que distingue arrastrar de pulsar la agarradera
+  (`SEPARATOR_DRAG_THRESHOLD_PX`) se fija en 4px por criterio, no por medición; subirlo o bajarlo solo
+  debe costar cambiar la constante y su test (`separator-gesture.test.ts`), nunca reescribir el gesto.
+- **Decisión sobre la marcha:** Sym plegado se oculta con `hidden`, no se desmonta; conserva su hueco
+  fijo en el árbol de React precisamente para no perder el borrador del composer, el contexto adjunto
+  ni un stream en curso al plegar y desplegar.
+- **Causa raíz:** desplegar solo el rail de Sym reabría el índice de bloques de Apuntes. Estaba
+  derivado de "¿barra y Sym están plegados?", así que cualquier cambio en esas dos superficies
+  recalculaba también el índice aunque nadie lo hubiera pedido. Se sustituyó por una orden explícita
+  con marca (`FoldAllCommand`, con `seq`) que el índice solo obedece cuando llega una orden nueva; ver
+  ADR-031.

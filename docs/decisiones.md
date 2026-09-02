@@ -1474,3 +1474,40 @@ consuma un intento:
   cuando empezó la subida: quien abre un material mientras se prepara otro conserva su pantalla.
 - Si al usarlo la navegación automática de la subida molesta, la salida barata es dejarla solo en la
   generación de pruebas; la de la subida está aislada en un único callback de `App`.
+
+---
+
+## ADR-031 · `Plegar todo` es una orden con marca, no un estado que se recalcula de otras superficies
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** El botón `Plegar todo` / `Desplegar todo` de la cabecera del material (extensión pedida
+por Iván sobre F5-51 y F5-52) recoge de una vez tres superficies que hasta entonces se plegaban cada
+una por su cuenta: la barra lateral, Sym y, si hay un apunte abierto, su índice de bloques. La primera
+implementación calculaba si el índice debía estar plegado mirando si la barra y Sym ya lo estaban
+(`sidebarCollapsed && chatCollapsed`).
+
+**Opciones consideradas.**
+
+- **Estado derivado de las otras dos superficies.** Descartada: al probarlo, desplegar solo el rail de
+  Sym (sin tocar la barra) volvía a evaluar esa condición a `false` y reabría el índice de bloques
+  aunque el alumno no hubiera tocado el apunte. Plegar o desplegar una superficie por separado no puede
+  tener efecto sobre las demás.
+- **Estado propio del índice sin relación con `Plegar todo`.** Descartada: entonces el botón de la
+  cabecera dejaría de plegarlo, que es justo lo que pide la extensión.
+
+**Decisión.** `Plegar todo` emite un mandato (`FoldAllCommand`, en `domain/workspace/layout.ts`):
+`{ collapsed, seq }`. `seq` crece en cada pulsación para distinguir dos órdenes iguales seguidas de
+ninguna orden. `NoteWorkspace` mantiene su propio `outlineCollapsed` y solo lo sobrescribe cuando
+`foldAll.seq` cambia respecto al último que atendió; fuera de eso, el índice de bloques manda sobre su
+propio rail sin que nada se lo vuelva a imponer.
+
+**Consecuencias.**
+
+- Plegar o desplegar Sym por su lado (la agarradera) o la barra lateral (su rail) nunca mueve el índice
+  de bloques, y viceversa: solo pulsar el botón de la cabecera los mueve a los tres a la vez.
+- Con `foldAll` en `null` (apertura inicial, sin ninguna pulsación todavía) el índice arranca
+  desplegado, igual que antes de que existiera el botón.
+- Cualquier otra superficie que en el futuro se sume a `Plegar todo` sigue el mismo patrón: lee
+  `foldAll` y compara `seq`, no deriva su plegado del de sus vecinas.

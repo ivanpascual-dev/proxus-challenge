@@ -19,6 +19,15 @@ export interface SplitBounds {
 
 export const DEFAULT_MATERIAL_RATIO = 0.58;
 
+// Orden de `Plegar todo` / `Desplegar todo`. Es un mandato con marca de emisión, no un estado
+// derivado: si el índice de bloques mirase "¿están plegados la barra y Sym?", desplegar solo a Sym
+// desde su rail le abriría el índice sin que nadie se lo haya pedido. `seq` distingue dos órdenes
+// iguales seguidas; `null` es "todavía no se ha pulsado nada en esta sesión".
+export interface FoldAllCommand {
+  readonly collapsed: boolean;
+  readonly seq: number;
+}
+
 // Acota una proporción a lo que el viewport puede sostener. Si ni siquiera cabe el mínimo de los dos
 // paneles (`minRatio > maxRatio`), no hay una proporción válida que ofrecer: se acota solo a [0, 1]
 // para no devolver algo fuera de rango, y es responsabilidad de quien llama decidir el modo `chat` en

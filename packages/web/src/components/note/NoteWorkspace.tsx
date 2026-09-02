@@ -1,8 +1,9 @@
 import { useAtomSet } from "@effect/atom-react";
 import { LIMITS, type Artifact, type UrlSourceResult } from "@proxus/shared";
-import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { saveNoteAction } from "../../domain/artifacts/atoms.ts";
 import { findBlockForTopic } from "../../domain/materials/note-target.ts";
+import type { FoldAllCommand } from "../../domain/workspace/layout.ts";
 import { AddFromUrl } from "./AddFromUrl.tsx";
 import { NoteOutline } from "./NoteOutline.tsx";
 import { SelectedNoteBlock } from "./SelectedNoteBlock.tsx";
@@ -33,6 +34,10 @@ interface NoteWorkspaceProps {
   // guardar y el estado de guardado a la misma altura, sin una fila propia encima ni un pie aparte.
   readonly onDelete: () => void;
   readonly deleting: boolean;
+  // `Plegar todo` de la cabecera del material también recoge el índice de bloques (petición de Iván):
+  // leer un apunte a solas es leerlo sin las tres superficies laterales, no sin dos. Llega como orden
+  // con marca, no como estado: desplegar solo a Sym desde su rail no debe abrir este índice.
+  readonly foldAll: FoldAllCommand | null;
 }
 
 export function NoteWorkspace({
@@ -41,7 +46,8 @@ export function NoteWorkspace({
   requestedTopicPages,
   onRequestedTopicPagesConsumed,
   onDelete,
-  deleting
+  deleting,
+  foldAll
 }: NoteWorkspaceProps) {
   const [draft, setDraft] = useState<NoteDraft>(() => draftFromArtifact(artifact));
   const [dirty, setDirty] = useState(false);
@@ -52,8 +58,18 @@ export function NoteWorkspace({
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   // Plan de correcciones §4.2.8 / C5-14: el rail del índice de bloques. No se persiste (dura mientras
   // este workspace esté montado) y contraer no desmonta el editor ni toca `draft` ni la selección.
-  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
+  const [outlineCollapsed, setOutlineCollapsed] = useState(() => foldAll?.collapsed ?? false);
+  // Solo una orden nueva mueve el índice: después el alumno sigue mandando sobre su propio rail sin
+  // que nada se lo vuelva a imponer.
+  const lastFoldSeqRef = useRef(foldAll?.seq ?? 0);
   const save = useAtomSet(saveNoteAction, { mode: "promise" });
+
+  useEffect(() => {
+    if (foldAll !== null && foldAll.seq !== lastFoldSeqRef.current) {
+      lastFoldSeqRef.current = foldAll.seq;
+      setOutlineCollapsed(foldAll.collapsed);
+    }
+  }, [foldAll]);
 
   // Cuando el artefacto cambia por debajo (aceptar o descartar una propuesta refresca el apunte) y
   // no hay cambios sin guardar, se recarga el borrador para reflejar el bloque nuevo. Con cambios
