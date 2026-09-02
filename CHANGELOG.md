@@ -332,6 +332,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   recuperaba al escribir la primera letra.
 - **Ctrl + rueda sobre el mapa mental ya no amplía también la página del navegador**, y recorrer el
   mapa con la rueda deja de llenar la consola de avisos.
+- **La página declara que está en español.** El documento se anunciaba como inglés, así que un lector
+  de pantalla pronunciaba toda la interfaz con fonética inglesa.
 
 ### Eliminado
 
