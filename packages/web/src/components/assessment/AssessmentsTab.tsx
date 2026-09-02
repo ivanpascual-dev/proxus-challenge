@@ -228,7 +228,13 @@ function GenerateCard({
   readonly onGenerated: (generated: GeneratedAssessment) => void;
 }) {
   const range = target.kind === "test" ? LIMITS.questionsPerTest : LIMITS.questionsPerQuiz;
-  const [count, setCount] = useState<number>(range.default);
+  // El campo guarda lo que se está tecleando, no un número ya acotado. Acotar en cada tecla hacía
+  // imposible escribir una cifra: al borrar el contenido para poner "12", la primera tecla ("1") se
+  // acotaba al mínimo y la segunda formaba "52", que se acotaba al máximo. De ahí que solo salieran
+  // el mínimo o el máximo salvo usando las flechas. Se acota al salir del campo y al generar.
+  const [countText, setCountText] = useState<string>(String(range.default));
+  const parsedCount = Number.parseInt(countText, 10);
+  const count = clamp(Number.isNaN(parsedCount) ? range.default : parsedCount, range.min, range.max);
   // El modo solo se elige para el Examen; el Control es siempre de práctica.
   const [mode, setMode] = useState<"practice" | "exam">("practice");
   // De dónde salen las preguntas: "material" (nuevas) o "review" (concentradas en lo que llevas peor
@@ -370,8 +376,9 @@ function GenerateCard({
                 type="number"
                 min={range.min}
                 max={range.max}
-                value={count}
-                onChange={(event) => setCount(clamp(Number(event.currentTarget.value), range.min, range.max))}
+                value={countText}
+                onChange={(event) => setCountText(event.currentTarget.value)}
+                onBlur={() => setCountText(String(count))}
                 className="mt-1 w-24 border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
               />
             </label>

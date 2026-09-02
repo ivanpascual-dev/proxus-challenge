@@ -318,6 +318,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   de rama del árbol de la interfaz al abrir o cerrar el material, así que se desmontaba y volvía a
   mostrarse como un borrador en blanco; se notaba, por ejemplo, al pulsar una fuente consultada sin
   material abierto. Ahora el chat vive siempre en el mismo hueco y solo cambia cómo se pinta.
+- **El número de preguntas de un Control o un Examen ya se puede teclear.** El campo acotaba al mínimo
+  y al máximo en cada tecla, así que escribir "12" pasaba por "1" (que saltaba a 10) y acababa en 30:
+  solo se podía elegir con las flechas. Ahora se escribe libre y se acota al salir del campo.
 - **Arrastrar el separador hasta el extremo ya no deja a Sym por debajo de su mínimo.** El reparto se
   hacía en porcentaje redondeado del contenedor entero, sin descontar la banda del separador, y en el
   extremo derecho Sym se quedaba en 417px en vez de los 420px prometidos.
