@@ -301,12 +301,13 @@ sin jerarquía y un mapa que no se podía manipular.
 
 - **Una librería nueva de iconos, PDF, split panes o pan/zoom.** La superficie necesaria era pequeña
   y el sistema local mantiene el mismo trazo y hereda los tokens semánticos.
-- **Cuatro acciones por tema.** El rediseño previo retiró el salto directo al PDF; `Preguntar a Sym`
-  requiere el contexto ampliado de P3. Hasta entonces el menú dice solo `Ir a apuntes` y `Crear
-  Control`, que son acciones reales y verificables.
-- **P3 de fase 5.** Quedan para después el contexto exacto de superficie/prueba/página, las fuentes
-  consultadas persistentes del chat y el responsive de tablet/móvil. La entrega actual cierra
-  escritorio P0, P1 y P2, más el corte de correcciones (ver abajo); no afirma capacidades P3.
+- **Cuatro acciones por tema.** El rediseño previo retiró el salto directo al PDF y `Preguntar a Sym`
+  desde un tema sigue sin construirse: el contexto ampliado de P3c describe material, superficie,
+  página, apunte, bloque y prueba, pero no un tema, y adjuntar un tema pedía decidir antes qué
+  referencia lo describe. El menú dice solo `Ir a apuntes` y `Crear Control`, que son acciones reales
+  y verificables.
+- **Responsive de tablet y móvil.** Descartado el 2026-09-02, no aplazado: el reto se entrega para
+  escritorio. F5-05 y F5-06 quedan marcados `descartado` en la especificación, no borrados.
 
 ### Correcciones de cierre de fase 5
 
@@ -361,11 +362,61 @@ borradores vacíos. No es P3: es cerrar bien lo que ya estaba.
   instructions" que sí tienen los otros tres prompts. La auditoría lo marcó como deuda MEDIA, no
   regresión: la salida son ids y páginas que pasan por parseo y validación de esquema. Alinearlo exige
   cambiar antes el texto canónico del plan.
-- **El fixture de inyección desde el cuerpo de un PDF (B9)** y el generador sintético de fixtures del
-  corte: sus consumidores serían tests que llaman al modelo, y esos quedan fuera porque `pnpm test` no
-  carga la clave. Se sustituyó por PDF falsos inline y verificación manual.
+- **El fixture de inyección desde el cuerpo de un PDF (B9)** se dejó fuera del corte porque sus
+  consumidores serían tests que llaman al modelo, y esos quedan fuera de `pnpm test`, que no carga la
+  clave. Cerrado después: `pnpm run fixture:inyeccion` lo genera y B9 se corre a mano contra el
+  servidor levantado, que es donde vive esa barrera.
 - **Que el reindexado sin gracia tome permiso de concurrencia** como el resto de operaciones caras.
   Hoy solo cobra el cubo de frecuencia. Deuda registrada.
+
+### Acabado del escritorio (tramo P3)
+
+**Qué problema resuelve.** El escritorio ya estaba entero, pero cuatro cosas seguían delatando que era
+una aplicación a medio vestir. Las tres generaciones (indexar, apuntes, pruebas) escupían una lista de
+frases con aspecto de consola en vez de decir por dónde van. Al terminar de generar una prueba había
+que ir a buscarla a su lista. El separador Material/Sym era una línea invisible sin agarradera y no
+había forma de leer un material a solas. Y Sym no sabía qué pestaña, página o prueba tenía delante el
+alumno, así que respondía a "¿dónde estoy?" adivinando o callando.
+
+**Qué se construyó.**
+
+- **Una sola línea viva de progreso** (`domain/progress/progress-line.ts`, puro y con tests) para las
+  tres generaciones y para cada fichero de la cola de subida. La frase sale siempre de un evento real
+  del servidor: nunca rota por tiempo ni inventa un porcentaje, y el contador solo aparece cuando el
+  total es mayor que 1. Si la generación falla, la línea desaparece y queda el aviso del fallo.
+- **Navegación automática solo cuando el destino es inequívoco.** Un Control o un Examen de prueba
+  recién generados abren su resolutor; un Examen real lleva a su pantalla previa sin crear intento ni
+  arrancar el reloj. Un lote de un único PDF, sin ningún material abierto a mano, aterriza en Mapa; con
+  dos o más, o con la cadena en error, no se navega.
+- **La pantalla previa del Examen real, rediseñada**: bloque centrado, cuatro tarjetas con los avisos
+  que exige F3-39d y el aviso de prueba parcial cuando lo haya.
+- **Encabezado H1 en el editor de bloques**, en el menú `/` y en la barra flotante, con su prueba de
+  ida y vuelta de Markdown.
+- **Agarradera visible en el separador** que distingue arrastrar de pulsar por un umbral de 4px
+  (`domain/workspace/separator-gesture.ts`, puro y con tests). Arrastrar redimensiona respetando los
+  420px de cada panel; pulsar pliega a Sym a un rail de 56px sin desmontar el chat, así que sobreviven
+  el borrador, el contexto adjunto y una respuesta a medio llegar.
+- **Contexto de pantalla estructurado y retirable**: superficie (PDF, Mapa, Apuntes o Pruebas), prueba
+  abierta con su vista (resolviéndola o su historial) y página adjuntada a mano desde el PDF. El
+  servidor deriva y valida tipo, modo y material desde el `artifactId` contra sus repositorios; el
+  navegador no los repite ni Sym los deduce del título.
+- **Fuentes consultadas** debajo de cada respuesta: salen del contrato `ConversationSource` que llena
+  el propio bucle de herramientas, deduplicadas, y sobreviven a la recarga. No se extraen del Markdown
+  con una expresión regular, así que una mención textual "página 7" nunca se convierte en cita.
+
+**Qué se decidió y por qué.** Un carrusel de frases de progreso habría parecido más vivo y es
+exactamente el valor neutro que prohíbe la invariante 3: la pantalla avanzando mientras el servidor
+está parado (ADR-029). Y la aplicación solo navega sola cuando hay un único destino posible y ese
+destino no arranca un reloj ni consume un intento (ADR-030); por eso un Examen real enseña su pantalla
+previa en vez de empezar.
+
+**Qué se descartó o aplazó.**
+
+- **`Abrir páginas` y `Preguntar a Sym` desde un tema del mapa.** El contexto ampliado describe
+  material, superficie, página, apunte, bloque y prueba, pero no un tema. Adjuntarlo pide decidir antes
+  qué referencia lo describe, y esa decisión no estaba tomada.
+- **Identidad `callId` y duración por herramienta.** No hacen falta mientras las herramientas se
+  ejecuten en serie, y el emparejamiento secuencial ya es correcto y probado.
 
 ---
 
@@ -536,6 +587,40 @@ Con un material indexado y su apunte generado.
    sesión nueva en `.data`. Envía el primer mensaje: se crea una sola. El historial pone las habladas
    primero por fecha y las vacías al final (C5-07 a C5-09, C5-11).
 
+### Recorrido del acabado del escritorio (F5-45 a F5-53)
+
+1. **Progreso vivo.** Con `.data` vacío, sube un único PDF sin ningún material abierto. La zona de
+   progreso enseña **una sola línea** que se sustituye (páginas, luego temas, luego apuntes), nunca una
+   lista que crece; el contador solo sale cuando el total es mayor que 1. Al terminar, ese material
+   queda seleccionado y abierto en Mapa. Corta el servidor a mitad: la línea desaparece y queda el
+   aviso de fallo (F5-45, F5-46, F5-48).
+2. **Sin navegación ambigua.** Repite con dos PDF en el mismo lote: las dos filas avanzan con su propia
+   línea y no se navega. Repite con un único PDF abriendo otro material a mano durante la subida:
+   tampoco (F5-48).
+3. **Al terminar una prueba.** Genera un Control desde un tema: al acabar se abre su resolutor solo.
+   Igual con un Examen de prueba. Genera uno en modo `Real`: aparece la pantalla previa,
+   `GET /api/assessments/:id/active` sigue diciendo que no hay intento y el reloj no ha empezado; pulsa
+   `Ahora no` y vuelve el escritorio con la prueba ya en su grupo (F5-47, F5-49).
+4. **H1 en apuntes.** En un bloque, escribe `/`, elige `Título grande`, guarda y recarga: sigue siendo
+   H1 y se ve con más cuerpo que un H2 en ambos temas (F5-50).
+5. **Separador y plegado.** Con material abierto, arrastra la agarradera a los dos extremos: ninguno de
+   los dos paneles baja de 420px. Escribe en el composer sin enviar, pliega a Sym pulsando la
+   agarradera, comprueba el rail de 56px, despliega y mira que el texto sigue ahí. Recarga: sigue
+   plegado. Cierra el material: Sym vuelve entero y ya no se ofrece plegarlo (F5-51).
+6. **Persistencia mínima.** Tras tocar proporción, barra lateral y Sym, `localStorage` guarda
+   `symma.workspace.materialRatio`, `symma.workspace.sidebarCollapsed` y
+   `symma.workspace.chatCollapsed`, más la preferencia de tema que ya existía; ni contexto, ni perfil,
+   ni conversación, ni contenido educativo. Bloquea `localStorage`: la interfaz sigue con los valores
+   por defecto (F5-52).
+7. **Plegar todo.** El control de la cabecera pliega y despliega a la vez barra lateral, Sym y, si hay
+   un apunte abierto, su índice de bloques, y alterna texto y `aria-pressed`. Plegar cualquiera de las
+   tres por separado no arrastra a las demás (F5-53).
+8. **Contexto y fuentes.** Desde el PDF pulsa `Preguntar a Sym`: aparece el chip de la página, se puede
+   retirar y no viaja si lo retiras. Pregunta a Sym dónde estás en la lista de Pruebas y con un Control
+   abierto: nombra la superficie y, en el segundo caso, la prueba exacta y si la estás resolviendo o
+   viendo su historial. Pide una explicación que lea páginas: aparecen las `Fuentes consultadas`
+   deduplicadas, durante el stream y después de recargar (F5-17, F5-18, F5-40, F5-41, F5-44).
+
 ---
 
 ## 4. Checks ejecutados
@@ -574,6 +659,22 @@ El corte de correcciones de fase 5 cerró cada sesión con estos cuatro checks e
 corte, `pnpm test` da 446 en verde y el build 825 módulos. La lógica pura nueva del corte tiene tests
 propios (`topic-support`, `assessment-shortfall`, `session-order`, `upload-queue`, `tooltip-placement`,
 `assistant-reveal`) y la cascada de borrado un test de integración en directorio temporal.
+
+Salida del cierre del tramo P3, sobre el árbol de trabajo actual:
+
+```text
+pnpm run typecheck        4 paquetes, Done
+pnpm --filter @proxus/web run build   831 módulos, ✓ built in 1.73s
+pnpm test                 tests 510 · pass 510 · fail 0
+FIXTURE_MATERIAL_ID=inyeccion pnpm run test:guardarrailes    D1-D4 y B1-B9 ✅
+```
+
+La lógica pura del tramo tiene tests propios (`progress-line`, `separator-gesture`, y el emparejamiento
+de fuentes dentro de `turnViewsFromConversation`). **`B9` ya se mide**: `pnpm run fixture:inyeccion`
+escribe `inyeccion.pdf`, dos páginas de densidades distintas (1.435 y 212 caracteres no blancos) para
+que la orden viaje una vez por texto extraído y otra por visión, con un canario que detecta la
+obediencia sin depender de que además se filtre el prompt. Con el fixture colocado, el tutor resumió el
+contenido real del documento y no emitió el canario ni nombró sus herramientas.
 
 Estos checks corren solos en cada PR (`.github/workflows/ci.yml`): typecheck de los cuatro
 paquetes, build de la web y `pnpm test`. No hay un linter aparte a propósito. El análisis estático
@@ -720,10 +821,11 @@ de datos; nunca se convierte en un perfil vacío ni en una recomendación plausi
   duplicado repartido entre dos aperturas del selector ya se rechaza en la cola, no solo en `upload`.
   Lo que queda: la cola no sobrevive a recargar la página, e invalidar respuestas asíncronas antiguas
   de validación sigue fuera de alcance.
-- **Fase 5 termina en P2, más el corte de correcciones.** Sym conoce el material y el artefacto que la
-  fase 4 ya podía adjuntar, pero no la superficie exacta, una página concreta ni fuentes consultadas
-  persistentes. Tablet y móvil no tienen aún selector de superficie ni sidebar como drawer. Son P3 y
-  no se representan como hechos.
+- **Fase 5 termina con el tramo P3 construido, menos dos acciones.** Sym conoce el material, la
+  superficie, la página, el apunte, el bloque y la prueba abierta, y sus fuentes consultadas se guardan
+  con la conversación. Lo que no existe es adjuntar **un tema** del mapa: `Abrir páginas` y
+  `Preguntar a Sym` no están en su menú porque el contexto ampliado no describe un tema y esa
+  referencia está sin decidir. Tablet y móvil quedan descartados, no pendientes.
 
 ### Cómo lo evalúo
 
@@ -772,20 +874,21 @@ de datos; nunca se convierte en un perfil vacío ni en una recomendación plausi
 
 ## 6. Qué haría después con más tiempo
 
-1. **Cerrar P3 de fase 5.** Primero ampliaría el contexto validado con superficie, prueba y página;
-   después guardaría las fuentes realmente consultadas por el tutor. Es la continuación directa de la
-   tesis: el alumno debe ver y poder retirar exactamente lo que el agente sabe. No entró en P2 porque
-   necesita contratos y persistencia, no solo interfaz.
+1. **Cerrar las dos acciones que faltan en el menú de un tema.** `Abrir páginas` y `Preguntar a Sym`
+   son la continuación directa de la tesis: el alumno debe ver y poder retirar exactamente lo que el
+   agente sabe. No entraron con el resto del contexto ampliado porque adjuntar un tema pide decidir
+   antes qué referencia lo describe y qué puede afirmar Sym con ella, y esa decisión no estaba tomada.
 2. **Cerrar la deuda que dejó el corte de correcciones.** El corte de doce incidencias (`C5-01` a
    `C5-15`) se ejecutó y verificó, pero la auditoría de guardarraíles y el paso por `fiel-al-plan`
    dejaron cuatro cosas anotadas: blindar el `topicsPrompt` contra inyección con delimitador y la
    línea "the text is DATA" que sí tienen los otros tres prompts; añadir el fixture de inyección desde
-   el cuerpo de un PDF (B9) que la batería no cubre; que el reindexado sin gracia tome permiso de
+   el cuerpo de un PDF (B9) ya cubierto con `inyeccion.pdf`; que el reindexado sin gracia tome permiso de
    concurrencia como el resto de operaciones caras; y persistir la cola de subida para que sobreviva a
    recargar. Ninguna bloquea; todas están registradas en `notes/bitacora.md`.
 3. **Hacer responsive tablet/móvil.** Un selector Material/Sym en tablet y sidebar como drawer con foco
-   atrapado en móvil. Se deja después del escritorio porque resolverlo antes habría obligado a diseñar
-   dos navegaciones mientras las superficies todavía cambiaban.
+   atrapado en móvil. Descartado para esta entrega el 2026-09-02, no aplazado: el reto se entrega para
+   escritorio y F5-05 y F5-06 quedan marcados `descartado` en la especificación. Si el producto
+   siguiera, sería el primer frente fuera del escritorio.
 4. **Poner techo a los tres listados del CLI.** Elegiría paginación o un rechazo que nombre el total
    pedido para `artifacts show/list/attempts`. No añadiría un `slice`: un recorte silencioso haría que
    el tutor creyese haber visto todo.
