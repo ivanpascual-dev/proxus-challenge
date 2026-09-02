@@ -251,7 +251,8 @@ Cuatro familias:
 | | Texto pegado por turno (selección, bloque, nota propia, URL extraída) | 12.000 caracteres |
 | | Historial reenviado en cada petición | 400 mensajes y 200.000 caracteres |
 | | Bloque editado por el alumno | 5.000 caracteres |
-| | Fichero subido (fase 4) | 25 MB |
+| | Fichero subido (fase 4) | 10 MB (bajado de 25 al cerrar la fase 5: el material real medido va de 0,39 a 1,22 MB) |
+| | Páginas de un material (fase 5) | 30, comprobadas con `pdfinfo` antes de escribir. Es el techo que de verdad acota el coste: una página bajo el umbral de densidad cuesta una llamada de visión, y los megabytes no lo miden |
 | Coste por turno | Páginas renderizadas | 20 |
 | | Bytes de imagen | 12 MB, contando la cadena base64 (medido en la fase 1) |
 | | Pasos del agente | 12, **acotado en el servidor** (subió de 8 en la fase 2, decisión 22 del plan: holgura para el camino de generación, no más seguridad) |

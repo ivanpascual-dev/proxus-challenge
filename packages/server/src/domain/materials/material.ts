@@ -64,6 +64,13 @@ export class MaterialAlreadyExists extends Data.TaggedError("MaterialAlreadyExis
   readonly materialId: string;
 }> {}
 
+// Más páginas de las que se aceptan indexar. Fallo por fichero: el resto del lote sigue. Se decide
+// con el `pdfinfo` que `checkCandidate` ya hacía, antes de copiar los bytes.
+export class MaterialTooManyPages extends Data.TaggedError("MaterialTooManyPages")<{
+  readonly fileName: string;
+  readonly pageCount: number;
+}> {}
+
 // Fallo agregado: los materiales que ya existen más los que trae la subida pasan de `maxMaterials`.
 // Aborta la petición entera, antes de escribir nada (F4-04).
 export class TooManyMaterials extends Data.TaggedError("TooManyMaterials")<{
@@ -82,7 +89,7 @@ export type MaterialUploadOutcome =
   | {
       readonly fileName: string;
       readonly outcome: "rejected";
-      readonly reason: UnsupportedFileType | MaterialAlreadyExists;
+      readonly reason: UnsupportedFileType | MaterialAlreadyExists | MaterialTooManyPages;
     };
 
 // El mismo rechazo por fichero que `upload` (tipo, nombre duplicado), pero sin escribir nada a disco:
@@ -94,7 +101,7 @@ export type MaterialValidationOutcome =
   | {
       readonly fileName: string;
       readonly outcome: "rejected";
-      readonly reason: UnsupportedFileType | MaterialAlreadyExists;
+      readonly reason: UnsupportedFileType | MaterialAlreadyExists | MaterialTooManyPages;
     };
 
 export interface RenderedPage {

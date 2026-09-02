@@ -15,6 +15,7 @@ import {
   ProxusApi,
   TooManyMaterials as ApiTooManyMaterials,
   UnsupportedFileType as ApiUnsupportedFileType,
+  MaterialTooManyPages as ApiMaterialTooManyPages,
   type MaterialUploadResult,
   type MaterialValidationResult
 } from "@proxus/shared";
@@ -102,8 +103,9 @@ const logAndFailStorage = (materialId: string, reason: unknown) =>
     Effect.andThen(Effect.fail(storageError(materialId)))
   );
 
-// El rechazo por fichero, del domain (`UnsupportedFileType` / `MaterialAlreadyExists`) al del
-// contrato, compartido entre `upload` (que sí escribió) y `validate` (que solo miró).
+// El rechazo por fichero, del domain (`UnsupportedFileType` / `MaterialTooManyPages` /
+// `MaterialAlreadyExists`) al del contrato, compartido entre `upload` (que sí escribió) y `validate`
+// (que solo miró).
 const toApiRejectionReason = (
   reason: Extract<MaterialUploadOutcome, { readonly outcome: "rejected" }>["reason"],
   verb: "subir" | "validar"
@@ -113,11 +115,18 @@ const toApiRejectionReason = (
         fileName: reason.fileName,
         message: `"${reason.fileName}" no se pudo ${verb}: ${reason.reason}`
       })
-    : new ApiMaterialAlreadyExists({
-        fileName: reason.fileName,
-        materialId: reason.materialId,
-        message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
-      });
+    : reason._tag === "MaterialTooManyPages"
+      ? new ApiMaterialTooManyPages({
+          fileName: reason.fileName,
+          pageCount: reason.pageCount,
+          ceiling: LIMITS.maxPagesPerMaterial,
+          message: `"${reason.fileName}" tiene ${reason.pageCount} páginas y el máximo por material son ${LIMITS.maxPagesPerMaterial}. Divídelo en partes más pequeñas y súbelas por separado.`
+        })
+      : new ApiMaterialAlreadyExists({
+          fileName: reason.fileName,
+          materialId: reason.materialId,
+          message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
+        });
 
 // `maxParts` en el contrato lleva un fichero de holgura sobre `maxFilesPerUpload` (ver el comentario
 // en `packages/shared/src/api/materials.ts`): el parser de multipart de esta beta trunca en silencio

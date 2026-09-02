@@ -67,10 +67,10 @@ POST   /api/materials/:id/assessments
 
 Los materiales representan PDFs disponibles para el tutor. El server puede renderizar páginas vía Poppler para que Gemini las procese como imágenes.
 
-`POST /` sube hasta `maxFilesPerUpload` PDFs a la vez (multipart, `maxUploadBytes` por fichero), solo
+`POST /` sube hasta `maxFilesPerUpload` PDFs a la vez (multipart, `maxUploadBytes` y `maxPagesPerMaterial` por fichero), solo
 PDF (fase 4, decisión 2); al subir, cada material se indexa y se le generan los apuntes en cadena, sin
 pulsar nada más (decisión 3). El fallo de un fichero concreto (tipo, nombre duplicado) va dentro de la
-respuesta, uno por fichero; solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
+respuesta, uno por fichero (el techo de páginas incluido: `MaterialTooManyPages`); solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
 abortan la subida entera, antes de escribir nada.
 
 `POST /validate` (cierre de fase 4) comprueba el mismo lote (multipart, mismo `UploadPayload`) sin

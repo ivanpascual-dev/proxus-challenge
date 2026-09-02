@@ -465,6 +465,11 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 - **F4-03.** CUANDO una subida contenga más de `maxFilesPerUpload` ficheros, o un fichero de más de
   `maxUploadBytes`, EL sistema DEBERÁ rechazarla nombrando el techo y lo recibido, antes de escribir
   nada en disco.
+- **F4-03b.** CUANDO un fichero subido tenga más de `maxPagesPerMaterial` páginas, EL sistema DEBERÁ
+  rechazar ESE fichero nombrando el techo y las páginas que tiene, antes de escribir nada en disco, y
+  DEBERÁ seguir procesando los demás ficheros de esa misma subida. El techo se comprueba sobre el
+  número de páginas real que reporta `pdfinfo`, nunca sobre el tamaño del fichero: lo que cuesta
+  indexar son las páginas por debajo del umbral de densidad, que se renderizan y van al modelo.
 - **F4-04.** CUANDO una subida haría pasar el total de materiales de `maxMaterials`, EL sistema DEBERÁ
   rechazarla nombrando cuántos materiales caben y cuántos hay.
 - **F4-05.** SI el nombre de un fichero subido coincide con el de un material existente, ENTONCES EL

@@ -40,6 +40,7 @@ const DOMAIN_ERROR_TAGS = new Set([
   "MaterialStorageError",
   "UnsupportedFileType",
   "MaterialAlreadyExists",
+  "MaterialTooManyPages",
   "TooManyMaterials",
   // artifact-errors.ts
   "ArtifactNotFound",

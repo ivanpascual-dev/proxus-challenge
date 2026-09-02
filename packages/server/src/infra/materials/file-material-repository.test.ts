@@ -351,3 +351,106 @@ test("upload aborta la petición entera cuando pasa de maxMaterials, antes de es
     });
   });
 });
+
+// Un PDF mínimo de N páginas, escrito a mano igual que los fixtures: el techo se comprueba con
+// `pdfinfo` de verdad (`PopplerPdfService`), así que hace falta un PDF que pdfinfo sepa contar, no un
+// stub del contador.
+const pdfWithPages = (pageCount: number): Buffer => {
+  const FONT = 1;
+  const CONTENT_START = 2;
+  const PAGE_START = CONTENT_START + pageCount;
+  const PAGES = PAGE_START + pageCount;
+  const CATALOG = PAGES + 1;
+
+  const objects: string[] = [];
+  objects[FONT] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  for (let i = 0; i < pageCount; i++) {
+    const stream = `BT /F1 12 Tf 40 780 Td (pagina ${i + 1}) Tj ET`;
+    objects[CONTENT_START + i] = `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`;
+    objects[PAGE_START + i] =
+      `<< /Type /Page /Parent ${PAGES} 0 R /MediaBox [0 0 595 842]` +
+      ` /Resources << /Font << /F1 ${FONT} 0 R >> >> /Contents ${CONTENT_START + i} 0 R >>`;
+  }
+  const kids = Array.from({ length: pageCount }, (_, i) => `${PAGE_START + i} 0 R`).join(" ");
+  objects[PAGES] = `<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>`;
+  objects[CATALOG] = `<< /Type /Catalog /Pages ${PAGES} 0 R >>`;
+
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (let n = 1; n <= CATALOG; n++) {
+    offsets[n] = Buffer.byteLength(pdf, "latin1");
+    pdf += `${n} 0 obj\n${objects[n]}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(pdf, "latin1");
+  pdf += `xref\n0 ${CATALOG + 1}\n0000000000 65535 f \n`;
+  for (let n = 1; n <= CATALOG; n++) {
+    pdf += `${String(offsets[n]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${CATALOG + 1} /Root ${CATALOG} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+};
+
+test("upload rechaza un PDF con más de maxPagesPerMaterial páginas, sin tocar disco", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const candidatePath = join(uploadDir, "any-temp-name");
+      writeFileSync(candidatePath, pdfWithPages(LIMITS.maxPagesPerMaterial + 1));
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [{ fileName: "larguisimo.pdf", path: candidatePath }];
+      const [outcome] = await Effect.runPromise(repo.upload(candidates));
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "rejected");
+      if (outcome.outcome === "rejected") {
+        assert.equal(outcome.reason._tag, "MaterialTooManyPages");
+        // Nombra lo recibido: un rechazo que no dice el número obliga a adivinarlo.
+        if (outcome.reason._tag === "MaterialTooManyPages") {
+          assert.equal(outcome.reason.pageCount, LIMITS.maxPagesPerMaterial + 1);
+        }
+      }
+      // El rechazo llega antes de copiar: el directorio de materiales sigue vacío.
+      assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});
+
+test("upload acepta un PDF justo en el techo de páginas", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const candidatePath = join(uploadDir, "any-temp-name");
+      writeFileSync(candidatePath, pdfWithPages(LIMITS.maxPagesPerMaterial));
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const candidates: readonly UploadCandidate[] = [{ fileName: "justo.pdf", path: candidatePath }];
+      const [outcome] = await Effect.runPromise(repo.upload(candidates));
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "created");
+      if (outcome.outcome === "created") {
+        assert.equal(outcome.material.pageCount, LIMITS.maxPagesPerMaterial);
+      }
+    });
+  });
+});
+
+test("validate rechaza el PDF demasiado largo igual que upload, sin escribir", async () => {
+  await withDirs(async (pdfDir, indexDir) => {
+    await withUploadDir(async (uploadDir) => {
+      const candidatePath = join(uploadDir, "any-temp-name");
+      writeFileSync(candidatePath, pdfWithPages(LIMITS.maxPagesPerMaterial + 1));
+
+      const repo = await materialRepo(pdfDir, indexDir);
+      const [outcome] = await Effect.runPromise(
+        repo.validate([{ fileName: "larguisimo.pdf", path: candidatePath }])
+      );
+      assert.ok(outcome, "expected exactly one outcome");
+
+      assert.equal(outcome.outcome, "rejected");
+      if (outcome.outcome === "rejected") {
+        assert.equal(outcome.reason._tag, "MaterialTooManyPages");
+      }
+      assert.deepEqual(readdirSync(pdfDir), []);
+    });
+  });
+});

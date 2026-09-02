@@ -190,6 +190,14 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Cambiado
 
+- **El límite de tamaño por fichero baja de 25 MB a 10 MB, y se añade un techo de 30 páginas.** El
+  tamaño nunca midió lo que cuesta preparar un material: lo que se paga son las páginas, porque cada
+  página que no lleva texto suficiente hay que renderizarla y pasarla por el modelo. Un PDF de 400
+  páginas escaneadas cabía de sobra en 25 MB y disparaba 400 lecturas. Ahora un PDF demasiado largo se
+  rechaza al momento, diciendo cuántas páginas tiene y cuántas caben, y sin llegar a guardarse; el
+  resto de ficheros de la misma subida siguen su camino. Los 10 MB dejan ocho veces de margen sobre el
+  material de estudio más pesado que se ha probado.
+
 - **Los botones de acción comparten un lenguaje visual.** Guardar, borrar, cancelar, generar, volver,
   empezar, entregar, aceptar, descartar, subir y reintentar muestran un icono del mismo sistema que el
   resto de la aplicación, una etiqueta clara, la misma tipografía y estados coherentes de hover,

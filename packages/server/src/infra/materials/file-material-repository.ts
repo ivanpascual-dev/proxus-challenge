@@ -10,6 +10,7 @@ import {
   MaterialRepositoryError,
   TooManyMaterials,
   UnsupportedFileType,
+  MaterialTooManyPages,
   type MaterialRepository as MaterialRepositoryType,
   type MaterialUploadOutcome,
   type MaterialValidationOutcome,
@@ -211,7 +212,7 @@ export const FileMaterialRepository = {
       knownIds: Set<string>
     ): Effect.Effect<
       { readonly ok: true; readonly id: string; readonly bytes: Uint8Array; readonly pageCount: number }
-      | { readonly ok: false; readonly reason: UnsupportedFileType | MaterialAlreadyExists },
+      | { readonly ok: false; readonly reason: UnsupportedFileType | MaterialAlreadyExists | MaterialTooManyPages },
       MaterialRepositoryError
     > => Effect.gen(function* () {
       const id = idFor(candidate.fileName);
@@ -251,6 +252,17 @@ export const FileMaterialRepository = {
             fileName: candidate.fileName,
             reason: "pdfinfo no pudo leer este fichero como PDF."
           })
+        };
+      }
+
+      // El techo que de verdad acota el coste, y por eso va aquí y no en el tamaño: cada página por
+      // debajo del umbral de densidad se renderiza y se transcribe con el modelo, así que las páginas
+      // son la unidad que se paga, no los megabytes. `pdfinfo` ya está hecho y la copia todavía no,
+      // así que el rechazo llega antes de escribir nada.
+      if (pageCount > LIMITS.maxPagesPerMaterial) {
+        return {
+          ok: false,
+          reason: new MaterialTooManyPages({ fileName: candidate.fileName, pageCount })
         };
       }
 

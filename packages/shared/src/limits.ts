@@ -13,8 +13,20 @@ export const LIMITS = {
   // 2026-08-31).
   maxConversationHistoryTokens: 80_000,
   maxBlockCharacters: 5_000,
-  maxUploadBytes: 25 * 1024 * 1024,
+  // Fusible barato de entrada: rechaza sin gastar `pdfinfo`. Bajado de 25 MB a 10 MB al cerrar la
+  // fase 5, medido contra el material real de estudio (0,39 a 1,22 MB, de 51 a 89 KB por página):
+  // 10 MB deja ocho veces de margen sobre el más pesado y sigue admitiendo un escaneado corto a
+  // 300 dpi. No bajar de aquí sin volver a medir. Ojo: los megabytes NO miden lo que cuesta indexar
+  // (eso lo miden las páginas por debajo del umbral de densidad, que se renderizan y van al
+  // modelo); quien pone ese techo es `maxPagesPerMaterial`.
+  maxUploadBytes: 10 * 1024 * 1024,
   maxMaterials: 5,
+  // Techo de páginas de un material, comprobado con `pdfinfo` antes de escribir nada. Es el límite
+  // que de verdad acota el coste: cada página que no llega a `textDensityThreshold` se renderiza y
+  // se transcribe con el modelo, así que un PDF escaneado cuesta una llamada de visión por página.
+  // Sin esto, un fichero de 9 MB con 400 páginas escaneadas pasaba las dos puertas de tamaño y
+  // lanzaba 400 llamadas. 30 deja el doble de margen sobre el material más largo medido (14).
+  maxPagesPerMaterial: 30,
   maxFilesPerUpload: 5,
   // El máximo simultáneo que la interfaz puede mostrar hoy: un material, el artefacto de su pestaña
   // activa (apunte o prueba) y un bloque resaltado dentro de él (`MaterialPanel.tsx`, pestañas

@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { MaterialAlreadyExists, UnsupportedFileType } from "../errors/material-errors.ts";
+import { MaterialAlreadyExists, MaterialTooManyPages, UnsupportedFileType } from "../errors/material-errors.ts";
 
 // "indexed" si hay un índice archivado para el contenido exacto de este PDF (ADR-011). Lo calcula
 // `list` en una sola pasada (sha256 del fichero), para que la barra lateral no tenga que pedir el
@@ -52,7 +52,7 @@ export const MaterialUploadResult = Schema.Union([
   Schema.Struct({
     fileName: Schema.String,
     outcome: Schema.Literal("rejected"),
-    reason: Schema.Union([UnsupportedFileType, MaterialAlreadyExists])
+    reason: Schema.Union([UnsupportedFileType, MaterialAlreadyExists, MaterialTooManyPages])
   })
 ]);
 export type MaterialUploadResult = typeof MaterialUploadResult.Type;
@@ -73,7 +73,7 @@ export const MaterialValidationResult = Schema.Union([
   Schema.Struct({
     fileName: Schema.String,
     outcome: Schema.Literal("rejected"),
-    reason: Schema.Union([UnsupportedFileType, MaterialAlreadyExists])
+    reason: Schema.Union([UnsupportedFileType, MaterialAlreadyExists, MaterialTooManyPages])
   })
 ]);
 export type MaterialValidationResult = typeof MaterialValidationResult.Type;

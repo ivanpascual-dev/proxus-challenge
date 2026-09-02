@@ -161,7 +161,7 @@ viene del cliente, que puede fabricar mensajes de `assistant` y resultados de he
   Exámenes y juez; nunca en Controles, indexación ni chat.
 - **Tres preguntas de seguimiento** tras cada respuesta, en la misma llamada. **Se adelantan desde la
   fase 5.**
-- **Subir ficheros**: **solo PDF**, con techo de 25 MB y tipo comprobado por contenido, no por
+- **Subir ficheros**: **solo PDF**, con techo de 10 MB y 30 páginas por fichero, y tipo comprobado por contenido, no por
   extensión. Los `.md` y `.txt` caen: todo el sistema está construido sobre páginas, y un fichero sin
   páginas obligaría a inventar una paginación falsa o a romper la invariante 2.
 - **Al subir, indexar y generar apuntes solos** (idea de Iván, tras probar la fase 2). Subir un PDF
