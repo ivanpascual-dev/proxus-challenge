@@ -288,6 +288,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Corregido
 
+- **Un nombre de fichero largo ya no deforma la interfaz.** Un título sin espacios ni guiones no tiene
+  dónde partirse, y en el panel lateral, en el diálogo de subida y en la barra de "Sym ve" empujaba su
+  caja hasta sacar una barra de scroll horizontal. Ahora se recorta con puntos suspensivos, con el
+  nombre completo disponible al pasar el ratón por encima; en el panel lateral aprovecha antes las dos
+  líneas de la fila.
 - **Borrar el material que tienes abierto ya no rompe la apertura automática del siguiente que
   subas.** El panel desaparecía y la pantalla quedaba bien, pero por dentro la aplicación seguía
   creyendo que ese material estaba abierto. Como no abre nada automáticamente cuando ya estás mirando

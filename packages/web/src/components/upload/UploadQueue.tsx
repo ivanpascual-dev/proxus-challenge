@@ -55,9 +55,12 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
         <div className="mt-3">
           <ul className="grid gap-2">
             {staged.map((item) => (
+              // `min-w-0`: la celda de un grid tampoco encoge por debajo de su contenido, así que
+              // sin esto el `truncate` del nombre no llegaba a actuar y la fila ensanchaba el
+              // diálogo entero hasta sacarle scroll horizontal.
               <li
                 key={item.key}
-                className={`border p-3 text-sm ${
+                className={`min-w-0 border p-3 text-sm ${
                   item.status === "rejected"
                     ? "border-danger/40 bg-danger/10"
                     : item.status === "valid"
@@ -65,16 +68,21 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
                     : "border-border bg-surface"
                 }`}
               >
+                {/* `truncate` no recorta nada dentro de un flex sin `min-w-0`: el `min-width: auto`
+                    por defecto impide que el elemento encoja por debajo de su contenido, así que un
+                    nombre de fichero largo empujaba la caja y sacaba scroll horizontal en el
+                    diálogo. El grupo de la derecha lleva `shrink-0` para que quien ceda sea el
+                    nombre, que es lo que sabe recortarse. */}
                 <div className="flex items-center justify-between gap-2">
-                  <strong className="truncate text-heading">{item.file.name}</strong>
-                  <div className="flex items-center gap-2">
+                  <strong className="min-w-0 truncate text-heading">{item.file.name}</strong>
+                  <div className="flex shrink-0 items-center gap-2">
                     <span className={item.status === "rejected" ? "text-danger-ink" : "text-muted"}>
                       {item.status === "validating" ? "Comprobando…" : item.status === "valid" ? "Listo para subir" : "Rechazado"}
                     </span>
                     <IconButton icon="close" label={`Quitar ${item.file.name} de la lista`} size={16} onClick={() => onRemoveStaged(item.key)} />
                   </div>
                 </div>
-                {item.message !== undefined && <p className="mt-1 text-danger-ink">{item.message}</p>}
+                {item.message !== undefined && <p className="mt-1 break-words text-danger-ink">{item.message}</p>}
               </li>
             ))}
           </ul>
@@ -99,7 +107,7 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
           {uploads.map((item) => (
             <li
               key={item.key}
-              className={`rounded-[10px] border p-3 text-sm ${
+              className={`min-w-0 rounded-[10px] border p-3 text-sm ${
                 item.stage === "error" || item.stage === "rejected"
                   ? "border-danger/40 bg-danger/10"
                   : item.stage === "done"
@@ -108,15 +116,15 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <strong className="truncate text-heading">{item.fileName}</strong>
+                <strong className="min-w-0 truncate text-heading">{item.fileName}</strong>
                 <span
-                  className={
+                  className={`shrink-0 ${
                     item.stage === "error" || item.stage === "rejected"
                       ? "text-danger-ink"
                       : item.stage === "done"
                       ? "text-success-ink"
                       : "text-muted"
-                  }
+                  }`}
                 >
                   {STAGE_LABEL[item.stage]}
                 </span>
@@ -124,7 +132,9 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
               {item.message !== undefined && (
                 <p
                   className={
-                    item.stage === "error" || item.stage === "rejected" ? "mt-1 text-danger-ink" : "mt-1 text-muted"
+                    item.stage === "error" || item.stage === "rejected"
+                      ? "mt-1 break-words text-danger-ink"
+                      : "mt-1 break-words text-muted"
                   }
                 >
                   {item.message}

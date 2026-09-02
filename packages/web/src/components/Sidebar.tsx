@@ -65,7 +65,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
         <IconButton icon="chevron-right" label="Expandir el panel lateral" onClick={onToggleCollapsed} />
         <UploadManager compact onMaterialPrepared={onMaterialPrepared} />
         <div className="my-1 h-px w-6 shrink-0 bg-border" />
-        <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden">
           {AsyncResult.matchWithError(materials, {
             onInitial: () => null,
             onError: () => <Icon name="warning" size={16} className="text-danger-ink" />,
@@ -111,7 +111,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
         <UploadManager onMaterialPrepared={onMaterialPrepared} />
       </div>
 
-      <div className="min-h-0 overflow-y-auto p-2">
+      <div className="min-h-0 overflow-y-auto overflow-x-hidden p-2">
         {AsyncResult.matchWithError(materials, {
           onInitial: () => <p className="p-2 text-muted text-sm">Cargando materiales…</p>,
           onError: (error) => {
@@ -126,7 +126,10 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
                   {value.materials.map((material) => {
                     const selected = selectedMaterialId === material.id;
                     return (
-                      <li key={material.id} className="group relative">
+                      // `min-w-0`: una celda de grid tampoco encoge por debajo de su contenido sin
+                      // esto (mismo `min-width: auto` que en flex), así que el `line-clamp` del
+                      // título de dentro no llegaba a actuar y la fila entera crecía a lo ancho.
+                      <li key={material.id} className="group relative min-w-0">
                         <button
                           type="button"
                           onClick={() => onSelectMaterial(material.id)}
@@ -135,7 +138,21 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
                           }`}
                           style={selected ? { boxShadow: "inset 2px 0 0 var(--color-brand)" } : undefined}
                         >
-                          <span className="line-clamp-2 block text-heading text-sm">{material.title}</span>
+                          {/* Un título sin espacios ni guiones no tiene dónde partirse, y
+                              `line-clamp` solo recorta líneas: la palabra desbordaba los 224px del
+                              sidebar y sacaba scroll horizontal. `break-words` la parte solo cuando
+                              no cabe (el texto normal sigue partiéndose por sus espacios), y el
+                              `line-clamp-2` cierra en puntos suspensivos tras aprovechar las dos
+                              líneas. El nombre entero queda en el `title`. */}
+                          {/* Sin `block`: `line-clamp` necesita su propio `display: -webkit-box` y
+                              `block` se lo pisaba, así que el recorte a dos líneas no llegaba a
+                              aplicarse y un título largo crecía hasta cuatro. */}
+                          <span
+                            className="line-clamp-2 break-words text-heading text-sm"
+                            title={material.title}
+                          >
+                            {material.title}
+                          </span>
                           <span className="mt-1 flex items-center gap-1.5 text-muted text-xs">
                             <Icon
                               name={material.indexState === "indexed" ? "check-circle" : "warning"}

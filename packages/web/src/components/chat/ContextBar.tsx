@@ -64,22 +64,30 @@ export function ContextBar({
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 border-border border-t px-4 py-3" aria-label="Contexto que ve Sym">
       <span className="text-muted text-xs">Sym ve:</span>
-      {refs.map((ref) => (
-        <span
-          key={contextRefKey(ref)}
-          className="flex items-center gap-1.5 rounded-sm border border-brand/40 bg-brand-soft px-3 py-1 text-heading text-xs"
-        >
-          {contextRefLabel(ref)}
-          <button
-            type="button"
-            onClick={() => onRemove(ref)}
-            aria-label={`Quitar ${contextRefLabel(ref)} del contexto`}
-            className="text-muted hover:text-danger-ink"
+      {refs.map((ref) => {
+        const label = contextRefLabel(ref);
+        return (
+          // Un título de material puede ser una sola palabra sin espacios ni guiones, y entonces no
+          // hay punto de corte: el chip crecía hasta desbordar el chat. Se recorta con puntos
+          // suspensivos (`min-w-0` es imprescindible: dentro de un flex, `truncate` no recorta nada
+          // sin él) y el nombre entero queda en el `title`, porque lo que Sym ve tiene que poder
+          // leerse. La × nunca se comprime: es la forma de retirar el contexto.
+          <span
+            key={contextRefKey(ref)}
+            className="flex max-w-full items-center gap-1.5 rounded-sm border border-brand/40 bg-brand-soft px-3 py-1 text-heading text-xs"
           >
-            <Icon name="close" size={16} />
-          </button>
-        </span>
-      ))}
+            <span className="min-w-0 truncate" title={label}>{label}</span>
+            <button
+              type="button"
+              onClick={() => onRemove(ref)}
+              aria-label={`Quitar ${label} del contexto`}
+              className="shrink-0 text-muted hover:text-danger-ink"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }

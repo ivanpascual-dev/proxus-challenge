@@ -25,8 +25,10 @@ export function StatusNotice({ tone, title, description, action }: StatusNoticeP
     <div className={`flex items-start gap-2.5 border p-3 text-sm ${classes}`}>
       <Icon name={icon} size={18} className="mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="font-medium">{title}</p>
-        {description !== undefined && <p className="mt-0.5 opacity-90">{description}</p>}
+        {/* Los avisos llevan dentro nombres de fichero, que pueden no tener ningún punto de
+            corte natural: sin esto empujan la caja del aviso en vez de partirse. */}
+        <p className="break-words font-medium">{title}</p>
+        {description !== undefined && <p className="mt-0.5 break-words opacity-90">{description}</p>}
         {action !== undefined && <div className="mt-2">{action}</div>}
       </div>
     </div>
