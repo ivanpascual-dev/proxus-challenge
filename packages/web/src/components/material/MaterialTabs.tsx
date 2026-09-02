@@ -1,4 +1,9 @@
-export type Tab = "pdf" | "mindmap" | "notes" | "assessments";
+import type { MaterialSurface } from "@proxus/shared";
+
+// Las pestañas del material son exactamente las superficies del contrato de contexto (§5.2): si
+// alguna vez se añade una quinta pestaña, el typecheck obliga a declararla también ahí, en vez de
+// dejar a Sym sin saber nombrar dónde está el alumno.
+export type Tab = MaterialSurface;
 
 const TABS: ReadonlyArray<{ readonly value: Tab; readonly label: string }> = [
   { value: "pdf", label: "PDF" },

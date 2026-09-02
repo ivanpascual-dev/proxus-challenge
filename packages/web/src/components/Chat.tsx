@@ -11,13 +11,22 @@ type ChatState =
   | { readonly kind: "draft" }
   | { readonly kind: "stored"; readonly conversationId: string; readonly pending: PendingMessage | undefined };
 
-export function Chat({ proposedContext }: { readonly proposedContext: readonly ChatContextRef[] }) {
+export function Chat({
+  proposedContext,
+  onContextDismissed
+}: {
+  readonly proposedContext: readonly ChatContextRef[];
+  // Se avisa a quien propuso el contexto de que el alumno ha retirado un chip (invariante 9): hay
+  // referencias, como la página del PDF, que se adjuntan a mano y hay que soltar en su origen.
+  readonly onContextDismissed: (ref: ChatContextRef) => void;
+}) {
   const [state, setState] = useState<ChatState>({ kind: "draft" });
 
   if (state.kind === "draft") {
     return (
       <DraftConversation
         proposedContext={proposedContext}
+        onContextDismissed={onContextDismissed}
         onConversationCreated={(conversationId, pending) =>
           setState({ kind: "stored", conversationId, pending })}
         onSelectConversation={(conversationId) =>
@@ -32,6 +41,7 @@ export function Chat({ proposedContext }: { readonly proposedContext: readonly C
       conversationId={state.conversationId}
       pending={state.pending}
       proposedContext={proposedContext}
+      onContextDismissed={onContextDismissed}
       onResetToDraft={() => setState({ kind: "draft" })}
       onSelectConversation={(conversationId) =>
         setState({ kind: "stored", conversationId, pending: undefined })}

@@ -61,6 +61,15 @@ export function App() {
     setCitationTarget({ materialId, page });
   };
 
+  // La página que el alumno adjunta desde el PDF con `Preguntar a Sym` (§5.2, F5-40). Vive aquí, y no
+  // en `MaterialPanel`, porque quien la retira es la × de su chip, que está en el chat: el panel la
+  // propone y el chat la quita. Adjuntar otra página del mismo material reemplaza a la anterior, que
+  // es lo que hace un único hueco de estado.
+  const [attachedPage, setAttachedPage] = useState<number | null>(null);
+  useEffect(() => {
+    setAttachedPage(null);
+  }, [selectedMaterialId]);
+
   const [landingTarget, setLandingTarget] = useState<LandingTarget | null>(null);
   // La cadena de preparación termina fuera del ciclo de render, así que la condición "no hay ningún
   // material abierto" se lee de un ref al día, no del valor capturado cuando empezó la subida.
@@ -150,7 +159,7 @@ export function App() {
             />
           </ErrorBoundary>
         )}
-        material={selectedMaterial === undefined ? null : ({ focusMode, onToggleFocusMode, foldAll }) => (
+        material={selectedMaterial === undefined ? null : ({ focusMode, onToggleFocusMode, foldAll, onRevealChat }) => (
           <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
             <MaterialPanel
               focusMode={focusMode}
@@ -169,12 +178,24 @@ export function App() {
               onCitationConsumed={() => setCitationTarget(null)}
               landingTarget={landingTarget}
               onLandingConsumed={() => setLandingTarget(null)}
+              attachedPage={attachedPage}
+              onAttachPage={setAttachedPage}
+              onRevealChat={onRevealChat}
             />
           </ErrorBoundary>
         )}
         chat={
           <ErrorBoundary label="el chat">
-            <Chat proposedContext={hasMiddlePanel ? screenContext : []} />
+            <Chat
+              proposedContext={hasMiddlePanel ? screenContext : []}
+              onContextDismissed={(ref) => {
+                // Retirar el chip de la página es soltar el adjunto, no solo esconderlo: si no,
+                // volver a pulsar `Preguntar a Sym` en la misma página no traería nada de vuelta.
+                if (ref.type === "page") {
+                  setAttachedPage(null);
+                }
+              }}
+            />
           </ErrorBoundary>
         }
       />

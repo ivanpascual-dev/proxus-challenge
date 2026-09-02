@@ -72,6 +72,9 @@ interface AppShellProps {
     readonly focusMode: boolean;
     readonly onToggleFocusMode: () => void;
     readonly foldAll: FoldAllCommand | null;
+    // Adjuntar contexto desde el material (una página del PDF, §5.2) tiene que poder enseñar el chip:
+    // un chip que se propone detrás del rail plegado no cumple la invariante 9.
+    readonly onRevealChat: () => void;
   }) => ReactNode) | null;
   readonly chat: ReactNode;
 }
@@ -234,7 +237,12 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
                 ? { flex: "1 1 auto", minWidth: MIN_PANEL_WIDTH_PX }
                 : { flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }}
             >
-              {material({ focusMode, onToggleFocusMode: toggleFocusMode, foldAll })}
+              {material({
+                focusMode,
+                onToggleFocusMode: toggleFocusMode,
+                foldAll,
+                onRevealChat: () => setChatCollapsedAndPersist(false)
+              })}
             </div>
             {!symCollapsed && (
               // Banda de 9px: dentro, la línea de 1px del separador; encima, la agarradera. La
@@ -313,7 +321,13 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
           // El viewport no admite los dos mínimos: se prioriza lo que el alumno abrió explícitamente
           // (adaptación mínima, no la selección de superficie completa que llega en P3).
           <div className="h-screen min-w-0 flex-1 overflow-hidden bg-canvas">
-            {material({ focusMode, onToggleFocusMode: toggleFocusMode, foldAll })}
+            {material({
+              focusMode,
+              onToggleFocusMode: toggleFocusMode,
+              foldAll,
+              // Sin split, Sym no está plegado: no hay nada que desplegar.
+              onRevealChat: () => {}
+            })}
           </div>
         ) : (
           <div className="h-screen min-w-0 flex-1 overflow-hidden bg-surface">

@@ -33,6 +33,7 @@ interface StoredConversationProps {
   readonly conversationId: string;
   readonly pending: PendingMessage | undefined;
   readonly proposedContext: readonly ChatContextRef[];
+  readonly onContextDismissed: (ref: ChatContextRef) => void;
   readonly onResetToDraft: () => void;
   readonly onSelectConversation: (conversationId: string) => void;
 }
@@ -41,6 +42,7 @@ export function StoredConversation({
   conversationId,
   pending,
   proposedContext,
+  onContextDismissed,
   onResetToDraft,
   onSelectConversation
 }: StoredConversationProps) {
@@ -58,7 +60,7 @@ export function StoredConversation({
   const [historyWarning, setHistoryWarning] = useState<string | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { activeContext, dismiss } = useDismissibleContext(proposedContext);
+  const { activeContext, dismiss } = useDismissibleContext(proposedContext, onContextDismissed);
 
   const invalidateArtifacts = useAtomSet(invalidateArtifactsAction);
   const refreshMaterials = useAtomRefresh(materialsQuery);

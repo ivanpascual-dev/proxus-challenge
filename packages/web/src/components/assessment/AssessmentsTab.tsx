@@ -61,9 +61,13 @@ export function AssessmentsTab({
   readonly pendingControl: PendingControl | null;
   readonly onPendingControlConsumed: () => void;
   readonly onStartExam: (artifactId: string, title: string) => void;
-  // Contexto de pantalla (fase 4, decisión 5): la prueba abierta en detalle, para el chip del tutor.
-  // `undefined` mientras se está en la lista, sin ninguna prueba concreta abierta.
-  readonly onActiveArtifactChange?: (artifact: { readonly id: string; readonly title: string } | undefined) => void;
+  // Contexto de pantalla (fase 4, decisión 5; fase 5, §5.2): la prueba abierta en detalle y en qué
+  // vista, para el chip del tutor. `undefined` mientras se está en la lista, sin ninguna prueba
+  // concreta abierta: la lista no finge que haya una seleccionada. El tipo y el modo NO viajan, los
+  // deriva el servidor del artefacto.
+  readonly onActiveArtifactChange?: (
+    artifact: { readonly id: string; readonly title: string; readonly view: "solve" | "history" } | undefined
+  ) => void;
   readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const assessments = useAtomValue(materialAssessmentsQuery(materialId));
@@ -102,7 +106,7 @@ export function AssessmentsTab({
   }, [pendingControl, onPendingControlConsumed]);
 
   useEffect(() => {
-    onActiveArtifactChange?.(view.kind === "list" ? undefined : { id: view.id, title: view.title });
+    onActiveArtifactChange?.(view.kind === "list" ? undefined : { id: view.id, title: view.title, view: view.kind });
   }, [view, onActiveArtifactChange]);
 
   if (view.kind === "solve") {

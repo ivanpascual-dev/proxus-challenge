@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ActionButton } from "../../ui/ActionButton.tsx";
 import { IconButton } from "../../ui/IconButton.tsx";
 import { PdfPage, type PageMarker } from "./PdfPage.tsx";
 import { PdfThumbnailRail } from "./PdfThumbnailRail.tsx";
@@ -20,12 +21,15 @@ interface PdfWorkspaceProps {
   // `onScrolledToPage`, igual que hacía `IndexedPdfViewer` antes de esta pieza.
   readonly scrollToPage: number | null;
   readonly onScrolledToPage: () => void;
+  // `Preguntar a Sym` (§4.10, F5-40): adjunta la página que se está leyendo como chip de contexto.
+  // No envía nada ni escribe en el composer: crea el chip, que el alumno ve y puede retirar.
+  readonly onAskAboutPage: (page: number) => void;
 }
 
 const prefersReducedMotion = (): boolean =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function PdfWorkspace({ materialId, pageCount, markerFor, scrollToPage, onScrolledToPage }: PdfWorkspaceProps) {
+export function PdfWorkspace({ materialId, pageCount, markerFor, scrollToPage, onScrolledToPage, onAskAboutPage }: PdfWorkspaceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const ratiosRef = useRef(new Map<number, number>());
   const [activePage, setActivePage] = useState(1);
@@ -162,6 +166,15 @@ export function PdfWorkspace({ materialId, pageCount, markerFor, scrollToPage, o
           </label>
           <IconButton icon="chevron-right" label="Página siguiente" onClick={() => goToPage(activePage + 1, { focus: true })} disabled={activePage >= pageCount} />
         </div>
+        <ActionButton
+          icon="sparkles"
+          variant="brand"
+          size="compact"
+          aria-label={`Preguntar a Sym por la página ${activePage}`}
+          onClick={() => onAskAboutPage(activePage)}
+        >
+          Preguntar a Sym
+        </ActionButton>
         <IconButton icon="fit-width" label="Ajustar ancho" onClick={() => setZoom(DEFAULT_ZOOM)} />
         <div className="flex items-center gap-1">
           <IconButton icon="zoom-out" label="Reducir zoom" onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP))} disabled={zoom <= MIN_ZOOM} />

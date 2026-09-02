@@ -7,22 +7,46 @@ import { Icon } from "../ui/Icon.tsx";
 export function contextRefKey(ref: ChatContextRef): string {
   switch (ref.type) {
     case "material":
+      // La superficie no entra en la clave: cambiar de pestaña no es adjuntar otro material, así que
+      // un chip de material retirado sigue retirado al moverse por el material.
       return `material:${ref.materialId}`;
     case "artifact":
       return `artifact:${ref.artifactId}`;
+    case "assessment":
+      return `assessment:${ref.artifactId}`;
     case "block":
       return `block:${ref.artifactId}:${ref.blockId}`;
+    case "page":
+      return `page:${ref.materialId}:${ref.page}`;
   }
 }
+
+// Fase 5, §5.2: el chip dice en qué zona está el alumno con el mismo vocabulario que ve en la
+// interfaz. La prueba no dice si es Control o Examen: eso lo deriva el servidor del artefacto real,
+// y el chip solo tiene que ser reconocible para quien lo va a retirar.
+const SURFACE_LABEL: Record<NonNullable<Extract<ChatContextRef, { readonly type: "material" }>["surface"]>, string> = {
+  pdf: "PDF",
+  mindmap: "Mapa",
+  notes: "Apuntes",
+  assessments: "Pruebas"
+};
 
 function contextRefLabel(ref: ChatContextRef): string {
   switch (ref.type) {
     case "material":
-      return `Material: ${ref.title}`;
+      return ref.surface === undefined
+        ? `Material: ${ref.title}`
+        : `Material: ${ref.title} · ${SURFACE_LABEL[ref.surface]}`;
     case "artifact":
-      return `Apunte/prueba: ${ref.title}`;
+      return `Apunte: ${ref.title}`;
+    case "assessment":
+      return ref.view === "solve"
+        ? `Prueba: ${ref.title}`
+        : `Prueba: ${ref.title} · historial`;
     case "block":
       return `Bloque: ${ref.title}`;
+    case "page":
+      return `Página ${ref.page}: ${ref.title}`;
   }
 }
 

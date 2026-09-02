@@ -7,6 +7,10 @@ import { Icon } from "../ui/Icon.tsx";
 // Shift+Enter inserta salto, y una composición IME (acentos, japonés, etc.) nunca se envía a mitad.
 const MAX_COMPOSER_HEIGHT_PX = 152;
 
+// Id estable del campo de escribir: `Preguntar a Sym` desde el material deja aquí el cursor después
+// de adjuntar el chip (§4.10). Mismo patrón que `index-material-action`.
+export const CHAT_COMPOSER_INPUT_ID = "chat-composer-input";
+
 interface ChatComposerProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -47,6 +51,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, blocked = fa
     >
       <div className="flex items-end gap-2">
         <textarea
+          id={CHAT_COMPOSER_INPUT_ID}
           ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.currentTarget.value)}

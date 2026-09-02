@@ -30,6 +30,7 @@ import {
   noteProgressLine,
   type ProgressLine,
 } from "../domain/progress/progress-line.ts";
+import { buildScreenContext } from "../domain/tutor/screen-refs.ts";
 import type { FoldAllCommand } from "../domain/workspace/layout.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 import { NextStudyAction } from "./assessment/NextStudyAction.tsx";
@@ -39,6 +40,7 @@ import { MaterialTabs, type Tab } from "./material/MaterialTabs.tsx";
 import { MindMapWorkspace } from "./material/mindmap/MindMapWorkspace.tsx";
 import { PdfWorkspace } from "./material/pdf/PdfWorkspace.tsx";
 import type { PageMarker } from "./material/pdf/PdfPage.tsx";
+import { CHAT_COMPOSER_INPUT_ID } from "./chat/ChatComposer.tsx";
 import { ActionButton } from "./ui/ActionButton.tsx";
 import { GenerationProgress } from "./ui/GenerationProgress.tsx";
 
@@ -76,6 +78,11 @@ interface MaterialPanelProps {
   readonly focusMode: boolean;
   readonly onToggleFocusMode: () => void;
   readonly foldAll: FoldAllCommand | null;
+  // La página adjuntada a mano desde el PDF (§5.2, F5-40). Vive en `App` porque quien la retira es la
+  // × de su chip, que está en el chat: el panel la propone, el chat la quita.
+  readonly attachedPage: number | null;
+  readonly onAttachPage: (page: number | null) => void;
+  readonly onRevealChat: () => void;
 }
 
 type NoteAvailability =
@@ -99,6 +106,9 @@ export function MaterialPanel({
   focusMode,
   onToggleFocusMode,
   foldAll,
+  attachedPage,
+  onAttachPage,
+  onRevealChat,
 }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
@@ -111,6 +121,10 @@ export function MaterialPanel({
   >(null);
   const [progressOpen, setProgressOpen] = useState(false);
   const [activeAssessmentArtifact, setActiveAssessmentArtifact] = useState<
+    { readonly id: string; readonly title: string; readonly view: "solve" | "history" } | undefined
+  >();
+  // El bloque abierto en Apuntes, tal como lo reporta `NoteWorkspace` (§5.2).
+  const [selectedBlock, setSelectedBlock] = useState<
     { readonly id: string; readonly title: string } | undefined
   >();
   const artifacts = useAtomValue(artifactsQuery);
@@ -133,23 +147,20 @@ export function MaterialPanel({
     }),
   });
 
+  // Qué le proponemos a Sym que está viendo el alumno (§5.2). La regla de qué convive con qué es
+  // lógica pura y probada (`domain/tutor/screen-refs.ts`); aquí solo se le da el estado del panel.
   useEffect(() => {
-    const refs: ChatContextRef[] = [{ type: "material", materialId, title }];
-    if (tab === "notes" && noteArtifact !== undefined) {
-      refs.push({
-        type: "artifact",
-        artifactId: noteArtifact.id,
-        title: noteArtifact.title,
-      });
-    }
-    if (tab === "assessments" && activeAssessmentArtifact !== undefined) {
-      refs.push({
-        type: "artifact",
-        artifactId: activeAssessmentArtifact.id,
-        title: activeAssessmentArtifact.title,
-      });
-    }
-    onContextChange(refs);
+    onContextChange(buildScreenContext({
+      materialId,
+      title,
+      surface: tab,
+      note: noteArtifact === undefined
+        ? undefined
+        : { id: noteArtifact.id, title: noteArtifact.title },
+      selectedBlock,
+      assessment: activeAssessmentArtifact,
+      page: attachedPage ?? undefined,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     materialId,
@@ -157,8 +168,19 @@ export function MaterialPanel({
     tab,
     noteArtifact?.id,
     noteArtifact?.title,
+    selectedBlock,
     activeAssessmentArtifact,
+    attachedPage,
   ]);
+
+  // Salir del PDF suelta la página adjunta: es "la página activa" (§5.2), no un adjunto que sobreviva
+  // a la superficie donde se cogió. Así el conjunto nunca pasa de tres referencias.
+  useEffect(() => {
+    if (tab !== "pdf" && attachedPage !== null) {
+      onAttachPage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, attachedPage]);
 
   // Al salir del panel del material (otro material, o ninguno), el contexto que proponía deja de
   // aplicar: nada de lo que ya no está en pantalla debe seguir viajando al tutor.
@@ -186,6 +208,15 @@ export function MaterialPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [landingTarget, materialId, indexed]);
+
+  // `Preguntar a Sym` desde el PDF (§4.10, F5-40): adjunta la página, se asegura de que Sym esté a la
+  // vista (un chip detrás del rail plegado no se puede ver ni retirar) y deja el cursor en el
+  // composer. No envía: el alumno escribe su pregunta.
+  const askAboutPage = (page: number) => {
+    onAttachPage(page);
+    onRevealChat();
+    requestAnimationFrame(() => document.getElementById(CHAT_COMPOSER_INPUT_ID)?.focus());
+  };
 
   const generateControlForTopic = (topicId: string, topicLabel: string) => {
     setPendingControl({ topicId, topicLabel, origin: "material" });
@@ -288,6 +319,7 @@ export function MaterialPanel({
             pageCount={pageCount}
             scrollTo={pendingPage}
             onScrolled={() => setPendingPage(null)}
+            onAskAboutPage={askAboutPage}
           />
         ) : (
           <PdfWorkspace
@@ -296,6 +328,7 @@ export function MaterialPanel({
             markerFor={() => null}
             scrollToPage={pendingPage}
             onScrolledToPage={() => setPendingPage(null)}
+            onAskAboutPage={askAboutPage}
           />
         )}
       </div>
@@ -323,6 +356,7 @@ export function MaterialPanel({
             requestedTopicPages={pendingNoteTopicPages}
             onRequestedTopicPagesConsumed={() => setPendingNoteTopicPages(null)}
             foldAll={foldAll}
+            onSelectedBlockChange={setSelectedBlock}
           />
         </div>
       )}
@@ -417,11 +451,13 @@ function IndexedPdfWorkspace({
   pageCount,
   scrollTo,
   onScrolled,
+  onAskAboutPage,
 }: {
   readonly materialId: string;
   readonly pageCount: number;
   readonly scrollTo: number | null;
   readonly onScrolled: () => void;
+  readonly onAskAboutPage: (page: number) => void;
 }) {
   const index = useAtomValue(materialIndexQuery(materialId));
 
@@ -447,6 +483,7 @@ function IndexedPdfWorkspace({
       markerFor={markerFor}
       scrollToPage={scrollTo}
       onScrolledToPage={onScrolled}
+      onAskAboutPage={onAskAboutPage}
     />
   );
 }
@@ -543,12 +580,14 @@ function NotesTab({
   requestedTopicPages,
   onRequestedTopicPagesConsumed,
   foldAll,
+  onSelectedBlockChange,
 }: {
   readonly materialId: string;
   readonly onOpenCitation: (materialId: string, page: number) => void;
   readonly requestedTopicPages: readonly number[] | null;
   readonly onRequestedTopicPagesConsumed: () => void;
   readonly foldAll: FoldAllCommand | null;
+  readonly onSelectedBlockChange: (block: { readonly id: string; readonly title: string } | undefined) => void;
 }) {
   const artifacts = useAtomValue(artifactsQuery);
 
@@ -585,6 +624,7 @@ function NotesTab({
               requestedTopicPages={requestedTopicPages}
               onRequestedTopicPagesConsumed={onRequestedTopicPagesConsumed}
               foldAll={foldAll}
+              onSelectedBlockChange={onSelectedBlockChange}
             />
           );
         },
@@ -665,12 +705,14 @@ function ExistingNote({
   requestedTopicPages,
   onRequestedTopicPagesConsumed,
   foldAll,
+  onSelectedBlockChange,
 }: {
   readonly noteId: string;
   readonly onOpenCitation: (materialId: string, page: number) => void;
   readonly requestedTopicPages: readonly number[] | null;
   readonly onRequestedTopicPagesConsumed: () => void;
   readonly foldAll: FoldAllCommand | null;
+  readonly onSelectedBlockChange: (block: { readonly id: string; readonly title: string } | undefined) => void;
 }) {
   const note = useAtomValue(artifactQuery(noteId));
   const deleteArtifact = useAtomSet(deleteArtifactAction, { mode: "promise" });
@@ -739,6 +781,7 @@ function ExistingNote({
             requestedTopicPages={requestedTopicPages}
             onRequestedTopicPagesConsumed={onRequestedTopicPagesConsumed}
             foldAll={foldAll}
+            onSelectedBlockChange={onSelectedBlockChange}
           />
         </div>
       ),

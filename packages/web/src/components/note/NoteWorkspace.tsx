@@ -5,7 +5,7 @@ import { saveNoteAction } from "../../domain/artifacts/atoms.ts";
 import { findBlockForTopic } from "../../domain/materials/note-target.ts";
 import type { FoldAllCommand } from "../../domain/workspace/layout.ts";
 import { AddFromUrl } from "./AddFromUrl.tsx";
-import { NoteOutline } from "./NoteOutline.tsx";
+import { blockHeading, NoteOutline } from "./NoteOutline.tsx";
 import { SelectedNoteBlock } from "./SelectedNoteBlock.tsx";
 import { ProposalCard } from "./ProposalCard.tsx";
 import {
@@ -38,6 +38,10 @@ interface NoteWorkspaceProps {
   // leer un apunte a solas es leerlo sin las tres superficies laterales, no sin dos. Llega como orden
   // con marca, no como estado: desplegar solo a Sym desde su rail no debe abrir este índice.
   readonly foldAll: FoldAllCommand | null;
+  // Contexto de pantalla (fase 5, §5.2): el bloque que el alumno tiene abierto, para que Sym sepa que
+  // está en ESE bloque de Apuntes y no en una sección del PDF. Solo viaja un bloque ya guardado: uno
+  // recién añadido no tiene id en el servidor y no se podría comprobar allí.
+  readonly onSelectedBlockChange: (block: { readonly id: string; readonly title: string } | undefined) => void;
 }
 
 export function NoteWorkspace({
@@ -47,7 +51,8 @@ export function NoteWorkspace({
   onRequestedTopicPagesConsumed,
   onDelete,
   deleting,
-  foldAll
+  foldAll,
+  onSelectedBlockChange
 }: NoteWorkspaceProps) {
   const [draft, setDraft] = useState<NoteDraft>(() => draftFromArtifact(artifact));
   const [dirty, setDirty] = useState(false);
@@ -204,6 +209,22 @@ export function NoteWorkspace({
   };
 
   const selectedBlock = draft.blocks.find((block) => block.key === selectedKey);
+  // El encabezado del chip es el mismo que el del índice: la primera línea no vacía del bloque. Se
+  // recalcula al cambiar de bloque o al cambiar esa línea, no en cada tecla del cuerpo.
+  const selectedBlockId = selectedBlock?.id;
+  const selectedBlockHeading = selectedBlock === undefined ? undefined : blockHeading(selectedBlock.markdown);
+
+  useEffect(() => {
+    onSelectedBlockChange(
+      selectedBlockId === undefined || selectedBlockHeading === undefined
+        ? undefined
+        : { id: selectedBlockId, title: selectedBlockHeading }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBlockId, selectedBlockHeading]);
+
+  // Salir de los apuntes retira el chip: lo que ya no está en pantalla no viaja al tutor.
+  useEffect(() => () => onSelectedBlockChange(undefined), [onSelectedBlockChange]);
 
   return (
     <article className="flex min-h-0 w-full flex-1 flex-col">

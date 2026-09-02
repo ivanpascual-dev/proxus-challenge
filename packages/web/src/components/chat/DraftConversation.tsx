@@ -17,12 +17,14 @@ import { describeFailure } from "../../lib/user-feedback.ts";
 // `maxConversations` (C5-09).
 interface DraftConversationProps {
   readonly proposedContext: readonly ChatContextRef[];
+  readonly onContextDismissed: (ref: ChatContextRef) => void;
   readonly onConversationCreated: (conversationId: string, pending: PendingMessage) => void;
   readonly onSelectConversation: (conversationId: string) => void;
 }
 
 export function DraftConversation({
   proposedContext,
+  onContextDismissed,
   onConversationCreated,
   onSelectConversation
 }: DraftConversationProps) {
@@ -31,7 +33,7 @@ export function DraftConversation({
   const refreshConversationList = useAtomRefresh(conversationsQuery);
   const conversations = useAtomValue(conversationsQuery);
   const materials = useAtomValue(materialsQuery);
-  const { activeContext, dismiss } = useDismissibleContext(proposedContext);
+  const { activeContext, dismiss } = useDismissibleContext(proposedContext, onContextDismissed);
 
   // El borrador todavía no ha escrito nada en servidor, así que puede mirar el conteo real y avisar
   // por adelantado en vez de dejar que el alumno escriba y choque contra el 400 al enviar (C5-09,
