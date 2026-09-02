@@ -32,7 +32,14 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, blocked = fa
       return;
     }
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_COMPOSER_HEIGHT_PX)}px`;
+    const measured = Math.min(el.scrollHeight, MAX_COMPOSER_HEIGHT_PX);
+    // Medido dentro de un contenedor sin pintar, `scrollHeight` vale 0. Pasa al volver de la pantalla
+    // previa del Examen real, que sustituye la aplicación entera. Fijar `0px` dejaba el campo
+    // aplastado para siempre, porque este efecto solo vuelve a correr al cambiar el texto: con
+    // `auto` se queda en la altura natural de una línea y la siguiente tecla ya mide bien.
+    if (measured > 0) {
+      el.style.height = `${measured}px`;
+    }
   }, [value]);
 
   const submit = () => {

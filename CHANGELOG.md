@@ -324,6 +324,9 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Arrastrar el separador hasta el extremo ya no deja a Sym por debajo de su mínimo.** El reparto se
   hacía en porcentaje redondeado del contenedor entero, sin descontar la banda del separador, y en el
   extremo derecho Sym se quedaba en 417px en vez de los 420px prometidos.
+- **El cuadro de escribir a Sym ya no se queda aplastado al volver de la pantalla previa de un examen.**
+  Medía su altura mientras la pantalla todavía no estaba pintada, se quedaba a cero y solo se
+  recuperaba al escribir la primera letra.
 - **Ctrl + rueda sobre el mapa mental ya no amplía también la página del navegador**, y recorrer el
   mapa con la rueda deja de llenar la consola de avisos.
 
