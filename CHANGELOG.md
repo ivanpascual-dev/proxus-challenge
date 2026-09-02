@@ -187,6 +187,12 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   verdad, con la misma cita navegable de siempre y un aviso si el texto es transcripción del modelo.
   Se ven en directo mientras responde y siguen ahí al recargar la conversación; una llamada que falla
   no crea fuente, y no se inventa una cita a partir de lo que el modelo escribe en la respuesta.
+- **Un PDF de ejemplo con el que se puede probar todo.** `enjambres-de-inspeccion.pdf` (`pnpm run
+  fixture:demo`) son seis páginas de un manual técnico inventado de cabo a rabo, con definiciones,
+  clasificaciones, umbrales numéricos y protocolos. Da nueve temas en el mapa mental y suficiente
+  materia para apuntes, Controles y Exámenes, sin subir ningún documento con derechos. El fixture que
+  ya había, `densidad.pdf`, sigue donde estaba: calibra el clasificador de densidad y su texto es una
+  palabra repetida, así que no da ni para una pregunta.
 
 ### Cambiado
 

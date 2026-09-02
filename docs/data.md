@@ -94,18 +94,42 @@ rm -rf packages/server/.data/agent-sessions
 
 No borres `materials/pdfs` si quieres conservar PDFs de prueba.
 
-## Fixture de ejemplo
+## Fixtures de ejemplo
 
-`packages/server/fixtures/materials/densidad.pdf` es un fixture **sintético, generado y sin derechos
-de terceros**. Lo escribe a mano `packages/server/fixtures/make-fixture.mjs` (sin dependencias
-nuevas). Son cuatro páginas con densidades de texto distintas (26, 2.400, 200 y 610 caracteres no
-blancos) para calibrar el clasificador de densidad: las páginas 2 y 4 quedan por encima del umbral de
-600 (`extracted`), la 1 y la 3 por debajo (`transcribed`).
+Los dos son **sintéticos, generados y sin derechos de terceros**, y los escribe a mano un script sin
+dependencias nuevas. Sirven para cosas distintas y no se sustituyen entre sí.
+
+**`densidad.pdf` es material de calibración, no de demostración.** Lo genera
+`packages/server/fixtures/make-fixture.mjs`. Son cuatro páginas con densidades de texto elegidas a
+propósito (26, 2.400, 200 y 610 caracteres no blancos) para caer a los dos lados del umbral de 600:
+las páginas 2 y 4 quedan por encima (`extracted`), la 1 y la 3 por debajo (`transcribed`).
+`densidad-fixture.test.ts` afirma esa clasificación página a página, así que **cambiarle el contenido
+rompe el test**. Su texto es una palabra repetida: no da para un mapa mental ni para una prueba.
+
+**`enjambres-de-inspeccion.pdf` es el material de demostración.** Lo genera
+`packages/server/fixtures/make-demo-fixture.mjs`. Son seis páginas de un manual inventado de cabo a
+rabo (una disciplina que no existe, con sus definiciones, sus clasificaciones, sus umbrales
+numéricos y sus protocolos), pensado para que se pueda recorrer la aplicación entera sin subir un PDF
+con derechos: todas sus páginas pasan el umbral de densidad, así que se indexa por texto sin coste de
+renderizado ni de visión, y produce **nueve temas** en el mapa mental con material suficiente para
+apuntes, Controles y Exámenes.
+
+**`inyeccion.pdf` es munición de la batería de guardarraíles.** Lo genera
+`packages/server/fixtures/make-injection-fixture.mjs`. Son dos páginas de material de estudio
+inventado con una orden de inyección metida dentro, en densidades opuestas (1.435 y 212 caracteres no
+blancos) para que la orden llegue al modelo una vez por texto extraído y otra por visión, más un
+canario que delata la obediencia. Es el fixture de B9; cómo correrlo está en
+[`docs/testing.md`](testing.md).
 
 ```bash
-pnpm run fixture:materials   # regenera densidad.pdf
+pnpm run fixture:materials   # regenera densidad.pdf (calibración)
+pnpm run fixture:demo        # regenera enjambres-de-inspeccion.pdf (demostración)
+pnpm run fixture:inyeccion   # regenera inyeccion.pdf (guardarraíles, B9)
 pnpm run seed:demo           # copia fixtures/materials/*.pdf a .data/materials/pdfs/
 ```
+
+Ojo con `seed:demo`: copia **todos** los fixtures, `inyeccion.pdf` incluido, y ese ocupa plaza de
+material sin ser material de estudio. Bórralo de `.data/materials/pdfs/` cuando acabes con B9.
 
 Los 9 PDFs de `packages/server/.data/materials/pdfs` en un clon local son material de cursos reales y
 **no se suben nunca**. El fixture existe para que los tests del umbral corran en cualquier clon.
