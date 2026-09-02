@@ -28,7 +28,11 @@ export function MaterialHeader({
   onToggleFocusMode,
 }: MaterialHeaderProps) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-border border-b px-4">
+    // Contenedor con nombre: en el mínimo de 420px que promete F5-03 el grupo de acciones pedía
+    // 413px, se comía el título entero y sacaba scroll horizontal. Por debajo de 470px `Plegar todo`
+    // y `Ver progreso` se quedan en solo icono (con `aria-label` y tooltip, así que no pierden
+    // nombre); `Siguiente paso` conserva su texto porque es el que mueve el estudio.
+    <header className="@container/material-header flex h-16 shrink-0 items-center justify-between gap-3 border-border border-b px-4">
       <div className="min-w-0">
         <h2 className="truncate font-semibold text-heading text-lg leading-tight">{title}</h2>
         <p className="mt-0.5 flex items-center gap-1.5 text-muted text-xs">
@@ -48,6 +52,9 @@ export function MaterialHeader({
           size="compact"
           variant={focusMode ? "selected" : "neutral"}
           aria-pressed={focusMode}
+          aria-label={focusMode ? "Desplegar todo" : "Plegar todo"}
+          title={focusMode ? "Desplegar todo" : "Plegar todo"}
+          labelClassName="@max-[470px]/material-header:hidden"
           onClick={onToggleFocusMode}
         >
           {focusMode ? "Desplegar todo" : "Plegar todo"}
@@ -56,6 +63,9 @@ export function MaterialHeader({
         <ActionButton
           icon="progress"
           size="compact"
+          aria-label="Ver progreso"
+          title="Ver progreso"
+          labelClassName="@max-[470px]/material-header:hidden"
           onClick={onOpenProgress}
         >
           Ver progreso

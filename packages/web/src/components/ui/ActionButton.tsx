@@ -9,6 +9,10 @@ interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly variant?: ActionButtonVariant;
   readonly size?: ActionButtonSize;
   readonly children: ReactNode;
+  // Clases para la etiqueta, no para el botón. Sirve para esconderla en un contenedor estrecho y
+  // dejar el control en solo icono; quien la esconda tiene que dar `aria-label`, o el botón se queda
+  // sin nombre accesible.
+  readonly labelClassName?: string;
 }
 
 const VARIANT_CLASSES: Record<ActionButtonVariant, string> = {
@@ -30,6 +34,7 @@ export function ActionButton({
   size = "default",
   className = "",
   children,
+  labelClassName = "",
   type = "button",
   ...props
 }: ActionButtonProps) {
@@ -40,7 +45,7 @@ export function ActionButton({
       {...props}
     >
       <Icon name={icon} size={size === "compact" ? 16 : 18} />
-      <span>{children}</span>
+      <span className={labelClassName}>{children}</span>
     </button>
   );
 }
