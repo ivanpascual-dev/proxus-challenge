@@ -208,7 +208,6 @@ export const gradeInProgressAttempt = (
     rawScore,
     maxScore,
     penalty: penaltyPoints,
-    displayedScore: displayedScore(rawScore, penaltyPoints, maxScore),
-    summary: `${rawScore}/${maxScore}`
+    displayedScore: displayedScore(rawScore, penaltyPoints, maxScore)
   };
 };

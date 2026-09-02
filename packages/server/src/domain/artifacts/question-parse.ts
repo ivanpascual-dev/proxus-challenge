@@ -68,10 +68,19 @@ export interface DroppedQuestion {
 }
 
 export type ParseResult =
-  | { readonly kind: "questions"; readonly questions: readonly ParsedQuestion[]; readonly dropped: readonly DroppedQuestion[] }
-  // El modelo dice que el material no da para tantas (decisión 22). NO es un error de formato y NO se
-  // reintenta: se falla ofreciendo generar `maxPossible`.
-  | { readonly kind: "insufficient"; readonly maxPossible: number }
+  // `insufficientContent` viaja SIEMPRE junto a `questions` (correcciones de cierre de fase 5, §6.2):
+  // el modelo no rellena, pero entrega lo que sí puede sostener. `true` autoriza una prueba parcial
+  // (decisión 9 del plan de correcciones); `dropped` sigue siendo un error de formato normal.
+  | {
+      readonly kind: "questions";
+      readonly questions: readonly ParsedQuestion[];
+      readonly dropped: readonly DroppedQuestion[];
+      readonly insufficientContent: boolean;
+    }
+  // Compatibilidad defensiva con el formato anterior a este corte: el modelo declara cuántas podía
+  // dar SIN escribir ninguna. No es un error de formato (no se reintenta con la misma petición), pero
+  // tampoco trae contenido: quien llama tiene que pedirlo aparte (`holesWithinCapacity`).
+  | { readonly kind: "legacy-insufficient"; readonly maxPossible: number }
   // No se pudo sacar un objeto JSON de la respuesta. Es un error de formato y SÍ se reintenta.
   | { readonly kind: "unparseable"; readonly reason: string };
 
@@ -187,29 +196,28 @@ export const parseGeneratedQuestions = (raw: string): ParseResult => {
     return { kind: "unparseable", reason: error instanceof Error ? error.message : String(error) };
   }
 
+  if (isRecord(value) && Array.isArray(value.questions)) {
+    const questions: ParsedQuestion[] = [];
+    const dropped: DroppedQuestion[] = [];
+    value.questions.forEach((entry, index) => {
+      const parsed = parseOne(entry);
+      if ("error" in parsed) {
+        dropped.push({ index, reason: parsed.error });
+      } else {
+        questions.push(parsed);
+      }
+    });
+    return { kind: "questions", questions, dropped, insufficientContent: value.insufficientContent === true };
+  }
+
   if (isRecord(value) && value.insufficientContent === true) {
     const maxPossible = typeof value.maxPossible === "number" && Number.isFinite(value.maxPossible)
       ? Math.max(0, Math.floor(value.maxPossible))
       : 0;
-    return { kind: "insufficient", maxPossible };
+    return { kind: "legacy-insufficient", maxPossible };
   }
 
-  if (!isRecord(value) || !Array.isArray(value.questions)) {
-    return { kind: "unparseable", reason: "la respuesta no trae un array `questions`" };
-  }
-
-  const questions: ParsedQuestion[] = [];
-  const dropped: DroppedQuestion[] = [];
-  value.questions.forEach((entry, index) => {
-    const parsed = parseOne(entry);
-    if ("error" in parsed) {
-      dropped.push({ index, reason: parsed.error });
-    } else {
-      questions.push(parsed);
-    }
-  });
-
-  return { kind: "questions", questions, dropped };
+  return { kind: "unparseable", reason: "la respuesta no trae un array `questions`" };
 };
 
 // Los tipos que un Control acepta (§6.2): sin múltiple respuesta. Un Examen los acepta todos. El

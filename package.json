@@ -12,6 +12,8 @@
     "test:guardarrailes": "node --import tsx scripts/test-guardarrailes.mjs",
     "measure:tokens": "node --env-file=.env --import tsx scripts/measure-tokens.mjs",
     "fixture:materials": "node packages/server/fixtures/make-fixture.mjs",
+    "fixture:demo": "node packages/server/fixtures/make-demo-fixture.mjs",
+    "fixture:inyeccion": "node packages/server/fixtures/make-injection-fixture.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "index:materials": "pnpm --filter @proxus/server run index:materials"
   },

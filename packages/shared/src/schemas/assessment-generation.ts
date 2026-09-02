@@ -19,6 +19,17 @@ export const GenerateAssessmentInput = Schema.Struct({
 });
 export type GenerateAssessmentInput = typeof GenerateAssessmentInput.Type;
 
+// La ruta rechaza la petición ANTES de abrir el stream (§6.9): cuerpo mal formado, `questionCount`
+// fuera de rango, material inexistente o sin indexar, tema fuera del índice, o tope de Controles/
+// Exámenes alcanzado. Un solo `_tag` para las cinco: la interfaz solo necesita mostrar `message`,
+// nunca distinguir el motivo por código.
+export class AssessmentGenerationRejected extends Schema.ErrorClass<AssessmentGenerationRejected>(
+  "AssessmentGenerationRejected"
+)({
+  _tag: Schema.tag("AssessmentGenerationRejected"),
+  message: Schema.String
+}) {}
+
 // Eventos del stream NDJSON. `topic` es null en la fase de guardado. El `done` lleva cuántas
 // preguntas salieron y cuántos reintentos hicieron falta: es observabilidad del modelo para la
 // bitácora (riesgo 2), no un aviso para el alumno (§6.8, paso 9).
@@ -33,6 +44,10 @@ export const AssessmentGenerationStreamEvent = Schema.Union([
     type: Schema.Literal("done"),
     assessment: ArtifactSummary,
     questionCount: Schema.Number,
+    // Lo que pedía la petición (correcciones de cierre de fase 5, decisión 10 y C5-05): igual a
+    // `questionCount` en una prueba completa, mayor en una parcial. La interfaz compara los dos para
+    // mostrar el aviso, en vez de que el servidor decida cuándo mostrarlo.
+    requestedQuestionCount: Schema.Number,
     retries: Schema.Number
   }),
   Schema.Struct({

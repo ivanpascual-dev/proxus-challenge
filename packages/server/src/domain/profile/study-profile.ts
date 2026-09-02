@@ -34,6 +34,9 @@ export class StudyProfileRepositoryError extends Data.TaggedError("StudyProfileR
 export interface StudyProfileRepository {
   readonly load: (materialId: string) => Effect.Effect<StoredStudyProfile, StudyProfileRepositoryError>;
   readonly save: (profile: StoredStudyProfile) => Effect.Effect<void, StudyProfileRepositoryError>;
+  // Borra el perfil de un material (parte de la cascada de borrado, ADR-027). Por `materialId`, no por
+  // huella: el perfil no se comparte entre materiales. La ausencia del fichero es éxito idempotente.
+  readonly remove: (materialId: string) => Effect.Effect<void, StudyProfileRepositoryError>;
 }
 
 export const StudyProfileRepository = Context.Service<StudyProfileRepository>(

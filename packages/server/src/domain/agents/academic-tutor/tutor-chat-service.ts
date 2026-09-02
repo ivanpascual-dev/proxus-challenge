@@ -3,9 +3,11 @@ import { LanguageModel } from "effect/unstable/ai";
 import {
   ConversationNotFound,
   ConversationStorageError,
+  InvalidScreenContext,
   LIMITS,
   LimitExceeded,
   type Conversation,
+  type ConversationSource,
   type ConversationSummary,
   type TutorChatRequest,
   type TutorChatResponse,
@@ -19,11 +21,14 @@ import {
   AgentSession,
   renderScreenContext,
   SessionRepository,
+  toPresentationMessages,
   type AgentSessionRunResult,
   type SessionNotFound,
   type SessionRepositoryError
 } from "../harness/index.ts";
 import { makeAcademicTutorHarness } from "../academic-tutor.ts";
+import { resolveScreenContext } from "./screen-context-resolver.ts";
+import { makeTurnSourceRecorder } from "./turn-sources.ts";
 import { initialTurnBudgetState } from "../../limits/turn-budget.ts";
 import { RateLimiter } from "../../limits/rate-limiter.ts";
 
@@ -31,7 +36,7 @@ export interface TutorChatService {
   readonly sendMessage: (
     input: TutorChatRequest,
     clientKey: string
-  ) => Effect.Effect<TutorChatResponse, ConversationNotFound | ConversationStorageError | LimitExceeded, LanguageModel.LanguageModel>;
+  ) => Effect.Effect<TutorChatResponse, ConversationNotFound | ConversationStorageError | InvalidScreenContext | LimitExceeded, LanguageModel.LanguageModel>;
   readonly streamMessage: (
     input: TutorChatRequest,
     clientKey: string
@@ -98,10 +103,13 @@ export const TutorChatServiceLive = Layer.effect(
     // El harness se construye por petición, con un presupuesto de turno fresco: dos peticiones no
     // comparten cuántas páginas o bytes de imagen les quedan. El limitador de frecuencia sí se
     // comparte entre peticiones (es lo que hace que la ventana deslizante cuente de verdad).
-    const makeTurnHarness = (clientKey: string) => Effect.gen(function* () {
+    const makeTurnHarness = (clientKey: string, onSource: (source: ConversationSource) => Effect.Effect<void>) => Effect.gen(function* () {
       const budgetRef = yield* Ref.make(initialTurnBudgetState);
-      const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, clientKey);
-      return { harness, session: AgentSession.make(harness) };
+      // §5.3: el registro de fuentes también es por turno. Los comandos de material apuntan ahí lo que
+      // el repositorio sirvió de verdad, y `onSource` lo hace visible mientras el turno sigue vivo.
+      const sources = yield* makeTurnSourceRecorder(onSource);
+      const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, clientKey, sources);
+      return { harness, session: AgentSession.make(harness), sources };
     });
 
     // Carga la conversación por `conversationId`, ejecuta el turno y guarda mensajes ya degradados
@@ -110,8 +118,9 @@ export const TutorChatServiceLive = Layer.effect(
     const runTurn = (
       input: TutorChatRequest,
       clientKey: string,
-      onMessage: Parameters<AgentSession["runTurn"]>[1]
-    ): Effect.Effect<AgentSessionRunResult, ConversationNotFound | ConversationStorageError | LimitExceeded, LanguageModel.LanguageModel> => Effect.gen(function* () {
+      onMessage: Parameters<AgentSession["runTurn"]>[1],
+      onSource: (source: ConversationSource) => Effect.Effect<void>
+    ): Effect.Effect<AgentSessionRunResult, ConversationNotFound | ConversationStorageError | InvalidScreenContext | LimitExceeded, LanguageModel.LanguageModel> => Effect.gen(function* () {
       const stored = yield* sessionRepository.getSession(input.conversationId).pipe(
         Effect.mapError(mapSessionError)
       );
@@ -125,14 +134,30 @@ export const TutorChatServiceLive = Layer.effect(
         return yield* historyLimitExceeded.value;
       }
 
-      const { harness, session } = yield* makeTurnHarness(clientKey);
+      const { harness, session, sources } = yield* makeTurnHarness(clientKey, onSource);
       const startedAt = new Date().toISOString();
 
       // Decisión 5 y 11: el contexto de pantalla viaja dentro del mensaje del usuario, nunca en el
       // system prompt. `ChatContextRef` solo lleva ids y título, así que anexarlo aquí nunca cuela
-      // texto libre del material.
-      const screenContext = renderScreenContext(input.context);
+      // texto libre del material. Fase 5, §5.2: antes de describirlo se comprueba contra los
+      // repositorios (material, página, prueba, apunte, bloque) y el tipo de prueba se deriva del
+      // artefacto real, no del título que mandó el cliente.
+      const resolvedContext = yield* resolveScreenContext(input.context, materialRepository, artifactRepository);
+      const screenContext = renderScreenContext(resolvedContext);
       const turnInput = screenContext === undefined ? input.input : `${input.input}\n\n${screenContext}`;
+
+      // §5.1: lo que ve el navegador en directo (streaming) nunca es el mensaje `user` concatenado.
+      // El primer mensaje que produce un turno es siempre ese `user` (harness/session.ts lo añade sin
+      // condición, una vez); se sustituye su contenido por `input.input` antes de emitirlo, sin tocar
+      // lo que `appendTurn` persiste para el historial que el modelo sigue usando como contexto.
+      let leadingUserMessageMasked = false;
+      const maskedOnMessage: typeof onMessage = (message) => {
+        if (!leadingUserMessageMasked && message.role === "user") {
+          leadingUserMessageMasked = true;
+          return onMessage({ role: "user", content: input.input });
+        }
+        return onMessage(message);
+      };
 
       const result = yield* session.runTurn(
         {
@@ -140,16 +165,28 @@ export const TutorChatServiceLive = Layer.effect(
           messages: stored.messages,
           maxSteps: input.maxSteps ?? LIMITS.maxAgentSteps
         },
-        onMessage
+        maskedOnMessage
       ).pipe(
         Effect.provide(harness.layer),
         Effect.mapError(toInternalError)
       );
 
+      // §5.3: lo que se guarda es lo mismo que se emitió, ya deduplicado por material y página. Al
+      // recargar la conversación las fuentes salen de aquí, nunca de releer el texto de la respuesta.
+      const turnSources = yield* sources.collected;
+
       yield* sessionRepository.appendTurn({
         sessionId: input.conversationId,
         messages: result.newMessages,
-        turn: { startedAt, steps: result.steps },
+        turn: {
+          startedAt,
+          steps: result.steps,
+          input: input.input,
+          context: input.context,
+          messageCount: result.newMessages.length,
+          followUpQuestions: result.followUpQuestions,
+          sources: turnSources
+        },
         title: stored.title.length === 0 ? deriveConversationTitle(input.input) : undefined
       }).pipe(Effect.mapError(mapSessionError));
 
@@ -158,18 +195,28 @@ export const TutorChatServiceLive = Layer.effect(
 
     return {
       sendMessage: (input, clientKey) => Effect.gen(function* () {
-        const result = yield* runTurn(input, clientKey, () => Effect.void);
+        const result = yield* runTurn(input, clientKey, () => Effect.void, () => Effect.void);
         return { output: result.output };
       }),
 
       streamMessage: (input, clientKey) => Stream.callback<TutorChatStreamEvent, unknown, LanguageModel.LanguageModel>((queue) =>
-        runTurn(input, clientKey, (message) =>
-          Queue.offer(queue, { type: "message" as const, message }).pipe(Effect.asVoid)
+        runTurn(
+          input,
+          clientKey,
+          (message) => Queue.offer(queue, { type: "message" as const, message }).pipe(Effect.asVoid),
+          // §5.3: la fuente se emite en cuanto se confirma, no al cerrar el turno: el alumno ve qué
+          // está consultando Sym mientras responde.
+          (source) => Queue.offer(queue, { type: "source" as const, source }).pipe(Effect.asVoid)
         ).pipe(
           // El fusible de conversación llena es un rechazo esperado del dominio, no un fallo de
           // transporte: se emite como el mismo evento `error` que ya usan los fallos del modelo
           // (decisión 7), en vez de romper la conexión NDJSON a medias.
           Effect.catchTag("LimitExceeded", (error) =>
+            Queue.offer(queue, { type: "error" as const, message: error.message }).pipe(Effect.as(null))
+          ),
+          // Lo mismo con el contexto de pantalla que ya no describe nada real (§5.2): es un rechazo
+          // del dominio con su texto, no una conexión rota. El turno no se ejecuta.
+          Effect.catchTag("InvalidScreenContext", (error) =>
             Queue.offer(queue, { type: "error" as const, message: error.message }).pipe(Effect.as(null))
           ),
           Effect.tap((result) => result === null ? Effect.void : Effect.gen(function* () {
@@ -230,7 +277,9 @@ export const TutorChatServiceLive = Layer.effect(
         Effect.map((session): Conversation => ({
           id: session.id,
           title: session.title,
-          messages: session.messages,
+          // §5.1: lo que recarga el navegador es la copia de presentación, no el historial que el
+          // modelo usó como contexto. `session.messages` (usado en `runTurn`) no se toca aquí.
+          messages: toPresentationMessages(session.messages, session.turns),
           turns: session.turns,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt

@@ -17,6 +17,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Añadido
 
+- **Foco visible en toda la interfaz.** Al navegar con teclado, cualquier botón, enlace o campo marca
+  con un anillo de 2px dónde está el foco, no solo los tres controles que ya lo tenían.
 - **Tema claro y oscuro.** El selector tiene tres opciones: sistema (por defecto), claro y oscuro. En
   "sistema" la aplicación sigue la preferencia del sistema operativo y reacciona si esa preferencia
   cambia; al elegir claro u oscuro la elección se recuerda y no la pisa el sistema.
@@ -24,9 +26,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   No hace falta indexarlo para verlo.
 - **Indexado desde la web.** Un material sin indexar muestra un botón para indexarlo con el progreso
   página a página, y dice explícitamente que aún no lo está en vez de enseñar un índice vacío.
-- **Mapa mental de temas.** Un material indexado se abre en dos pestañas, el PDF y un mapa mental de sus
-  temas en dos niveles. Al pulsar un tema se salta a su página. Un botón "Colores por grupo" tiñe cada
-  área y deja sus subtemas del mismo color más claro.
+- **Mapa mental de temas.** Un material indexado incluye un mapa mental de sus temas en dos niveles.
+  Se puede arrastrar, ampliar, reducir y volver a centrar; con el foco dentro, Ctrl con `+`, `-` o `0`
+  actúa sobre el mapa en vez de cambiar el zoom del navegador. Al pulsar un tema aparece junto al nodo
+  un menú para abrir sus apuntes o crear un Control, con navegación completa por teclado. Un selector
+  opcional tiñe cada área y deja sus subtemas del mismo color más claro.
 - **Marca de procedencia en el visor.** Las páginas que transcribió el modelo, porque no tenían texto
   extraíble, llevan una marca ámbar en la esquina. Las que fallaron al indexarse, una banda roja.
 - **Materiales de ejemplo.** `pnpm run seed:demo` copia unos PDFs de prueba para poder usar la
@@ -40,6 +44,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Varias conversaciones con el tutor, guardadas.** Una lista lateral junto al chat muestra las
   conversaciones anteriores, deja crear una nueva y borrar las que sobren; cambiar de una a otra
   recupera su historial completo.
+- **El chat no crea una conversación hasta que envías el primer mensaje.** Al abrir el chat, pulsar
+  "Nueva conversación" (un botón nuevo en la cabecera) o borrar la conversación abierta, queda un
+  borrador en blanco que no aparece en el historial. La conversación se guarda al enviar el primer
+  mensaje; si ese guardado falla, el texto escrito no se pierde.
 - **El tutor propone hasta tres preguntas de seguimiento.** Al final de cada respuesta aparecen, como
   botones, hasta tres preguntas relacionadas con lo que acaba de explicar; pulsar una la envía como si
   se hubiera escrito. Si están las tres y solo falta el cierre técnico, se recuperan; si el contenido
@@ -47,11 +55,20 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **El tutor ve lo que tienes abierto, y se enseña antes de enviar.** Con un material abierto, y su
   apunte o su prueba a la vista, aparece como una etiqueta encima del cuadro de texto; se puede quitar
   con la "×" antes de enviar y solo lleva el título y el identificador, nunca el contenido.
+- **Sym sabe en qué pestaña estás, y en qué bloque o prueba.** La etiqueta de contexto dice ahora la
+  superficie que tienes delante (PDF, Mapa, Apuntes o Pruebas), el bloque de apuntes seleccionado y la
+  prueba abierta con su vista (resolviéndola o su historial). Si le preguntas dónde estás, nombra solo
+  eso: nunca un intento ni una pregunta concreta, y nada en absoluto si retiras la etiqueta.
+- **Preguntar a Sym por la página que estás leyendo.** El pie del visor de PDF tiene un botón que
+  adjunta la página actual como etiqueta y despliega el chat si estaba plegado. Adjuntar otra página
+  reemplaza a la anterior, la "×" la suelta de verdad, y salir del PDF la retira sola.
 - **Los apuntes se editan por bloques.** Un apunte se abre en un espacio de trabajo donde cada idea es
   un bloque propio: se escribe con formato, se reordena arriba y abajo, se marca como importante, se
   añade y se borra. El título y cada bloque cuentan sus caracteres contra el máximo y el botón de
   guardar se bloquea si alguno se pasa. Al guardar se manda el apunte entero y gana el último que
   guarda.
+- **Encabezado H1 ("Título grande") en los apuntes.** El menú de formato de un bloque, con "/" o la
+  barra flotante, ofrece ahora un encabezado principal más grande que el H2 existente.
 - **Ficheros de apunte ilegibles a la vista.** Si un fichero de artefacto guardado no se puede
   decodificar, la barra lateral lista los demás y avisa del que falla con su motivo, en vez de
   quedarse sin barra lateral.
@@ -102,16 +119,25 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   con las preguntas, lo que respondió el alumno, la corrección de cada una con su cita, y el "Esto sí
   lo dije" de las de desarrollo. Un intento cancelado o caducado no se corrige: enseña por qué se
   cerró y, si el examen se interrumpió, cuántas veces y en qué franjas.
+- **Prueba parcial cuando el material no da para tanto.** Si al generar un Control o un Examen el
+  material no sostiene todas las preguntas pedidas para un tema, la prueba se guarda igual con las que
+  sí se pudieron generar y muestra "Se pidieron N preguntas; el contenido permitió M." al terminar, en
+  la lista y al abrir la prueba.
+- **Borrar un Control o un Examen.** Cada prueba de la lista tiene un botón para borrarla; se avisa de
+  que también se pierden sus intentos guardados.
 - **Pruebas de repaso.** Al generar un Control o un Examen, si el perfil del material tiene algo que
   repasar (un tema fallado, uno consultado con pista o uno marcado como importante) se puede elegir
   "De repaso" en vez de "Nuevas": las preguntas se concentran en esos temas y cada una dice por qué
   entró ("porque fallaste este tema", "porque abriste una pista", "porque lo marcaste como
   importante"). Si no hay nada que repasar, el interruptor no se ofrece y en su lugar se explica
   cuándo se activará. En el Examen real el motivo de cada pregunta no se muestra.
-- **Tu progreso en el material.** La pestaña "Pruebas" tiene un bloque desplegable, plegado por
-  defecto, que muestra tema a tema lo que llevas de este material: aciertos, fallos, respuestas sin
-  evaluar o en blanco, pistas abiertas y la marca de "importante", cada señal por separado y sin
-  sumarlas. Es solo lectura y se pone al día al entregar o discrepar un intento.
+- **Tu progreso en el material.** La cabecera del material abre un panel lateral que muestra tema a
+  tema aciertos, fallos, respuestas sin evaluar o en blanco, pistas abiertas y la marca de
+  "importante", cada señal por separado y sin sumarlas. Es solo lectura y se pone al día al entregar
+  o discrepar un intento.
+- **Siguiente paso recomendado.** La cabecera del material propone una acción concreta a partir de
+  señales verificables del material y del perfil, explica el motivo exacto y permite ejecutarla sin
+  convertir aciertos, fallos, pistas o marcas de importante en una puntuación mezclada.
 - **Un fallo al dibujar un panel ya no deja la página en blanco.** Si la lista de materiales, el panel
   del material o el chat fallan al renderizarse, ese panel muestra un aviso con "Reintentar" y
   "Recargar la página" y los otros dos siguen funcionando. El detalle técnico va a la consola del
@@ -125,9 +151,70 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Borrar un material.** Cada material de la barra lateral tiene un botón para borrarlo. Antes de
   hacerlo se avisa de que también se pierden su apunte, sus controles y sus exámenes con sus intentos,
   y de que no se puede deshacer.
+- **Tira de miniaturas en el visor de PDF.** La pestaña PDF tiene una columna izquierda con una
+  miniatura por página; la que se está leyendo se resalta sola, sin clic, según lo que se ve en el
+  lector. Un campo "Página" salta directo a cualquier página, "Ajustar ancho" y un zoom del 75% al
+  150% cambian el tamaño sin volver a pedir la imagen. Ninguna miniatura ni página se pide hasta que
+  está a punto de entrar en pantalla.
+- **Pulsar una cita de un apunte o de una corrección abre el material en la pestaña PDF** y salta
+  directo a la página citada, con un resalte breve. Si la cita no tiene página anclada, lo dice y no
+  navega.
+- **Los tooltips nunca se cortan contra el borde de la ventana.** Aparezcan donde aparezcan (una
+  esquina, un contenedor con scroll, un diálogo), la etiqueta se voltea arriba o abajo y se recoloca
+  para caber entera dentro de la pantalla, y se recalcula si se hace scroll o cambia el tamaño de la
+  ventana.
+- **El panel lateral se puede contraer a un rail.** Un botón lo reduce a una franja de iconos con la
+  marca, la subida o su progreso, un icono por material (con su tooltip y su punto de "preparándose")
+  y el tema; otro lo devuelve a su ancho. La preferencia se recuerda entre recargas. Borrar un
+  material sigue necesitando expandir.
+- **El índice de bloques de un apunte se puede contraer a un rail.** Queda una franja con los bloques
+  numerados y seleccionables (recuadro en los destacados), más añadir bloque y añadir desde una URL.
+  Buscar y borrar necesitan expandir. Contraer no cambia el bloque abierto ni descarta lo que estabas
+  escribiendo.
+- **Symma tiene marca propia y Sym tiene avatar.** Una "S" bicolor identifica a Symma en la barra
+  lateral y en el icono de la pestaña del navegador; un disco con una chispa identifica a Sym en la
+  cabecera del chat, en cada respuesta y en el estado vacío.
+- **La agarradera del separador entre Material y Sym se ve y se puede pulsar.** Arrastrarla
+  redimensiona los dos paneles respetando el mínimo de 420px; pulsarla sin arrastrar (o Enter y
+  Espacio con el foco encima) pliega a Sym a un rail de 56px con un botón para restaurarlo. Una
+  flecha dentro de la píldora marca hacia dónde se pliega. El borrador del chat, el contexto adjunto
+  y una respuesta en curso sobreviven al plegado.
+- **Botón `Plegar todo` / `Desplegar todo` en la cabecera del material.** Pegado al siguiente paso de
+  estudio, pliega o despliega de una vez la barra lateral, Sym y el índice de bloques del apunte
+  abierto; plegar o desplegar una de esas superficies por separado no mueve a las demás.
+- **Fuentes consultadas bajo cada respuesta del tutor.** Cuando Sym lee o visualiza páginas de un
+  material para responder, aparecen debajo como "Fuentes consultadas": el material y las páginas de
+  verdad, con la misma cita navegable de siempre y un aviso si el texto es transcripción del modelo.
+  Se ven en directo mientras responde y siguen ahí al recargar la conversación; una llamada que falla
+  no crea fuente, y no se inventa una cita a partir de lo que el modelo escribe en la respuesta.
+- **Un PDF de ejemplo con el que se puede probar todo.** `enjambres-de-inspeccion.pdf` (`pnpm run
+  fixture:demo`) son seis páginas de un manual técnico inventado de cabo a rabo, con definiciones,
+  clasificaciones, umbrales numéricos y protocolos. Da nueve temas en el mapa mental y suficiente
+  materia para apuntes, Controles y Exámenes, sin subir ningún documento con derechos. El fixture que
+  ya había, `densidad.pdf`, sigue donde estaba: calibra el clasificador de densidad y su texto es una
+  palabra repetida, así que no da ni para una pregunta.
 
 ### Cambiado
 
+- **El límite de tamaño por fichero baja de 25 MB a 10 MB, y se añade un techo de 30 páginas.** El
+  tamaño nunca midió lo que cuesta preparar un material: lo que se paga son las páginas, porque cada
+  página que no lleva texto suficiente hay que renderizarla y pasarla por el modelo. Un PDF de 400
+  páginas escaneadas cabía de sobra en 25 MB y disparaba 400 lecturas. Ahora un PDF demasiado largo se
+  rechaza al momento, diciendo cuántas páginas tiene y cuántas caben, y sin llegar a guardarse; el
+  resto de ficheros de la misma subida siguen su camino. Los 10 MB dejan ocho veces de margen sobre el
+  material de estudio más pesado que se ha probado.
+
+- **Los botones de acción comparten un lenguaje visual.** Guardar, borrar, cancelar, generar, volver,
+  empezar, entregar, aceptar, descartar, subir y reintentar muestran un icono del mismo sistema que el
+  resto de la aplicación, una etiqueta clara, la misma tipografía y estados coherentes de hover,
+  pulsación, foco y deshabilitado. Los selectores de origen de preguntas y modo de examen usan el
+  mismo patrón y distinguen visual y semánticamente la opción activa.
+- **Rediseño visual del escritorio de estudio.** Sidebar, chat, apuntes y pruebas comparten un
+  lenguaje más plano, con menos esquinas redondeadas y más contraste en la interacción. Los apuntes
+  se leen en dos paneles: un índice de bloques a la izquierda y un bloque a la vez a la derecha, con
+  el título, "Guardar", "Borrar" y el estado de guardado agrupados en una sola cabecera. El texto del
+  bloque se lee con más tamaño y más aire entre líneas. La pestaña Pruebas separa Controles, Exámenes
+  de prueba y Exámenes reales en tres grupos con su propio contador.
 - **Las páginas del material se renderizan a un tamaño uniforme** (lado corto 1152 px) en vez de a un
   dpi fijo, así una diapositiva y un A4 pesan parecido y se ven igual de nítidos.
 - **Toda la interfaz habla español.** El chat (cabecera, sugerencias de inicio, botones, mensajes), la
@@ -161,9 +248,61 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Los avisos de límite de frecuencia se leen en lenguaje humano.** Al agotar la ventana corta el
   aviso nombra los minutos que dura; al agotar el tope diario dice que se descanse y se vuelva
   mañana, en vez de hablar en segundos.
+- **El historial de conversaciones ordena primero las que tienen mensajes**, de la más reciente a la
+  más antigua, y deja al final las conversaciones vacías.
+- **Al llegar al máximo de conversaciones, el chat lo avisa antes de escribir.** Una banda sobre el
+  cuadro de texto explica que no se pueden crear más y lo bloquea, en vez de dejar escribir un mensaje
+  que fallaría al enviarse; el historial sigue disponible para borrar alguna y volver a escribir.
+- **El estado vacío del chat presenta a Sym como tutor de tus materiales, apuntes y progreso**, con
+  tres sugerencias que el tutor puede cumplir de verdad, ninguna de ellas crear Controles ni Exámenes.
+  Si todavía no has subido ningún material, lo recuerda con una línea.
+- **El chat de Sym agrupa cada turno en vez de listar mensajes sueltos.** La burbuja del alumno, la
+  actividad del agente y la respuesta (o el fallo) viajan juntas. La actividad aparece resumida y
+  colapsada ("Consultando el material · 2 pasos · Hecho") solo cuando el turno usó alguna
+  herramienta; abierta, cada paso tiene una etiqueta humana ("Leyendo el material") y un segundo
+  nivel con el detalle técnico, con las claves, tokens y bloques largos ya filtrados. El historial de
+  conversaciones deja de ser una columna fija y se abre desde un icono en la cabecera del chat.
+- **La pestaña del navegador dice "Symma"** en vez de "Proxus Tutor".
+- **Al llegar al máximo de 5 materiales desaparece la opción de subir.** Si aún queda una preparación
+  automática en marcha se ve un control de solo progreso; en cuanto termina, desaparece también.
+- **Añadir una nueva selección de ficheros que no cabe con los que ya están en cola se rechaza entera**,
+  explicando cuántos se recibieron, cuántos caben y el máximo de materiales. Los que ya estaban en cola
+  no se tocan.
+- **La respuesta nueva de Sym se revela progresivamente.** El texto de la última respuesta aparece en
+  bloques durante como mucho segundo y medio en vez de salir de golpe; el historial anterior y, si el
+  sistema pide movimiento reducido, también la respuesta nueva, se muestran completos al instante.
+- **Las tres zonas del escritorio se distinguen por su fondo.** La barra lateral y Sym van sobre una
+  superficie y el material sobre otra un escalón por debajo, con una sombra muy tenue en el borde de
+  la barra lateral, en vez de separarse solo con una línea.
+- **El progreso de indexar, generar apuntes, generar una prueba o subir un fichero se ve en una sola
+  línea que avanza**, no en una lista que crece. La línea dice la fase y, cuando hay más de un
+  elemento, el contador (página N de M, tema N de M); si falla, desaparece y queda solo el aviso de
+  error.
+- **Generar un Control o un Examen de prueba abre directamente su solver**, y un Examen real abre su
+  pantalla previa sin crear el intento ni arrancar el reloj, sin tener que ir a buscarlo a la lista.
+  Subir un único PDF sin tener otro material abierto lo deja seleccionado y en la pestaña Mapa en
+  cuanto termina de prepararse; indexar a mano el material que ya tienes abierto hace lo mismo.
+- **La pantalla previa al examen real se rediseña.** Queda centrada y los cuatro avisos (sin pistas,
+  el reloj solo corre dentro, cada salida se registra, el resto de la aplicación queda cerrado) se ven
+  en tarjetas con icono en vez de en una lista de puntos.
 
 ### Corregido
 
+- **Un nombre de fichero largo ya no deforma la interfaz.** Un título sin espacios ni guiones no tiene
+  dónde partirse, y en el panel lateral, en el diálogo de subida y en la barra de "Sym ve" empujaba su
+  caja hasta sacar una barra de scroll horizontal. Ahora se recorta con puntos suspensivos, con el
+  nombre completo disponible al pasar el ratón por encima; en el panel lateral aprovecha antes las dos
+  líneas de la fila.
+- **El tooltip de un botón dentro de un diálogo ya se ve por delante.** Se pintaba por detrás del
+  diálogo, que es justo donde no se puede leer, y su texto se salía de la burbuja cuando llevaba un
+  nombre de fichero dentro.
+- **Borrar el material que tienes abierto ya no rompe la apertura automática del siguiente que
+  subas.** El panel desaparecía y la pantalla quedaba bien, pero por dentro la aplicación seguía
+  creyendo que ese material estaba abierto. Como no abre nada automáticamente cuando ya estás mirando
+  algo, el siguiente PDF que preparabas terminaba su indexado y sus apuntes sin llevarte a su mapa
+  mental, y nada explicaba por qué.
+- **La nota de un intento de examen se redondea a dos decimales.** Antes se enseñaba con todos los
+  decimales del cálculo (p. ej. 7.777777...).
 - **Las insignias de estado se leen en el tema claro.** "Sin indexar", "transcrito por el modelo" y
   las marcas de acierto usaban un color que sobre su fondo claro no llegaba al mínimo de contraste.
 - **La pestaña "Pruebas" ya no se cae por un intento antiguo en disco.** Si un fichero de intento
@@ -186,6 +325,42 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   que ya no existía. Ahora se borran con el resto.
 - **Generar un apunte o una prueba avisa cuando el modelo se corta a media respuesta**, en vez de leerse
   como "el tema no daba para tanto" o entregarse con el bloque incompleto sin decirlo.
+- **El chat conserva los saltos de línea que escribes.** Un mensaje escrito con Shift+Enter en varias
+  líneas se guardaba bien, pero la burbuja del alumno lo enseñaba fundido en una sola línea.
+- **Subir varios PDF a la vez ya no falla en el cuarto o quinto material.** La preparación automática
+  (indexar y generar apuntes tras subir) competía por el mismo cupo de peticiones simultáneas que el
+  chat y las pruebas manuales; ahora queda fuera de ese cupo, como ya pasaba con el límite de
+  frecuencia.
+- **Borrar un material también borra su perfil de estudio**, y su índice y las páginas ya renderizadas
+  cuando ningún otro material conserva el mismo contenido. Antes solo se borraban el PDF y sus
+  artefactos.
+- **El índice ya no crea temas de portadas, separadores o páginas sin contenido de estudio.** Esas
+  páginas quedan sin tema y ya no generan un bloque de apuntes de relleno ("no tiene apenas texto...").
+- **Rechazar la generación de una prueba (rango de preguntas, tope alcanzado, material sin indexar) ya
+  muestra el motivo real** en vez de un mensaje genérico.
+- **Las sugerencias del chat vacío ya no se salen al estrechar el panel de Sym.** Se apilaban según el
+  ancho de la ventana, no el del panel, así que al reducir Sym el texto largo de cada tarjeta
+  desbordaba. Ahora se apilan según el ancho real del panel.
+- **Abrir o cerrar un material ya no vacía la conversación con Sym de la pantalla.** El chat cambiaba
+  de rama del árbol de la interfaz al abrir o cerrar el material, así que se desmontaba y volvía a
+  mostrarse como un borrador en blanco; se notaba, por ejemplo, al pulsar una fuente consultada sin
+  material abierto. Ahora el chat vive siempre en el mismo hueco y solo cambia cómo se pinta.
+- **El número de preguntas de un Control o un Examen ya se puede teclear.** El campo acotaba al mínimo
+  y al máximo en cada tecla, así que escribir "12" pasaba por "1" (que saltaba a 10) y acababa en 30:
+  solo se podía elegir con las flechas. Ahora se escribe libre y se acota al salir del campo.
+- **Arrastrar el separador hasta el extremo ya no deja a Sym por debajo de su mínimo.** El reparto se
+  hacía en porcentaje redondeado del contenedor entero, sin descontar la banda del separador, y en el
+  extremo derecho Sym se quedaba en 417px en vez de los 420px prometidos.
+- **La cabecera del material ya cabe con el panel en su ancho mínimo.** Sus acciones necesitaban más
+  sitio del que había, se comían el título y sacaban una barra de scroll horizontal. Por debajo de
+  470px, "Plegar todo" y "Ver progreso" se quedan en su icono, con el mismo nombre en el tooltip.
+- **El cuadro de escribir a Sym ya no se queda aplastado al volver de la pantalla previa de un examen.**
+  Medía su altura mientras la pantalla todavía no estaba pintada, se quedaba a cero y solo se
+  recuperaba al escribir la primera letra.
+- **Ctrl + rueda sobre el mapa mental ya no amplía también la página del navegador**, y recorrer el
+  mapa con la rueda deja de llenar la consola de avisos.
+- **La página declara que está en español.** El documento se anunciaba como inglés, así que un lector
+  de pantalla pronunciaba toda la interfaz con fonética inglesa.
 
 ### Eliminado
 

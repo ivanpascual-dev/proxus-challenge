@@ -1,18 +1,35 @@
 import { useState } from "react";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { deleteMaterialAction, materialsQuery } from "../domain/materials/atoms.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
-import { UploadDropzone } from "./UploadDropzone.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../lib/error-message.ts";
+import { UploadManager } from "./upload/UploadManager.tsx";
+import { BrandMark } from "./ui/BrandMark.tsx";
+import { Icon } from "./ui/Icon.tsx";
+import { IconButton } from "./ui/IconButton.tsx";
+import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 
 interface SidebarProps {
   readonly selectedMaterialId: string | null;
   readonly onSelectMaterial: (materialId: string) => void;
+  // Plan de correcciones §4.2.8 / C5-13: el estado de contraído lo posee `AppShell` y lo entrega aquí.
+  readonly collapsed: boolean;
+  readonly onToggleCollapsed: () => void;
+  // Sube tal cual lo que reporta `UploadManager` (§11.4, F5-48): el sidebar no decide si se navega,
+  // solo es por dónde pasa el aviso hasta `App`.
+  readonly onMaterialPrepared: (materialId: string) => void;
 }
 
-export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) {
+// Reescrito visualmente (fase 5, §4.2): 224px fijos, sin `details` contenedor ni tarjeta por fila,
+// sin renderizar `materialsQuery` de otra forma. Los apuntes viven dentro de su material (fase 2,
+// decisión 18) y Controles/Exámenes en su pestaña "Pruebas" (fase 3, decisión 15): el sidebar solo
+// lista materiales. El aviso de artefactos ilegibles vive ahora en `SystemNoticeRegion`, no aquí.
+//
+// Plan de correcciones §4.2.8 / C5-13: contraído es un rail de 56px con marca `S`, control de
+// expandir, subida o progreso, un botón de documento por material (con tooltip y estado) y un único
+// control de tema. Borrar un material no se ofrece en el rail (icono destructivo sin contexto): se
+// hace al expandir.
+export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onToggleCollapsed, onMaterialPrepared }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
   const deleteMaterial = useAtomSet(deleteMaterialAction, { mode: "promise" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -34,123 +51,141 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial }: SidebarProps) 
     try {
       await deleteMaterial(materialId);
     } catch (cause) {
-      setDeleteError({ materialId, message: messageOf(cause) });
+      const notice = describeFailure(cause, { area: "materials", action: "delete" }, "Sidebar");
+      setDeleteError({ materialId, message: notice.description ?? notice.title });
     } finally {
       setDeletingId(null);
     }
   };
 
-  return (
-    <aside className="h-screen overflow-y-auto border-border border-r bg-canvas p-5 max-md:h-auto max-md:max-h-[45vh] max-md:border-r-0 max-md:border-b">
-      <div className="mb-8 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-strong font-extrabold text-on-brand">
-            P
-          </div>
-          <div>
-            <strong className="block text-heading">Proxus Tutor</strong>
-            <span className="block text-muted text-sm">Asistente académico</span>
-          </div>
+  if (collapsed) {
+    return (
+      <div className="flex h-screen flex-col items-center gap-2 py-3">
+        <BrandMark size={28} className="shrink-0" />
+        <IconButton icon="chevron-right" label="Expandir el panel lateral" onClick={onToggleCollapsed} />
+        <UploadManager compact onMaterialPrepared={onMaterialPrepared} />
+        <div className="my-1 h-px w-6 shrink-0 bg-border" />
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden">
+          {AsyncResult.matchWithError(materials, {
+            onInitial: () => null,
+            onError: () => <Icon name="warning" size={16} className="text-danger-ink" />,
+            onDefect: () => <Icon name="warning" size={16} className="text-danger-ink" />,
+            onSuccess: ({ value }) => value.materials.map((material) => {
+              const selected = selectedMaterialId === material.id;
+              const indexed = material.indexState === "indexed";
+              return (
+                <span key={material.id} className="relative inline-flex">
+                  <IconButton
+                    icon="notes"
+                    label={indexed ? material.title : `${material.title} (preparándose)`}
+                    pressed={selected}
+                    onClick={() => onSelectMaterial(material.id)}
+                  />
+                  {!indexed && (
+                    <span
+                      className="pointer-events-none absolute top-0.5 right-0.5 size-2 rounded-full bg-warning"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              );
+            })
+          })}
         </div>
-        <ThemeToggle />
+        <ThemeToggle compact />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid h-screen grid-rows-[48px_auto_1fr_auto]">
+      <header className="flex items-center justify-between border-border border-b px-4">
+        <span className="flex items-center gap-2">
+          <BrandMark size={22} className="shrink-0" />
+          <strong className="text-heading">Symma</strong>
+        </span>
+        <IconButton icon="chevron-left" label="Contraer el panel lateral" onClick={onToggleCollapsed} />
+      </header>
+
+      <div className="border-border border-b p-3">
+        <UploadManager onMaterialPrepared={onMaterialPrepared} />
       </div>
 
-      <UploadDropzone />
-
-      <section className="mb-6">
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="font-semibold text-body text-sm uppercase tracking-widest">Materiales</h2>
-        </div>
+      <div className="min-h-0 overflow-y-auto overflow-x-hidden p-2">
         {AsyncResult.matchWithError(materials, {
-          onInitial: () => <p className="text-muted">Cargando materiales…</p>,
-          onError: (error) => <p className="text-danger-ink">{messageOf(error)}</p>,
-          onDefect: (defect) => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
+          onInitial: () => <p className="p-2 text-muted text-sm">Cargando materiales…</p>,
+          onError: (error) => {
+            const notice = describeFailure(error, { area: "materials", action: "list" }, "Sidebar");
+            return <p className="p-2 text-danger-ink text-sm">{notice.title} {notice.description}</p>;
+          },
+          onDefect: () => <p className="p-2 text-danger-ink text-sm">{DEFECT_MESSAGE}</p>,
           onSuccess: ({ value }) => value.materials.length === 0
-            ? <p className="text-muted">Aún no hay PDFs subidos.</p>
+            ? <p className="p-2 text-muted text-sm">Aún no hay PDFs subidos.</p>
             : (
-                <details className="rounded-2xl border border-border bg-surface" open>
-                  <summary className="cursor-pointer px-4 py-3 font-medium text-heading marker:text-brand">
-                    {value.materials.length} {value.materials.length === 1 ? "material" : "materiales"}
-                  </summary>
-                  <ul className="grid gap-2 border-border border-t p-3">
-                    {value.materials.map((material) => (
-                      <li key={material.id} className="relative">
+                <ul className="grid gap-0.5">
+                  {value.materials.map((material) => {
+                    const selected = selectedMaterialId === material.id;
+                    return (
+                      // `min-w-0`: una celda de grid tampoco encoge por debajo de su contenido sin
+                      // esto (mismo `min-width: auto` que en flex), así que el `line-clamp` del
+                      // título de dentro no llegaba a actuar y la fila entera crecía a lo ancho.
+                      <li key={material.id} className="group relative min-w-0">
                         <button
                           type="button"
                           onClick={() => onSelectMaterial(material.id)}
-                          className={`w-full rounded-xl p-3 pr-10 text-left transition hover:border-brand hover:bg-canvas ${
-                            selectedMaterialId === material.id
-                              ? "border border-brand bg-brand-soft"
-                              : "border border-transparent bg-canvas/70"
+                          className={`w-full rounded-sm py-2 pr-8 pl-3 text-left transition ${
+                            selected ? "bg-brand-soft" : "hover:bg-surface-muted"
                           }`}
+                          style={selected ? { boxShadow: "inset 2px 0 0 var(--color-brand)" } : undefined}
                         >
-                          <strong className="block text-heading">{material.title}</strong>
-                          <span className="mt-1 flex items-center gap-2 text-muted text-sm">
-                            <span>{material.pageCount} {material.pageCount === 1 ? "página" : "páginas"}</span>
-                            <span
-                              className={material.indexState === "indexed"
-                                ? "rounded-full bg-success/15 px-2 py-0.5 text-[0.7rem] text-success-ink"
-                                : "rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink"}
-                            >
-                              {material.indexState === "indexed" ? "indexado" : "sin indexar"}
-                            </span>
+                          {/* Un título sin espacios ni guiones no tiene dónde partirse, y
+                              `line-clamp` solo recorta líneas: la palabra desbordaba los 224px del
+                              sidebar y sacaba scroll horizontal. `break-words` la parte solo cuando
+                              no cabe (el texto normal sigue partiéndose por sus espacios), y el
+                              `line-clamp-2` cierra en puntos suspensivos tras aprovechar las dos
+                              líneas. El nombre entero queda en el `title`. */}
+                          {/* Sin `block`: `line-clamp` necesita su propio `display: -webkit-box` y
+                              `block` se lo pisaba, así que el recorte a dos líneas no llegaba a
+                              aplicarse y un título largo crecía hasta cuatro. */}
+                          <span
+                            className="line-clamp-2 break-words text-heading text-sm"
+                            title={material.title}
+                          >
+                            {material.title}
+                          </span>
+                          <span className="mt-1 flex items-center gap-1.5 text-muted text-xs">
+                            <Icon
+                              name={material.indexState === "indexed" ? "check-circle" : "warning"}
+                              size={16}
+                              className={material.indexState === "indexed" ? "text-success-ink" : "text-warning-ink"}
+                            />
+                            {material.pageCount} {material.pageCount === 1 ? "página" : "páginas"}
                           </span>
                         </button>
-                        <button
-                          type="button"
-                          title={`Borrar "${material.title}"`}
-                          aria-label={`Borrar "${material.title}"`}
-                          onClick={() => void onDelete(material.id, material.title)}
-                          disabled={deletingId !== null}
-                          className="absolute top-3 right-3 rounded-full p-1 text-muted transition hover:bg-danger/10 hover:text-danger-ink disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {deletingId === material.id ? "…" : "✕"}
-                        </button>
+                        <div className="absolute top-1.5 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                          <IconButton
+                            icon="trash"
+                            label={`Borrar "${material.title}"`}
+                            onClick={() => void onDelete(material.id, material.title)}
+                            disabled={deletingId !== null}
+                          />
+                        </div>
                         {deleteError !== null && deleteError.materialId === material.id && (
-                          <p className="mt-1 rounded-lg border border-danger/40 bg-danger/10 p-2 text-danger-ink text-xs">
-                            No se pudo borrar: {deleteError.message}
+                          <p className="mt-1 border border-danger/40 bg-danger/10 p-2 text-danger-ink text-xs">
+                            {deleteError.message}
                           </p>
                         )}
                       </li>
-                    ))}
-                  </ul>
-                </details>
+                    );
+                  })}
+                </ul>
               )
         })}
-      </section>
+      </div>
 
-      {/* Los apuntes viven dentro de su material (fase 2, decisión 18) y los Controles y Exámenes en su
-          pestaña "Pruebas" (fase 3, decisión 15): la barra lateral solo lista materiales. Lo único que
-          queda de artefactos aquí es el aviso de ficheros que no se pudieron leer (invariante 3). */}
-      <UnreadableArtifacts />
-    </aside>
+      <footer className="flex items-center justify-center border-border border-t p-2">
+        <ThemeToggle />
+      </footer>
+    </div>
   );
-}
-
-// El aviso de ficheros de artefacto ilegibles no depende del tipo: el servidor los devuelve todos en
-// `unreadable` (fase 2, invariante 3: se nombra el fichero que falla, no se calla).
-function UnreadableArtifacts() {
-  const artifacts = useAtomValue(artifactsQuery);
-
-  return AsyncResult.matchWithError(artifacts, {
-    onInitial: () => null,
-    onError: () => null,
-    onDefect: () => null,
-    onSuccess: ({ value }) => value.unreadable.length === 0
-      ? null
-      : (
-          <div className="mt-3 rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm">
-            <p className="font-semibold text-warning-ink">
-              {value.unreadable.length} {value.unreadable.length === 1 ? "fichero de artefacto no se pudo leer:" : "ficheros de artefacto no se pudieron leer:"}
-            </p>
-            <ul className="mt-1 grid gap-1 text-warning-ink">
-              {value.unreadable.map((file) => (
-                <li key={file.fileName}>
-                  <code>{file.fileName}</code>: {file.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
-  });
 }

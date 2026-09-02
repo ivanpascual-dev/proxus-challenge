@@ -3,6 +3,7 @@ import { Placeholder } from "@tiptap/extensions/placeholder";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { useEffect, useRef } from "react";
+import { Icon } from "../ui/Icon.tsx";
 import { BLOCK_FORMATS } from "./blockFormats.ts";
 import { noteBlockSchemaExtensions } from "./noteBlockSchema.ts";
 import { SlashCommand } from "./SlashCommand.ts";
@@ -166,64 +167,52 @@ export function BlockEditor({ markdown, onChange, placeholder }: BlockEditorProp
   };
 
   return (
-    <div className="rounded-2xl border border-border-strong bg-canvas px-3 py-2 focus-within:border-brand">
-      <BubbleMenu
-        editor={editor}
-        pluginKey="formatMenu"
-        options={{ placement: "top" }}
-        shouldShow={({ editor: instance, from, to }) =>
-          from !== to && !instance.isActive("codeBlock")}
-      >
-        <div className="flex max-w-xs flex-wrap items-center gap-1 rounded-xl border border-border bg-surface p-1 shadow-lg">
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-1 border-border border-b pb-2">
+        {BLOCK_FORMATS.map((format, index) => (
           <FormatButton
-            active={state.isBold}
-            label="Negrita"
-            onClick={() => editor.chain().focus().toggleBold().run()}
+            key={format.title}
+            active={state.activeFormats[index] ?? false}
+            label={format.title}
+            onClick={() => format.apply(editor)}
           >
-            <span className="font-bold">B</span>
+            {format.short}
           </FormatButton>
-          <FormatButton
-            active={state.isItalic}
-            label="Cursiva"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-          >
-            <span className="italic">I</span>
-          </FormatButton>
-          <FormatButton
-            active={state.isLink}
-            label="Enlace"
-            onClick={() => {
-              const previous = editor.getAttributes("link").href as string | undefined;
-              const url = window.prompt("Dirección del enlace", previous ?? "https://");
-              if (url === null) {
-                return;
-              }
-              if (url.trim() === "") {
-                editor.chain().focus().extendMarkRange("link").unsetLink().run();
-                return;
-              }
-              editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
-            }}
-          >
-            🔗
-          </FormatButton>
-          {!state.inTable && (
-            <>
-              <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
-              {BLOCK_FORMATS.map((format, index) => (
-                <FormatButton
-                  key={format.title}
-                  active={state.activeFormats[index] ?? false}
-                  label={format.title}
-                  onClick={() => format.apply(editor)}
-                >
-                  {format.short}
-                </FormatButton>
-              ))}
-            </>
-          )}
-        </div>
-      </BubbleMenu>
+        ))}
+        <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
+        <FormatButton
+          active={state.isBold}
+          label="Negrita"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
+          <span className="font-bold">B</span>
+        </FormatButton>
+        <FormatButton
+          active={state.isItalic}
+          label="Cursiva"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          <span className="italic">I</span>
+        </FormatButton>
+        <FormatButton
+          active={state.isLink}
+          label="Enlace"
+          onClick={() => {
+            const previous = editor.getAttributes("link").href as string | undefined;
+            const url = window.prompt("Dirección del enlace", previous ?? "https://");
+            if (url === null) {
+              return;
+            }
+            if (url.trim() === "") {
+              editor.chain().focus().extendMarkRange("link").unsetLink().run();
+              return;
+            }
+            editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+          }}
+        >
+          <Icon name="link" size={16} />
+        </FormatButton>
+      </div>
 
       <BubbleMenu
         editor={editor}
@@ -232,7 +221,7 @@ export function BlockEditor({ markdown, onChange, placeholder }: BlockEditorProp
         getReferencedVirtualElement={tableAnchor}
         shouldShow={({ editor: instance }) => instance.isActive("table")}
       >
-        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-surface p-1 text-xs shadow-lg">
+        <div className="flex flex-wrap items-center gap-1 border border-border bg-surface p-1 text-xs shadow-lg">
           <span className="px-1 text-muted">Tabla:</span>
           <TableButton label="Añadir fila" onClick={() => editor.chain().focus().addRowAfter().run()}>
             + fila
@@ -276,7 +265,7 @@ function FormatButton({ active, label, onClick, children }: FormatButtonProps) {
       type="button"
       aria-label={label}
       aria-pressed={active}
-      className={`min-w-8 rounded-lg px-2 py-1 text-sm ${
+      className={`min-w-8 px-2 py-1 text-sm ${
         active ? "bg-brand/15 text-brand" : "text-body hover:bg-surface-muted"
       }`}
       onClick={onClick}
@@ -297,7 +286,7 @@ function TableButton({ label, onClick, children }: TableButtonProps) {
     <button
       type="button"
       aria-label={label}
-      className="rounded-lg px-2 py-1 text-body hover:bg-surface-muted"
+      className=" px-2 py-1 text-body hover:bg-surface-muted"
       onClick={onClick}
     >
       {children}

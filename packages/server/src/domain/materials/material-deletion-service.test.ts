@@ -12,6 +12,7 @@ import {
 } from "../artifacts/artifact.ts";
 import { MaterialDeletionService, MaterialDeletionServiceLive } from "./material-deletion-service.ts";
 import { MaterialNotFound, MaterialRepository, type PdfMaterial } from "./material.ts";
+import { StudyProfileRepository, StudyProfileRepositoryError } from "../profile/study-profile.ts";
 
 const material: PdfMaterial = {
   id: "densidad",
@@ -107,14 +108,37 @@ const fakeArtifacts = (store: Artifact[], attempts: ArtifactAttempt[] = []) => L
   })
 );
 
-const run = (materials: Set<string>, artifacts: Artifact[], materialId: string, attempts: ArtifactAttempt[] = []) => Effect.runPromise(
+// Perfil de estudio (`.data/profile/<materialId>.json`, ADR-027): un `Set` con los materiales que
+// tienen perfil guardado. `failing` fuerza `StudyProfileRepositoryError` para el material indicado,
+// para comprobar que un fallo a mitad de la cascada deja el PDF sin borrar (decisión "el PDF se borra
+// al final").
+const fakeProfile = (store: Set<string>, failing: Set<string> = new Set()) => Layer.succeed(
+  StudyProfileRepository,
+  StudyProfileRepository.of({
+    load: () => Effect.die("not used"),
+    save: () => Effect.die("not used"),
+    remove: (materialId) => failing.has(materialId)
+      ? Effect.fail(new StudyProfileRepositoryError({ reason: "disco no disponible" }))
+      : Effect.sync(() => { store.delete(materialId); })
+  })
+);
+
+const run = (
+  materials: Set<string>,
+  artifacts: Artifact[],
+  materialId: string,
+  attempts: ArtifactAttempt[] = [],
+  profiles: Set<string> = new Set([materialId]),
+  failingProfiles: Set<string> = new Set()
+) => Effect.runPromise(
   Effect.gen(function* () {
     const service = yield* MaterialDeletionService;
     return yield* service.remove(materialId);
   }).pipe(
     Effect.provide(MaterialDeletionServiceLive.pipe(
       Layer.provide(fakeMaterials(materials)),
-      Layer.provide(fakeArtifacts(artifacts, attempts))
+      Layer.provide(fakeArtifacts(artifacts, attempts)),
+      Layer.provide(fakeProfile(profiles, failingProfiles))
     ))
   )
 );
@@ -162,4 +186,26 @@ test("MaterialNotFound si el material no existe, sin tocar artefactos de otros",
     (error: unknown) => (error as { _tag?: string })._tag === "MaterialNotFound"
   );
   assert.deepEqual(artifacts.map((artifact) => artifact.id), ["note-other"]);
+});
+
+test("borra también el perfil de estudio, sin tocar el de otro material (ADR-027)", async () => {
+  const materials = new Set([material.id, otherMaterial.id]);
+  const profiles = new Set([material.id, otherMaterial.id]);
+
+  await run(materials, [], material.id, [], profiles);
+
+  assert.equal(profiles.has(material.id), false);
+  assert.equal(profiles.has(otherMaterial.id), true);
+});
+
+test("un fallo al borrar el perfil deja el PDF sin borrar (el PDF se borra al final)", async () => {
+  const materials = new Set([material.id]);
+  const profiles = new Set([material.id]);
+  const failingProfiles = new Set([material.id]);
+
+  await assert.rejects(
+    run(materials, [], material.id, [], profiles, failingProfiles),
+    (error: unknown) => (error as { _tag?: string })._tag === "MaterialDeletionError"
+  );
+  assert.equal(materials.has(material.id), true);
 });

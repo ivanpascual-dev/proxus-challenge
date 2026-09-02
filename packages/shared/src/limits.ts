@@ -13,8 +13,20 @@ export const LIMITS = {
   // 2026-08-31).
   maxConversationHistoryTokens: 80_000,
   maxBlockCharacters: 5_000,
-  maxUploadBytes: 25 * 1024 * 1024,
+  // Fusible barato de entrada: rechaza sin gastar `pdfinfo`. Bajado de 25 MB a 10 MB al cerrar la
+  // fase 5, medido contra el material real de estudio (0,39 a 1,22 MB, de 51 a 89 KB por página):
+  // 10 MB deja ocho veces de margen sobre el más pesado y sigue admitiendo un escaneado corto a
+  // 300 dpi. No bajar de aquí sin volver a medir. Ojo: los megabytes NO miden lo que cuesta indexar
+  // (eso lo miden las páginas por debajo del umbral de densidad, que se renderizan y van al
+  // modelo); quien pone ese techo es `maxPagesPerMaterial`.
+  maxUploadBytes: 10 * 1024 * 1024,
   maxMaterials: 5,
+  // Techo de páginas de un material, comprobado con `pdfinfo` antes de escribir nada. Es el límite
+  // que de verdad acota el coste: cada página que no llega a `textDensityThreshold` se renderiza y
+  // se transcribe con el modelo, así que un PDF escaneado cuesta una llamada de visión por página.
+  // Sin esto, un fichero de 9 MB con 400 páginas escaneadas pasaba las dos puertas de tamaño y
+  // lanzaba 400 llamadas. 30 deja el doble de margen sobre el material más largo medido (14).
+  maxPagesPerMaterial: 30,
   maxFilesPerUpload: 5,
   // El máximo simultáneo que la interfaz puede mostrar hoy: un material, el artefacto de su pestaña
   // activa (apunte o prueba) y un bloque resaltado dentro de él (`MaterialPanel.tsx`, pestañas
@@ -22,6 +34,10 @@ export const LIMITS = {
   maxContextRefs: 3,
   maxConversations: 50,
   maxConversationTitleCharacters: 80,
+  // Fase 5, §5.4: techo visual del segundo nivel (técnico) de la actividad del agente. No recorta lo
+  // persistido (`AgentMessage.result` sigue completo en `Conversation.messages`), solo lo que se
+  // pinta: sin este techo, un resultado con páginas en base64 podría volcar megabytes al DOM.
+  maxActivityDetailCharacters: 4_000,
   followUpQuestions: 3,
   // Medido sobre la conversación real de cierre de fase 4: preguntas específicas y útiles llegaron
   // a 125 y 165 caracteres. 120 las descartaba aunque el prompt nunca había comunicado ese techo.
@@ -42,9 +58,14 @@ export const LIMITS = {
   // materiales hay vivos a la vez.
   uploadsPerWindow: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },
   maxConcurrentRequests: 3,
-  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` en su primer indexado y su
-  // primera generación de apuntes, porque subir ya se cobró contra `uploadsPerWindow` (fase 4, decisión 4).
-  uploadGraceMs: 10 * 60 * 1000,
+  // Gracia de alta: un material recién subido no cobra el cubo `artifacts` ni el permiso de
+  // concurrencia en su primer indexado y su primera generación de apuntes, porque subir ya se cobró
+  // contra `uploadsPerWindow` (fase 4, decisión 4; correcciones de cierre de fase 5, ADR-028).
+  // La ventana se concede UNA vez, en la subida, y nunca se renueva (ADR-028, enmienda): tiene que
+  // cubrir subir + indexar los cinco en paralelo + arrancar el último apunte. La generación de
+  // apuntes la revoca al terminar, así que en el flujo normal muere antes; este número es el techo
+  // de seguridad si algo se cuelga.
+  uploadGraceMs: 20 * 60 * 1000,
 
   // Pruebas (fase 3)
   // Cuántas preguntas: lo elige el alumno dentro de su rango. El reparto por tipo lo pone el código.
@@ -91,6 +112,10 @@ export const LIMITS = {
   maxTopicsPerMaterial: 40,
   maxTopicsPerPage: 3,
   maxIndexedCharactersPerPage: 8_000,
+  // Caracteres no blancos mínimos entre las páginas de un tema para que merezca existir como unidad
+  // de estudio (correcciones de cierre de fase 5, C5-04): red de seguridad determinista contra
+  // portadas, separadores y cierres que el modelo etiqueta como tema pese a la regla del prompt.
+  minTopicSourceCharacters: 60,
 
   // Modelo
   modelTemperature: 0.2, // baja y fija: respuesta reproducible y JSON de indexación estable (ADR-008, capa 4)

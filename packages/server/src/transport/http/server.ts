@@ -5,6 +5,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
 import {
+  AssessmentGenerationRejected,
   AssessmentGenerationStreamEvent,
   ExamInProgress,
   GenerateAssessmentInput,
@@ -75,6 +76,7 @@ const encodeNdjson = (event: TutorChatStreamEvent) =>
 const encodeLimitExceeded = Schema.encodeSync(LimitExceeded);
 const encodeRateLimited = Schema.encodeSync(RateLimited);
 const encodeExamInProgress = Schema.encodeSync(ExamInProgress);
+const encodeAssessmentGenerationRejected = Schema.encodeSync(AssessmentGenerationRejected);
 
 // La puerta cerrada del examen (decisión 18) para las rutas NDJSON sueltas: no pasan por `HttpApi`,
 // así que el middleware `ExamLockdownGuard` no las cubre y comprueban a mano. Sale como JSON con
@@ -93,7 +95,9 @@ const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
 
     // F4-11/F4-12: la sesión vive en el servidor, así que un cliente no puede mandar historial
     // fabricado. `onExcessProperty: "error"` es lo que convierte un campo no declarado (por ejemplo
-    // `messages`) en un 400, en vez de decodificar en silencio ignorándolo (invariante 3).
+    // `messages`) en un 400, en vez de decodificar en silencio ignorándolo (invariante 3). La opción
+    // vive en el propio `TutorChatRequest` para que valga también en el endpoint `chat` de `HttpApi`,
+    // que decodifica sin opciones; aquí se repite porque esta llamada es la que se lee al auditar.
     const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest, { onExcessProperty: "error" });
 
     const limitExceeded = checkChatRequestLimits(input);
@@ -198,6 +202,10 @@ const MaterialIndexStreamRoute = HttpRouter.add("POST", "/api/materials/:id/inde
     const body = events.pipe(
       Stream.provideService(LanguageModel.LanguageModel, languageModel),
       Stream.map(encodeIndexNdjson)
+      // La gracia NO se renueva aquí (ADR-028, enmienda tras la auditoría de guardarraíles): renovarla
+      // sin tope la hacía inmortal mientras un cliente siguiera reindexando, y eso saltaba el cubo
+      // `messages` indefinidamente. Ahora la ventana se concede una sola vez en la subida y se
+      // dimensiona (`uploadGraceMs`) para cubrir indexado y arranque de apuntes sin renovar.
     );
 
     return HttpServerResponse.stream(body, {
@@ -237,12 +245,13 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const key = yield* clientKey;
     // Genera un artefacto y hace una llamada al modelo por tema: cuenta contra el cubo `artifacts`
     // (más estricto que `messages`) y toma un permiso de concurrencia, igual que el chat, porque es
-    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (fase 4, decisión 4)
-    // salta el cubo, no la concurrencia, cuando es la primera generación de apuntes de un material
+    // caro y no debe poder lanzarse en paralelo sin tope. La gracia de alta (ADR-028) exime de las DOS
+    // barreras, no solo del cubo de frecuencia, cuando es la preparación automática de un material
     // recién subido: ya se cobró al decidir subir.
     const hasGrace = yield* rateLimiter.hasUploadGrace(id);
+    const usesConcurrencyPermit = !hasGrace;
     const rejected = yield* (hasGrace ? Effect.void : rateLimiter.check(key, "artifacts")).pipe(
-      Effect.andThen(() => rateLimiter.acquire(key)),
+      Effect.andThen(() => usesConcurrencyPermit ? rateLimiter.acquire(key) : Effect.void),
       Effect.as(Option.none<RateLimited>()),
       Effect.catchTag("RateLimited", (error) => Effect.succeed(Option.some(error)))
     );
@@ -259,7 +268,12 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
       Effect.catchTag("NoteGenerationError", () => Effect.succeed(Option.none<string>()))
     );
     if (Option.isSome(existingNote)) {
-      yield* rateLimiter.release(key);
+      if (usesConcurrencyPermit) {
+        yield* rateLimiter.release(key);
+      }
+      if (hasGrace) {
+        yield* rateLimiter.revokeUploadGrace(id);
+      }
       return yield* HttpServerResponse.json(
         encodeNoteAlreadyExists(new NoteAlreadyExists({
           materialId: id,
@@ -296,7 +310,16 @@ const NoteGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/notes", (
     const body = events.pipe(
       Stream.provideService(LanguageModel.LanguageModel, languageModel),
       Stream.map(encodeNoteGenNdjson),
-      Stream.ensuring(rateLimiter.release(key))
+      // Libera el permiso de concurrencia si lo tomó, y revoca la gracia si la tenía (ADR-028), en
+      // éxito y en fallo: la gracia no debe seguir viva más allá de esta preparación automática.
+      Stream.ensuring(Effect.gen(function* () {
+        if (usesConcurrencyPermit) {
+          yield* rateLimiter.release(key);
+        }
+        if (hasGrace) {
+          yield* rateLimiter.revokeUploadGrace(id);
+        }
+      }))
     );
 
     return HttpServerResponse.stream(body, {
@@ -333,7 +356,9 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
     );
     if (request === null) {
       return yield* HttpServerResponse.json(
-        { message: "El cuerpo de la petición no tiene el formato esperado (kind, topicId, origin, questionCount)." },
+        encodeAssessmentGenerationRejected(new AssessmentGenerationRejected({
+          message: "El cuerpo de la petición no tiene el formato esperado (kind, topicId, origin, questionCount)."
+        })),
         { status: 400 }
       );
     }
@@ -354,11 +379,15 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
     const assessmentGen = yield* AssessmentGenerationService;
 
     // Precondiciones comprobadas ANTES de abrir el stream (§6.9): material inexistente, sin indexar,
-    // techo de pruebas. Salen como JSON con `message`, no como un `failed` a mitad.
+    // techo de pruebas. Salen como JSON con `_tag` reconocido (`AssessmentGenerationRejected`), no como
+    // un `failed` a mitad: así la interfaz conserva el motivo exacto en vez de caer al genérico.
     const rejection = yield* assessmentGen.precheck(id, request);
     if (Option.isSome(rejection)) {
       yield* rateLimiter.release(key);
-      return yield* HttpServerResponse.json({ message: rejection.value.message }, { status: rejection.value.status });
+      return yield* HttpServerResponse.json(
+        encodeAssessmentGenerationRejected(new AssessmentGenerationRejected({ message: rejection.value.message })),
+        { status: rejection.value.status }
+      );
     }
 
     // La capa elegida según `request.kind` (§4.2): Examen lleva el pensamiento decidido en el tramo
@@ -378,6 +407,7 @@ const AssessmentGenerationRoute = HttpRouter.add("POST", "/api/materials/:id/ass
             type: "done" as const,
             assessment: summarizeAssessment(result.artifact),
             questionCount: result.questionCount,
+            requestedQuestionCount: request.questionCount,
             retries: result.retries
           }).pipe(Effect.asVoid),
           onFailure: (error) => Queue.offer(queue, {

@@ -2,6 +2,8 @@ import { Console, Context, Data, Effect, Layer, Ref, Schema } from "effect";
 import { ChatContextRef, LIMITS, type StudyProfile } from "@proxus/shared";
 import { GeminiModel } from "../../gemini.ts";
 import { AgentSession, renderScreenContext } from "../../harness/index.ts";
+import { resolveScreenContext } from "../screen-context-resolver.ts";
+import { noopTurnSourceRecorder } from "../turn-sources.ts";
 import { type AgentMessage } from "../../harness/message.ts";
 import { makeAcademicTutorHarness } from "../../academic-tutor.ts";
 import {
@@ -560,7 +562,7 @@ const dataset = TutorBehaviourEvalDataset.make({
       input: "¿Qué dice este material sobre las derivadas?",
       expected: { mustNotClaimAuthoring: true, mustNotRelistMaterials: true },
       materials: [calculo],
-      context: [{ type: "material", materialId: "calculo", title: "Cálculo I" }],
+      context: [{ type: "material", materialId: "calculo", title: "Cálculo I", surface: "pdf" }],
       maxSteps: 6
     }
   ]
@@ -586,12 +588,20 @@ const runEvalCase = (
   const studyProfileService = yield* StudyProfileService;
   const budgetRef = yield* Ref.make(initialTurnBudgetState);
   const rateLimiter = yield* makeRateLimiter();
-  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval");
+  // El eval mide comportamiento del tutor, no la procedencia del chat: registra las fuentes en el
+  // vacío (§5.3), igual que el CLI de demostración.
+  const sources = yield* noopTurnSourceRecorder;
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository, studyProfileService, budgetRef, rateLimiter, "eval", sources);
   const session = AgentSession.make(harness);
 
-  // Mismo ensamblado que `tutor-chat-service.ts`: el contexto de pantalla viaja al final del mensaje
-  // del usuario, nunca en el system prompt (decisión 11).
-  const screenContext = testCase.context === undefined ? undefined : renderScreenContext(testCase.context);
+  // Mismo ensamblado que `tutor-chat-service.ts`: el contexto de pantalla se resuelve contra los
+  // repositorios reales (fase 5, §5.2) y viaja al final del mensaje del usuario, nunca en el system
+  // prompt (decisión 11). Un caso con un contexto que no existe falla el eval en voz alta, que es lo
+  // que le pasaría a una petición de verdad.
+  const resolvedContext = testCase.context === undefined
+    ? []
+    : yield* resolveScreenContext(testCase.context, materialRepository, artifactRepository);
+  const screenContext = renderScreenContext(resolvedContext);
   const turnInput = screenContext === undefined ? testCase.input : `${testCase.input}\n\n${screenContext}`;
 
   const result = yield* session.run({

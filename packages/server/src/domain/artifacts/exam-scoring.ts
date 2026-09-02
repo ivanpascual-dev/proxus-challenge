@@ -32,13 +32,16 @@ export const penalty = (
   return wrongSingleChoice / 3 + wrongTrueFalse;
 };
 
-// Escala a 10 con suelo en 0. La penalización ya viene calculada (0 en práctica).
+// Escala a 10 con suelo en 0. La penalización ya viene calculada (0 en práctica). Es la NOTA
+// MOSTRADA (no entra en el perfil, ver el comentario de cabecera), así que se redondea aquí a dos
+// decimales como mucho: nadie más la vuelve a leer para hacer cuentas.
 export const displayedScore = (rawScore: number, penaltyPoints: number, maxScore: number): number => {
   if (maxScore <= 0) {
     return 0;
   }
   const scaled = ((rawScore - penaltyPoints) / maxScore) * 10;
-  return Math.min(10, Math.max(0, scaled));
+  const clamped = Math.min(10, Math.max(0, scaled));
+  return Math.round(clamped * 100) / 100;
 };
 
 // El tiempo del examen lo deriva el código del reparto de preguntas (decisión 17): un presupuesto por

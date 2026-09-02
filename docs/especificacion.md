@@ -62,8 +62,9 @@ domicilio.
   la última página servida y el total pedido.
 - **F1-07.** CUANDO un cliente supere una ventana de frecuencia, EL sistema DEBERÁ responder 429
   indicando cuánto falta para poder reintentar.
-- **F1-08.** MIENTRAS un cliente tenga `maxConcurrentRequests` peticiones en vuelo, EL sistema DEBERÁ
-  rechazar la siguiente con 429 en vez de encolarla.
+- **F1-08.** MIENTRAS un cliente tenga `maxConcurrentRequests` peticiones ordinarias en vuelo, EL
+  sistema DEBERÁ rechazar la siguiente con 429 en vez de encolarla; la preparación automática de un
+  material recién subido queda fuera de este contador según C5-02.
 - **F1-09.** EL sistema DEBERÁ declarar en `packages/shared/src/limits.ts` todo techo que aplique, y la
   interfaz DEBERÁ leer de ahí el contador de caracteres del mensaje, sin repetir la cifra.
 
@@ -82,8 +83,9 @@ domicilio.
   modo que un contenido modificado NO DEBERÁ encontrar índice, y un mismo contenido renombrado o con
   otra fecha de modificación SÍ DEBERÁ encontrar el suyo sin reindexar.
 - **F1-15.** CUANDO termine de indexarse un material, EL sistema DEBERÁ producir su lista de temas, como
-  mucho `maxTopicsPerMaterial`, organizados en una jerarquía de como mucho dos niveles, asignar al menos
-  un tema a cada página con contenido, y NO DEBERÁ traducir el vocabulario del material al nombrarlos.
+  mucho `maxTopicsPerMaterial`, organizados en una jerarquía de como mucho dos niveles, y NO DEBERÁ
+  traducir el vocabulario del material al nombrarlos; las páginas que no formen una unidad de estudio
+  podrán quedar sin tema según C5-04.
 - **F1-16.** MIENTRAS un material no esté indexado, EL sistema DEBERÁ decirlo explícitamente en la
   interfaz y en la respuesta del comando, y NO DEBERÁ devolver un índice vacío como si lo estuviera.
 
@@ -286,10 +288,10 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
 - **F3-08.** SI una pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema DEBERÁ
   descartarla y registrar el motivo en el log del servidor (diagnóstico para quien desarrolla, no cara
   al alumno), y NO DEBERÁ completarla adivinando ningún campo.
-- **F3-09.** El reparto es todo o nada (F3-10): CUANDO una prueba termine de generarse con éxito, las
-  preguntas guardadas DEBERÁN ser exactamente las pedidas. SI un tema no da para completar su parte del
-  reparto tras los reintentos (`maxGenerationRetriesPerTopic`), ENTONCES la generación entera DEBERÁ
-  fallar nombrando el tema y cuántas de las pedidas no se pudieron sacar.
+- **F3-09.** CUANDO una prueba termine de generarse, las preguntas guardadas DEBERÁN ser todas las
+  preguntas válidas que sostenga el material hasta el número pedido. SI el material declara que no da
+  para completar el reparto, ENTONCES el sistema DEBERÁ guardar una prueba parcial según C5-05; un fallo
+  de formato, red o truncado seguirá fallando según C5-06.
 - **F3-10.** SI no sobrevive ninguna pregunta, ENTONCES EL sistema DEBERÁ fallar la generación con su
   motivo, y NO DEBERÁ guardar una prueba sin preguntas.
 
@@ -431,17 +433,18 @@ mayúsculas son claves de `packages/shared/src/limits.ts`, que es su único domi
   EL sistema DEBERÁ marcar esa pregunta como sin evaluar con motivo de discrepancia, DEBERÁ retirar su
   aportación al perfil, y NO DEBERÁ contarla como acertada ni cambiar la nota mostrada del intento.
 
-#### La prueba sale completa o no sale
+#### La prueba no inventa para completar
 
-- **F3-44.** CUANDO el alumno pida una prueba de N preguntas, EL sistema DEBERÁ entregarla con
-  exactamente N preguntas, o DEBERÁ fallar la generación con su motivo sin guardar nada; NO DEBERÁ
-  entregar nunca una prueba con menos preguntas de las pedidas.
+- **F3-44.** CUANDO el alumno pida una prueba de N preguntas, EL sistema DEBERÁ intentar generar N y,
+  SI el contenido solo permite M preguntas válidas con `0 < M < N`, ENTONCES DEBERÁ guardar esas M e
+  indicar de forma persistente N y M según C5-05; NO DEBERÁ inventar preguntas para alcanzar N.
 - **F3-45.** SI alguna pregunta devuelta por el modelo no se puede decodificar, ENTONCES EL sistema
   DEBERÁ volver a pedir solo las que faltan hasta `maxGenerationRetriesPerTopic` veces antes de fallar,
   y NO DEBERÁ completar ninguna adivinando ningún campo.
 - **F3-46.** SI el modelo responde que el material no da para las preguntas pedidas, ENTONCES EL sistema
-  DEBERÁ fallar nombrando cuántas sí daba el tema, NO DEBERÁ reintentar, y NO DEBERÁ generar preguntas
-  que el material no sostenga.
+  DEBERÁ conservar las preguntas válidas que sí devolvió, dejar de pedir las que faltan de ese tema y
+  NO DEBERÁ generar preguntas que el material no sostenga; SI no sobrevive ninguna pregunta en toda la
+  prueba, ENTONCES la generación DEBERÁ fallar sin guardar.
 - **F3-47.** TODA pregunta de opción única y de varias respuestas correctas DEBERÁ tener exactamente
   cuatro opciones, y sus identificadores los DEBERÁ asignar el código por posición: EL sistema NO DEBERÁ
   aceptar del modelo ningún identificador de opción, de criterio ni de pregunta.
@@ -462,6 +465,11 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
 - **F4-03.** CUANDO una subida contenga más de `maxFilesPerUpload` ficheros, o un fichero de más de
   `maxUploadBytes`, EL sistema DEBERÁ rechazarla nombrando el techo y lo recibido, antes de escribir
   nada en disco.
+- **F4-03b.** CUANDO un fichero subido tenga más de `maxPagesPerMaterial` páginas, EL sistema DEBERÁ
+  rechazar ESE fichero nombrando el techo y las páginas que tiene, antes de escribir nada en disco, y
+  DEBERÁ seguir procesando los demás ficheros de esa misma subida. El techo se comprueba sobre el
+  número de páginas real que reporta `pdfinfo`, nunca sobre el tamaño del fichero: lo que cuesta
+  indexar son las páginas por debajo del umbral de densidad, que se renderizan y van al modelo.
 - **F4-04.** CUANDO una subida haría pasar el total de materiales de `maxMaterials`, EL sistema DEBERÁ
   rechazarla nombrando cuántos materiales caben y cuántos hay.
 - **F4-05.** SI el nombre de un fichero subido coincide con el de un material existente, ENTONCES EL
@@ -604,9 +612,317 @@ Las cifras en mayúsculas son claves de `packages/shared/src/limits.ts`, que es 
   ENTONCES EL sistema DEBERÁ rechazar el turno siguiente antes de llamar al modelo, nombrando el techo
   y sugiriendo empezar una conversación nueva.
 
-### Fase 5 · Pulido y prueba
+### Fase 5 · El escritorio de estudio
 
-_Pendiente._
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/fase5-el-escritorio-de-estudio.md`](../notes/plans/fase5-el-escritorio-de-estudio.md).
+Cada criterio lleva su prioridad de entrega (P0 a P3, definidas en ese plan) junto al identificador. Un
+criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesión que lo cubre.
+
+#### Escritorio y layout
+
+- **F5-01 · P0.** MIENTRAS no haya material seleccionado, sea el estado inicial o tras cerrar el
+  material abierto, EL sistema DEBERÁ mostrar Sym ocupando todo el espacio restante tras el sidebar,
+  sin reservar espacio a un material vacío; el sidebar medirá 224px expandido y podrá contraerse según
+  C5-13.
+- **F5-02 · P0.** CUANDO la persona seleccione un material, EL sistema DEBERÁ mostrar el split
+  Material/Sym con Material al 58% y Sym al 42% del espacio restante tras el sidebar.
+- **F5-03 · P0.** MIENTRAS la persona arrastre el separador Material/Sym, EL sistema DEBERÁ mantener
+  cada panel en al menos 420px y NO DEBERÁ colapsar ninguno a cero; cerrar el material DEBERÁ ser una
+  acción explícita, distinta de arrastrar el separador a un extremo.
+- **F5-04 · P0.** CUANDO la persona cambie la proporción del split, EL sistema DEBERÁ recordar solo esa
+  proporción en almacenamiento local y aplicarla la próxima vez que haya material seleccionado, sin
+  persistir contexto, perfil ni contenido educativo.
+- **F5-05 · `descartado` (2026-09-02).** CUANDO el viewport esté entre 768px y 1179px, EL sistema DEBERÁ
+  mostrar una sola superficie (Material o Sym) a la vez, con un control en cabecera para alternar entre
+  ellas.
+- **F5-06 · `descartado` (2026-09-02).** CUANDO el viewport sea menor de 768px, EL sistema DEBERÁ
+  presentar el sidebar como un drawer modal con foco atrapado, que se cierra con Escape o al seleccionar
+  un material.
+
+> F5-05 y F5-06 quedan **descartados**, no diferidos: decisión de Iván del 2026-09-02, el reto se
+> entrega para escritorio. No se implementan, no se prueban y no se afirman en el CHANGELOG. Se
+> conservan escritos para que el hueco sea visible.
+
+#### Sidebar, subida y avisos globales
+
+- **F5-07 · P0.** EL sidebar DEBERÁ listar únicamente materiales y controles globales (subida, avisos de
+  estado, selector de tema), y NO DEBERÁ mostrar apuntes, controles ni exámenes en su listado.
+- **F5-08 · P0.** CUANDO la persona elija o suelte varios ficheros en la subida, EL sistema DEBERÁ
+  comprobar cada uno sin escribir en disco, permitir retirar cualquiera antes de confirmar y NO DEBERÁ
+  habilitar la subida mientras quede alguno en comprobación o rechazado; cerrar el diálogo de subida NO
+  DEBERÁ interrumpir una cadena de subida, indexado o apuntes ya iniciada, y reabrirlo DEBERÁ mostrar la
+  misma cola con su progreso.
+- **F5-09 · P0.** EL sistema DEBERÁ mostrar los avisos de artefacto ilegible como aviso global fuera del
+  sidebar de materiales, y NO DEBERÁ mostrar en él la razón cruda del fallo.
+
+#### Chat de Sym
+
+- **F5-10 · P0.** CUANDO la persona pulse Enter sin Shift en el composer y no esté componiendo con IME,
+  EL sistema DEBERÁ enviar el mensaje; Shift+Enter DEBERÁ insertar un salto de línea sin enviar.
+- **F5-11 · P0.** MIENTRAS la persona escriba en el composer, EL sistema DEBERÁ ajustar su altura
+  automáticamente hasta seis líneas y, a partir de ahí, DEBERÁ usar scroll interno propio, sin permitir
+  redimensionado manual.
+- **F5-12 · P0.** EL sistema DEBERÁ renderizar la respuesta de Sym en Markdown, y SOLO las tablas y los
+  bloques de código DEBERÁN tener scroll horizontal propio; el texto normal NO DEBERÁ crear scroll
+  anidado.
+- **F5-13 · P0.** EL mensaje del alumno DEBERÁ mostrarse en una superficie tenue de ancho máximo 72% sin
+  etiqueta de autor, y la respuesta de Sym DEBERÁ mostrarse sobre el lienzo sin tarjeta, con ancho
+  máximo de 760px.
+
+#### Actividad del agente
+
+- **F5-14 · P0.** EL sistema DEBERÁ agrupar la actividad de herramientas por turno y presentarla,
+  cerrada, como un resumen humano (verbo, contador, estado), y NO DEBERÁ mostrar JSON crudo en ese
+  nivel.
+- **F5-15 · P0.** CUANDO la persona despliegue un turno, EL sistema DEBERÁ listar sus llamadas y
+  resultados en el orden persistido, emparejando cada `tool-call` con el siguiente `tool-result`
+  pendiente, y DEBERÁ mostrar `No hay resultado disponible` cuando la secuencia esté incompleta, sin
+  inventar un resultado.
+- **F5-16 · P0.** SI una herramienta falla dentro de un turno, ENTONCES EL sistema DEBERÁ conservar ese
+  estado de fallo al recargar la conversación, y NO DEBERÁ pintarlo como éxito.
+
+#### Contexto adjunto
+
+- **F5-17 · P3.** CUANDO la persona adjunte contexto desde una acción de la interfaz (material, página,
+  apunte, bloque, prueba), EL sistema DEBERÁ mostrarlo como chip visible y retirable antes de enviar, y
+  NO DEBERÁ enviarlo al servidor hasta que la persona envíe el mensaje.
+- **F5-18 · P3.** SI la persona retira un chip de contexto antes de enviar, ENTONCES EL sistema NO
+  DEBERÁ incluir esa referencia en la petición.
+
+> F5-17 nombraba también el **tema** como origen. `Preguntar a Sym` desde un tema del mapa nunca se
+> construyó (era acabado de §4.10 del plan de fase 5, no entró en P1 ni en P2) y §5.2 no define ninguna
+> referencia que describa un tema, así que el origen sale del criterio en vez de quedarse como una
+> promesa que ninguna prueba puede recorrer. El hueco se conserva escrito en `NOTES.md`; reabrirlo pide
+> decidir antes qué referencia describe un tema. El criterio queda verificado a mano por Iván el
+> 2026-09-02 adjuntando la página desde el PDF.
+
+#### PDF y citas
+
+- **F5-19 · P1.** CUANDO la persona abra un material, EL sistema DEBERÁ mostrar una tira de miniaturas
+  que cargue cada una solo al entrar en su viewport, con la página activa resaltada y sincronizada con
+  el lector.
+- **F5-20 · P1.** CUANDO la persona pulse una cita de apunte o de corrección, EL sistema DEBERÁ cambiar
+  a PDF, navegar a la primera página citada y resaltarla; SI la cita no tiene ancla, ENTONCES DEBERÁ
+  mostrar el motivo y NO DEBERÁ navegar.
+- **F5-21 · P1.** EL sistema NO DEBERÁ generar una petición de página o miniatura por cada página del
+  material al abrirlo: solo por las próximas al viewport.
+
+#### Mapa mental
+
+- **F5-22 · P2.** MIENTRAS la persona arrastre el fondo del mapa, EL sistema DEBERÁ desplazar el lienzo
+  (pan), y la rueda con ctrl o gesto de zoom DEBERÁ aplicar zoom anclado al cursor, sin scroll de
+  documento para recorrer el grafo; CUANDO el mapa tenga el foco y la persona pulse Ctrl+`+`,
+  Ctrl+`-` o Ctrl+`0`, ENTONCES EL sistema DEBERÁ ampliar, reducir o encuadrar el mapa y DEBERÁ impedir
+  el zoom global del navegador, que seguirá disponible cuando el foco esté fuera del mapa.
+- **F5-23 · P2.** CUANDO la persona active un nodo con Enter o Espacio, EL sistema DEBERÁ abrir
+  `TopicActionsPopover`, y Escape DEBERÁ cerrarlo devolviendo el foco al nodo.
+- **F5-24 · P2.** CUANDO la persona pulse doble clic en el fondo o el control de centrar, EL sistema
+  DEBERÁ ajustar la vista para encuadrar el grafo completo con margen, dentro del rango de zoom
+  permitido.
+
+#### Apuntes
+
+- **F5-25 · P1.** EL sistema DEBERÁ mantener montado como mucho un editor TipTap a la vez en Apuntes,
+  correspondiente al bloque seleccionado.
+- **F5-26 · P1.** CUANDO la persona cambie de bloque seleccionado sin guardar, EL sistema DEBERÁ
+  conservar el borrador global sin llamar a la API de guardado, y DEBERÁ indicar `Cambios sin guardar`.
+- **F5-27 · P1.** CUANDO la persona abra el bloque de apuntes desde un tema del mapa, EL sistema DEBERÁ
+  seleccionar el bloque con mayor solape de páginas con ese tema mediante `findBlockForTopic`; SI no
+  existe ningún bloque con solape, ENTONCES DEBERÁ abrir Apuntes y mostrar un aviso explícito de que no
+  hay bloque vinculado.
+
+#### Pruebas
+
+- **F5-28 · P1.** EL sistema DEBERÁ presentar Controles, Exámenes de prueba y Exámenes reales como tres
+  grupos separados con contador y estado vacío propio, conservando la etiqueta de origen `De repaso`
+  dentro de su grupo.
+- **F5-29 · P1.** MIENTRAS la persona esté en la lista de Pruebas, Sym DEBERÁ conocer solo que está en
+  la pestaña `Pruebas`; CUANDO abra el solver o el historial de un Control o Examen de prueba concreto,
+  EL sistema DEBERÁ nombrar a Sym el artefacto exacto y si lo está resolviendo o viendo su historial.
+- **F5-30 · P1.** CUANDO la persona empiece un Examen real, EL sistema DEBERÁ sustituir el escritorio
+  completo (sidebar, cabecera, chat, citas y controles del AppShell), y DEBERÁ restaurarlo al terminar o
+  cancelar.
+
+#### Progreso de estudio
+
+- **F5-31 · P2.** MIENTRAS el perfil de un material no tenga señales, el panel de progreso DEBERÁ
+  explicar qué acciones empiezan a poblarlo, sin mostrar un perfil vacío como si tuviera datos.
+- **F5-32 · P2.** EL panel de progreso DEBERÁ mostrar aciertos, fallos, sin evaluar, en blanco, pistas y
+  énfasis como señales separadas, y NO DEBERÁ combinarlas en un porcentaje ni en una nota agregada.
+- **F5-33 · P2.** EL sistema DEBERÁ calcular la siguiente acción de estudio siguiendo el orden fallos >
+  pistas > énfasis > práctica nueva, mostrando solo el motivo de la señal que decidió la rama, sin sumar
+  señales.
+- **F5-34 · P0.** SI la carga del perfil o de una página falla, ENTONCES EL sistema DEBERÁ decir
+  explícitamente que no hay datos o que la operación falló, y NO DEBERÁ mostrar cero, un porcentaje
+  neutro ni una pantalla vacía de éxito.
+
+#### Accesibilidad y rendimiento
+
+- **F5-35 · P2.** EL sistema DEBERÁ permitir recorrer toda la interfaz principal solo con teclado (Tab,
+  Shift+Tab, flechas, Enter, Espacio, Escape), con foco visible de 2px y roles/nombres accesibles
+  correctos, y DEBERÁ mantener contraste AA al 200% de zoom en ambos temas.
+- **F5-36 · P2.** EL sistema NO DEBERÁ re-renderizar PDF ni el editor de Apuntes al escribir en el chat,
+  NO DEBERÁ recalcular el layout del mapa en cada `pointermove`, y DEBERÁ mantener como mucho un editor
+  TipTap montado.
+
+#### Comunicación y diagnóstico
+
+- **F5-37 · P0.** SI ocurre un error de dominio, de red o un fallo desconocido en cualquier superficie,
+  ENTONCES EL sistema DEBERÁ mostrar qué ocurrió, qué queda afectado y qué puede hacer la persona, y NO
+  DEBERÁ mostrar `_tag`, `SchemaError`, estado HTTP, stack, ruta local, JSON, id interno, nombre de
+  proveedor ni texto crudo de una excepción.
+- **F5-38 · P0.** CUANDO ocurra un fallo inesperado, EL sistema DEBERÁ conservar la causa técnica, la
+  operación y la superficie en consola o log de servidor, DEBERÁ redactar claves y cuerpos binarios
+  antes de registrarla, y NO DEBERÁ repetirla en pantalla.
+- **F5-39 · P0.** EL historial de conversaciones DEBERÁ abrirse desde Sym sin alterar el sidebar de
+  materiales; la burbuja del alumno DEBERÁ mostrar únicamente lo que escribió, y el contexto interno
+  DEBERÁ reaparecer como chips humanos, nunca como el bloque `SCREEN CONTEXT`, delimitadores ni
+  identificadores; esto DEBERÁ cumplirse igual al recargar una conversación antigua que durante el
+  streaming de una nueva.
+
+#### Contexto estructurado ampliado
+
+- **F5-40 · P3.** CUANDO la persona adjunte una página desde PDF, EL sistema DEBERÁ mostrar el chip
+  antes de enviar y permitir retirarlo sin que viaje al servidor; SI adjunta otra página del mismo
+  material, ENTONCES DEBERÁ reemplazar la página anterior, y el servidor DEBERÁ validar que la página
+  esté dentro del rango del material.
+- **F5-41 · P3.** CUANDO una llamada a lectura o vista de material del turno se complete con éxito, EL
+  sistema DEBERÁ presentar sus páginas como `Fuentes consultadas`, deduplicadas por material y página,
+  tanto durante el streaming como al recargar; una llamada fallida NO DEBERÁ crear fuente, y ninguna
+  mención textual de página en la respuesta DEBERÁ convertirse por sí sola en cita.
+
+#### Detalle técnico e identidad
+
+- **F5-42 · P0.** CUANDO la persona despliegue el detalle técnico de una llamada de herramienta, EL
+  sistema DEBERÁ mostrarlo abreviado por un techo de caracteres declarado en
+  `packages/shared/src/limits.ts`, y NO DEBERÁ mostrar claves, tokens, system prompt, contenido base64
+  ni consumo de tokens.
+- **F5-43 · P0.** EL sistema DEBERÁ mostrar `Symma` como marca del producto y `Sym` con el descriptor
+  `Tutor académico` como identidad del agente en toda la interfaz visible, y NO DEBERÁ mostrar
+  `Proxus Tutor`, `Asistente académico`, `Nexo`, `Compañero de estudio` ni `Sesión efímera`.
+- **F5-44 · P3.** CUANDO la persona pregunte quién es Sym o dónde está, EL sistema DEBERÁ responder que
+  es Sym, el tutor académico dentro de Symma, y DEBERÁ nombrar únicamente la ubicación presente en el
+  contexto adjunto (material, página, bloque, pestaña Pruebas, o el Control/Examen de prueba abierto con
+  su vista); NO DEBERÁ inventar un intento o una pregunta concreta, y NO DEBERÁ afirmar ubicación alguna
+  si la persona retira el chip correspondiente; durante un Examen real NO DEBERÁ existir chat.
+
+#### Progreso de una generación
+
+- **F5-45 · P3.** MIENTRAS se esté indexando un material, redactando sus apuntes o generando una prueba,
+  EL sistema DEBERÁ mostrar una sola línea de progreso que se sustituye, con la frase de la fase en
+  curso y, SOLO cuando el total sea mayor que uno, su contador de avance; NO DEBERÁ acumular una lista
+  de líneas, NO DEBERÁ mostrar una frase que no proceda de un evento recibido del servidor y NO DEBERÁ
+  mostrar porcentaje mientras el total sea desconocido.
+- **F5-46 · P3.** SI una generación falla o se corta, ENTONCES EL sistema DEBERÁ retirar la línea de
+  progreso y mostrar en su lugar el fallo con su texto completo, y NO DEBERÁ dejar visible una frase de
+  progreso junto al error.
+
+#### Navegación automática al terminar
+
+- **F5-47 · P3.** CUANDO termine de generarse un Control o un Examen de prueba, EL sistema DEBERÁ
+  abrirlo directamente en su solver; CUANDO termine de generarse un Examen real, DEBERÁ abrir su
+  pantalla previa SIN crear el intento ni arrancar el reloj; SI la generación falla, ENTONCES NO DEBERÁ
+  navegar a ninguna parte.
+- **F5-48 · P3.** CUANDO termine la preparación automática de un lote de un único PDF y no haya ningún
+  material abierto, EL sistema DEBERÁ seleccionar ese material y mostrarlo en la pestaña Mapa; SI el
+  lote tenía dos o más ficheros, SI la persona ya ha abierto un material a mano, o SI la cadena terminó
+  en error, ENTONCES NO DEBERÁ cambiar lo que la persona está mirando. CUANDO termine un indexado manual
+  del material que ya está abierto, EL sistema DEBERÁ cambiar a su pestaña Mapa.
+
+#### Pantalla previa del examen y editor
+
+- **F5-49 · P3.** LA pantalla previa de un examen DEBERÁ presentar centrados su título, su conteo de
+  preguntas y minutos y sus dos acciones, DEBERÁ seguir advirtiendo de las tres cosas que exige F3-39d
+  (que se puede retomar, que el reloj solo corre dentro y que las interrupciones quedan registradas), y
+  DEBERÁ mostrar el aviso de prueba parcial cuando lo haya.
+- **F5-50 · P3.** EL editor de un bloque de apuntes DEBERÁ ofrecer el encabezado H1 en el menú `/` y en
+  la barra flotante, DEBERÁ mostrarlo con más cuerpo que el H2, y DEBERÁ conservarlo intacto al guardar
+  y volver a abrir el apunte.
+
+#### Separador, plegado de Sym y persistencia de layout
+
+- **F5-51 · P3.** EL separador entre Material y Sym DEBERÁ mostrar una agarradera visible; arrastrarla
+  DEBERÁ redimensionar respetando los 420px mínimos de F5-03, y pulsarla sin arrastrar DEBERÁ plegar a
+  Sym a un rail de 56px con un control de restaurar y nombre accesible. MIENTRAS Sym esté plegado, EL
+  sistema DEBERÁ conservar su borrador, su contexto adjunto y cualquier respuesta en curso, y NO DEBERÁ
+  desmontar el chat. CUANDO no haya material seleccionado, NO DEBERÁ ofrecerse el plegado.
+- **F5-52 · P3.** EL sistema DEBERÁ persistir en almacenamiento local exactamente la proporción del
+  split y los dos estados de plegado (sidebar y Sym), y NO DEBERÁ persistir contexto, perfil,
+  conversación ni contenido educativo; SI el almacenamiento local falla o está bloqueado, ENTONCES la
+  interfaz DEBERÁ seguir funcionando con los valores por defecto.
+
+#### Plegar todo el escritorio
+
+- **F5-53 · P3.** LA cabecera del material DEBERÁ ofrecer, junto al siguiente paso de estudio, un
+  control `Plegar todo` / `Desplegar todo` que alterne su texto y su `aria-pressed` según el estado
+  resultante; en un único gesto DEBERÁ plegar o desplegar a la vez la barra lateral, Sym y, si hay un
+  apunte abierto, su índice de bloques. Plegar o desplegar por separado cualquiera de esas superficies
+  (la agarradera de Sym, el rail de la barra lateral o el rail del índice de bloques) NO DEBERÁ
+  arrastrar a las demás ni disparar el gesto de `Plegar todo`.
+
+### Correcciones de cierre de fase 5
+
+Plan y procedimiento de prueba de cada criterio:
+[`notes/plans/correciones.md`](../notes/plans/correciones.md). Este corte es independiente del P3
+opcional y corrige comportamientos encontrados al probar P0 a P2.
+
+#### Datos derivados y generación
+
+- **C5-01.** CUANDO la persona borre un material, EL sistema DEBERÁ borrar también su perfil de estudio
+  y, SI ningún otro PDF conserva la misma huella de contenido, su índice y todas sus páginas renderizadas;
+  SI otro PDF conserva esa huella, ENTONCES DEBERÁ mantener las cachés compartidas.
+- **C5-02.** CUANDO se suban cinco PDF válidos en un lote, EL sistema DEBERÁ completar para cada uno la
+  secuencia subida, indexado y apuntes sin aplicar `maxConcurrentRequests` a esas preparaciones
+  automáticas; EL sistema DEBERÁ mantener ese fusible para el chat y las acciones que no procedan de la
+  gracia de una subida.
+- **C5-03.** CUANDO se añada un segundo lote a la zona de subida, EL sistema DEBERÁ validar el conjunto
+  acumulado contra `maxFilesPerUpload`, las plazas restantes de `maxMaterials` y los nombres duplicados;
+  SI se supera un techo, ENTONCES DEBERÁ rechazar la incorporación completa nombrando el límite, sin
+  recortar la selección en silencio.
+- **C5-04.** SI una portada, separador, página final o fragmento aislado no alcanza
+  `minTopicSourceCharacters` caracteres no blancos ni constituye una unidad de estudio, ENTONCES EL
+  sistema DEBERÁ dejar esas páginas sin tema y NO DEBERÁ crear un bloque de apuntes de relleno para
+  ellas.
+- **C5-05.** CUANDO una prueba pida N preguntas y el material declare de forma válida que solo sostiene
+  M, con `0 < M < N`, EL sistema DEBERÁ guardar M, conservar N como cantidad solicitada y mostrar
+  `Se pidieron N preguntas; el contenido permitió M.` al terminar, en la lista y al abrir la prueba.
+- **C5-06.** SI faltan preguntas por salida truncada, respuesta indecodificable, error de red o tipo de
+  pregunta incorrecto sin una declaración válida de contenido insuficiente, ENTONCES EL sistema DEBERÁ
+  aplicar los reintentos existentes y, al agotarlos, fallar sin guardar una prueba parcial.
+
+#### Chat y conversaciones
+
+- **C5-07.** EL historial de conversaciones DEBERÁ listar primero las conversaciones con turnos,
+  ordenadas por `updatedAt` descendente, con desempate estable por `createdAt` e id; las conversaciones
+  vacías heredadas DEBERÁN aparecer después.
+- **C5-08.** MIENTRAS no se haya enviado el primer mensaje, EL sistema NO DEBERÁ crear ni guardar una
+  conversación; pulsar `Nueva conversación` o borrar la activa DEBERÁ abrir un borrador local.
+- **C5-09.** CUANDO ya existan `maxConversations` conversaciones, EL sistema DEBERÁ mantener visible y
+  operable el historial para abrir o borrar existentes; SI falla la creación al enviar el primer
+  mensaje, ENTONCES DEBERÁ conservar el texto escrito en el borrador.
+- **C5-10.** CUANDO se muestre una respuesta nueva de Sym, EL sistema DEBERÁ revelarla de forma
+  progresiva durante como mucho 1,5 segundos; SI la persona prefiere movimiento reducido o la respuesta
+  procede del historial, ENTONCES DEBERÁ mostrarla completa de inmediato.
+- **C5-11.** EL estado vacío del chat DEBERÁ describir a Sym como tutor que trabaja con materiales,
+  apuntes y progreso, y sus tres sugerencias DEBERÁN corresponder a capacidades reales del agente, sin
+  ofrecer crear Controles ni Exámenes desde el chat.
+
+#### Interfaz contenida en el viewport
+
+- **C5-12.** CUANDO se abra un tooltip junto a cualquier borde del viewport o dentro de un contenedor
+  con `overflow`, EL sistema DEBERÁ mantenerlo completamente visible, sin crear scroll de página, y
+  DEBERÁ conservar la asociación accesible con su control por hover y foco.
+- **C5-13.** CUANDO la persona contraiga el sidebar global, EL sistema DEBERÁ pasar de 224px a un rail de
+  56px, mantener accesibles selección de material, estado de subida y tema mediante iconos con nombre,
+  y recordar solo esa preferencia en almacenamiento local.
+- **C5-14.** CUANDO la persona contraiga el índice de bloques de Apuntes, EL sistema DEBERÁ pasar de
+  240px a un rail de 56px que conserve los bloques numerados y seleccionables, con un recuadro en los
+  destacados, más añadir bloque y añadir desde una URL; NO DEBERÁ desmontar el editor, cambiar la
+  selección por el propio contraer ni descartar cambios sin guardar.
+- **C5-15.** MIENTRAS haya `maxMaterials` materiales, EL control `Subir material` y la entrada de
+  ficheros NO DEBERÁN estar visibles ni disponibles; una cadena ya iniciada PODRÁ mantener un control
+  de progreso sin capacidad de añadir ficheros.
 
 ---
 
@@ -619,4 +935,3 @@ decisiones tomadas:
 - Frameworks nuevos.
 - Cambios cosméticos como aportación principal.
 - Herramientas nuevas del agente (ver `docs/decisiones.md`, ADR-004).
-- Lo listado en [`extensibilidad.md`](extensibilidad.md), cada cosa con su razón.

@@ -57,7 +57,10 @@ export const SolvableAssessment = Schema.Struct({
   kind: Schema.Union([Schema.Literal("quiz"), Schema.Literal("test")]),
   title: Schema.String,
   examTimeLimitSeconds: Schema.Number,
-  questions: Schema.Array(SolvableQuestion)
+  questions: Schema.Array(SolvableQuestion),
+  // Cuántas se pidieron al generar (correcciones de cierre de fase 5, C5-05): igual a
+  // `questions.length` salvo en una prueba parcial. La cabecera de la prueba compara los dos.
+  requestedQuestionCount: Schema.Number
 });
 export type SolvableAssessment = typeof SolvableAssessment.Type;
 
@@ -132,6 +135,9 @@ export const AssessmentListEntry = Schema.Struct({
   origin: Schema.Union([Schema.Literal("material"), Schema.Literal("review")]),
   createdAt: Schema.String,
   questionCount: Schema.Number,
+  // Cuántas se pidieron al generar (correcciones de cierre de fase 5, C5-05): igual a
+  // `questionCount` salvo en una prueba parcial. La fila lo muestra bajo el conteo cuando difieren.
+  requestedQuestionCount: Schema.Number,
   examTimeLimitSeconds: Schema.Number,
   lastAttempt: Schema.NullOr(Schema.Struct({
     id: Schema.String,

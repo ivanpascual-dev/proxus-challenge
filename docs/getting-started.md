@@ -136,13 +136,19 @@ No subas `packages/server/.data`. Si una mejora necesita datos reproducibles, us
 fuera de `.data`, como el que ya existe:
 
 ```txt
-packages/server/fixtures/materials/densidad.pdf   # sintético, generado por make-fixture.mjs
+packages/server/fixtures/materials/densidad.pdf                 # calibración del umbral de densidad
+packages/server/fixtures/materials/enjambres-de-inspeccion.pdf  # manual inventado, para probar la app
 ```
 
 ```bash
-pnpm run fixture:materials   # regenera el fixture
-pnpm run seed:demo           # lo copia a packages/server/.data/materials/pdfs/
+pnpm run fixture:materials   # regenera densidad.pdf
+pnpm run fixture:demo        # regenera enjambres-de-inspeccion.pdf
+pnpm run seed:demo           # los copia a packages/server/.data/materials/pdfs/
 ```
+
+Para **probar** la aplicación usa `enjambres-de-inspeccion.pdf`: seis páginas de contenido inventado y
+denso que dan nueve temas, apuntes y pruebas. `densidad.pdf` existe para calibrar el clasificador y su
+texto es una palabra repetida: no da ni para una pregunta.
 
 ## 7. Flujo recomendado para explorar
 

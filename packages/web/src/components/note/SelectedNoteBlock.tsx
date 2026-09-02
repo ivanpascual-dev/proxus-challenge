@@ -3,21 +3,30 @@ import { LIMITS, type RewriteMode } from "@proxus/shared";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { rewriteBlockAction } from "../../domain/artifacts/atoms.ts";
-import { BlockCitation } from "./BlockCitation.tsx";
 import { BlockEditor } from "./BlockEditor.tsx";
 import type { DraftBlock } from "./draft.ts";
-import { messageOf } from "../../lib/error-message.ts";
+import { describeFailure } from "../../lib/user-feedback.ts";
+import { MaterialCitation } from "../ui/MaterialCitation.tsx";
+import { blockHeading } from "./NoteOutline.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
-interface NoteBlockCardProps {
+interface SelectedNoteBlockProps {
   readonly block: DraftBlock;
-  readonly index: number;
-  readonly total: number;
   readonly artifactId: string;
+  readonly position: { readonly index: number; readonly total: number };
   readonly onChangeMarkdown: (markdown: string) => void;
   readonly onToggleEmphasis: () => void;
-  readonly onMove: (direction: -1 | 1) => void;
-  readonly onDelete: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }
+
+const pageRangeLabel = (pages: readonly number[]): string => {
+  if (pages.length === 0) {
+    return "";
+  }
+  const min = Math.min(...pages);
+  const max = Math.max(...pages);
+  return min === max ? `página ${min}` : `páginas ${min}-${max}`;
+};
 
 const authorLabel = (author: DraftBlock["author"]) => (author === "tutor" ? "Tutor" : "Tú");
 
@@ -26,16 +35,16 @@ const modeLabel: Record<RewriteMode, string> = {
   deeper: "Más a fondo"
 };
 
-export function NoteBlockCard({
+// Un único bloque a la vez (fase 5, §4.8): el índice de la izquierda ya no repite este contenido, y
+// el reordenar vive en `NoteOutline`, no aquí.
+export function SelectedNoteBlock({
   block,
-  index,
-  total,
   artifactId,
+  position,
   onChangeMarkdown,
   onToggleEmphasis,
-  onMove,
-  onDelete
-}: NoteBlockCardProps) {
+  onOpenCitation
+}: SelectedNoteBlockProps) {
   const overLimit = block.markdown.length > LIMITS.maxBlockCharacters;
 
   const rewrite = useAtomSet(rewriteBlockAction, { mode: "promise" });
@@ -58,7 +67,8 @@ export function NoteBlockCard({
       const result = await rewrite({ id: artifactId, blockId: block.id, mode });
       setProposal(result);
     } catch (cause) {
-      setRewriteError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "notes", action: "generate" }, "SelectedNoteBlock");
+      setRewriteError(notice.description ?? notice.title);
     } finally {
       setRewriting(null);
     }
@@ -73,55 +83,29 @@ export function NoteBlockCard({
   };
 
   return (
-    <section
-      className={`rounded-3xl border bg-surface p-5 ${
-        block.emphasis ? "border-brand" : "border-border"
-      }`}
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section className={`border-l-2 pl-4 ${block.emphasis ? "border-brand" : "border-transparent"}`}>
+      <p className="text-muted text-xs">
+        Bloque {position.index} de {position.total} · {blockHeading(block.markdown)}
+        {block.source?.type === "material" && block.source.pages.length > 0 && (
+          <> · generado desde las {pageRangeLabel(block.source.pages)}</>
+        )}
+      </p>
+
+      <div className="mt-2 mb-3 flex flex-wrap items-center justify-between gap-2 border-border border-b pb-3">
         <div className="flex items-center gap-2 text-muted text-sm">
-          <span className="rounded-full bg-canvas px-2 py-0.5">{authorLabel(block.author)}</span>
-          {block.emphasis && <span className="text-brand">★ Importante</span>}
+          <span>{authorLabel(block.author)}</span>
           {block.source?.type === "material" && <span>· cita un material</span>}
           {block.source?.type === "url" && <span>· cita una URL</span>}
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="rounded-lg border border-border px-2 py-1 text-sm hover:border-brand disabled:opacity-40"
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            aria-label="Subir el bloque"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-border px-2 py-1 text-sm hover:border-brand disabled:opacity-40"
-            disabled={index === total - 1}
-            onClick={() => onMove(1)}
-            aria-label="Bajar el bloque"
-          >
-            ↓
-          </button>
-          <button
-            type="button"
-            className={`rounded-lg border px-2 py-1 text-sm hover:border-brand ${
-              block.emphasis ? "border-brand text-brand" : "border-border"
-            }`}
-            onClick={onToggleEmphasis}
-            aria-pressed={block.emphasis}
-          >
-            ★
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-danger/40 px-2 py-1 text-danger-ink text-sm hover:border-danger"
-            onClick={onDelete}
-          >
-            Borrar
-          </button>
-        </div>
+        <ActionButton
+          icon="star"
+          variant={block.emphasis ? "selected" : "neutral"}
+          size="compact"
+          onClick={onToggleEmphasis}
+          aria-pressed={block.emphasis}
+        >
+          Importante
+        </ActionButton>
       </div>
 
       <div className="grid gap-1">
@@ -133,9 +117,19 @@ export function NoteBlockCard({
         </span>
       </div>
 
-      {block.source?.type === "material" && <BlockCitation source={block.source} />}
+      {block.source?.type === "material" && (
+        <div className="mt-3 border-border border-t pt-3">
+          <MaterialCitation
+            materialId={block.source.materialId}
+            pages={block.source.pages}
+            transcribed={block.source.transcribed}
+            {...(block.source.unanchoredReason !== null ? { unanchoredReason: block.source.unanchoredReason } : {})}
+            onOpen={onOpenCitation}
+          />
+        </div>
+      )}
       {block.source?.type === "url" && (
-        <aside className="mt-3 rounded-2xl border border-border bg-canvas/60 p-3 text-sm">
+        <aside className="mt-3 border border-border bg-canvas/60 p-3 text-sm">
           <p className="font-semibold text-body">
             <a href={block.source.url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
               {block.source.title || block.source.url}
@@ -149,15 +143,16 @@ export function NoteBlockCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted text-xs">Reescribir con el tutor:</span>
           {(["clearer", "deeper"] as const).map((mode) => (
-            <button
+            <ActionButton
               key={mode}
-              type="button"
-              className="rounded-lg border border-border px-2 py-1 text-xs hover:border-brand hover:text-brand disabled:opacity-40"
+              icon="edit"
+              variant="brand"
+              size="compact"
               disabled={!canRewrite || rewriting !== null}
               onClick={() => askRewrite(mode)}
             >
               {rewriting === mode ? "Reescribiendo…" : modeLabel[mode]}
-            </button>
+            </ActionButton>
           ))}
           {block.id === undefined && (
             <span className="text-muted text-xs italic">guarda el apunte primero</span>
@@ -165,39 +160,41 @@ export function NoteBlockCard({
         </div>
 
         {rewriteError !== undefined && (
-          <p className="mt-2 rounded-xl border border-danger/40 bg-danger/15 p-2 text-danger-ink text-xs">
+          <p className="mt-2 border border-danger/40 bg-danger/15 p-2 text-danger-ink text-xs">
             {rewriteError}
           </p>
         )}
 
         {proposal !== null && (
-          <div className="mt-3 grid gap-2 rounded-2xl border border-brand/50 bg-brand/5 p-3">
+          <div className="mt-3 grid gap-2 border border-brand/50 bg-brand/5 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold text-brand text-xs uppercase tracking-widest">Propuesta del tutor</p>
               {!proposal.usedSource && (
-                <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
+                <span className=" bg-warning/15 px-2 py-0.5 text-[0.7rem] text-warning-ink">
                   reescrito sin fuente
                 </span>
               )}
             </div>
-            <div className="prose dark:prose-invert max-w-none rounded-xl bg-canvas/60 p-3 text-sm">
+            <div className="prose dark:prose-invert max-w-none bg-canvas/60 p-3 text-sm">
               <Streamdown>{proposal.markdown}</Streamdown>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
+              <ActionButton
+                icon="check"
+                variant="primary"
+                size="compact"
                 onClick={acceptProposal}
               >
                 Reemplazar el bloque
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-border px-4 py-1.5 text-sm hover:border-brand"
+              </ActionButton>
+              <ActionButton
+                icon="trash"
+                variant="danger"
+                size="compact"
                 onClick={() => setProposal(null)}
               >
                 Descartar
-              </button>
+              </ActionButton>
             </div>
             <p className="text-muted text-xs">
               Reemplazar solo cambia el borrador: los apuntes no se guardan hasta que pulses «Guardar apuntes».

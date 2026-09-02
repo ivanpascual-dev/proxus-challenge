@@ -186,3 +186,20 @@ test("un material sin indexar falla con un motivo claro, sin crear nada", async 
   );
   assert.equal(store.length, 0);
 });
+
+// C5-04: un tema hoja sin respaldo de texto suficiente (portada, cierre) no genera bloque de relleno;
+// si ninguno lo sostiene, la generación falla en voz alta en vez de guardar un apunte vacío.
+test("ningún tema hoja con respaldo suficiente: falla sin bloque de relleno, sin crear nada", async () => {
+  const store: Artifact[] = [];
+  const escaso: MaterialIndex = {
+    ...index,
+    topics: [{ id: "portada", label: "Portada", pages: [1], parentId: null }],
+    pages: index.pages.map((page) => page.page === 1 ? { ...page, text: "Título", topicIds: ["portada"] } : { ...page, topicIds: [] })
+  };
+  await assert.rejects(
+    forMaterial(material.id, store, { getIndex: (id) => id === material.id ? Effect.succeed(escaso) : Effect.fail(new MaterialNotFound({ materialId: id })) }),
+    (error: unknown) => (error as { _tag?: string })._tag === "NoteGenerationError"
+      && /no contiene unidades de estudio suficientes/.test((error as { reason: string }).reason)
+  );
+  assert.equal(store.length, 0);
+});

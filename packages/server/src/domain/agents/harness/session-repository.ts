@@ -1,4 +1,5 @@
 import { Context, Data, Effect } from "effect";
+import type { ChatContextRef, ConversationSource } from "@proxus/shared";
 import type { AgentMessage } from "./message.ts";
 
 // La observabilidad por paso (fase 4, decisión 7): el coste y los errores del modelo viven en el
@@ -28,9 +29,20 @@ export interface StoredStep {
   readonly error?: StoredStepError | undefined;
 }
 
+// Fase 5, §5.1: turno visible separado del prompt interno. `input` es el texto literal del alumno,
+// `context` las referencias aceptadas al enviar, `messageCount` cuántos mensajes de `messages` produjo
+// este turno y `followUpQuestions` el array ya validado. Un fichero de sesión anterior a este campo se
+// migra al leerlo (`session-migration.ts`), nunca a mano en cada consumidor.
 export interface StoredTurn {
   readonly startedAt: string;
   readonly steps: readonly StoredStep[];
+  readonly input: string;
+  readonly context: readonly ChatContextRef[];
+  readonly messageCount: number;
+  readonly followUpQuestions: readonly string[];
+  // Fase 5, §5.3: los materiales y páginas que el agente consultó en el turno, derivados de comandos
+  // que completaron. Un turno anterior a este campo se lee como lista vacía.
+  readonly sources: readonly ConversationSource[];
 }
 
 export interface StoredAgentSession {
@@ -84,11 +96,19 @@ export class SessionRepositorySerializationError extends Data.TaggedError("Sessi
   readonly reason: unknown;
 }> { }
 
+// §5.1: la suma de `messageCount` de los turnos migrados no coincide con `messages.length`, o el
+// número de mensajes de rol `user` no coincide con el número de turnos. No se desplazan mensajes a
+// otro turno ni se adivina el corte (invariante 3): se declara el fallo y se nombra la conversación.
+export class SessionTurnMismatch extends Data.TaggedError("SessionTurnMismatch")<{
+  readonly sessionId: string;
+}> { }
+
 export type SessionRepositoryError =
   | SessionAlreadyExists
   | SessionNotFound
   | SessionRepositoryStorageError
-  | SessionRepositorySerializationError;
+  | SessionRepositorySerializationError
+  | SessionTurnMismatch;
 
 export interface SessionRepository {
   readonly getSession: (

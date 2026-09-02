@@ -61,6 +61,17 @@ export class MaterialAlreadyExists extends Schema.ErrorClass<MaterialAlreadyExis
   message: Schema.String
 }) {}
 
+// El PDF tiene más páginas de las que se aceptan indexar. Fallo por fichero, como el tipo o el
+// nombre repetido: el resto del lote sigue. Se comprueba con `pdfinfo` antes de copiar nada, y
+// nombra el techo y lo recibido porque un rechazo que no dice el número obliga a adivinarlo.
+export class MaterialTooManyPages extends Schema.ErrorClass<MaterialTooManyPages>("MaterialTooManyPages")({
+  _tag: Schema.tag("MaterialTooManyPages"),
+  fileName: Schema.String,
+  pageCount: Schema.Number,
+  ceiling: Schema.Number,
+  message: Schema.String
+}) {}
+
 // La petición entera se rechaza antes de escribir nada (F4-03, F4-04): los materiales que ya existen
 // más los que trae la subida pasan de `maxMaterials`. Nombra cuántos caben y cuántos hay.
 export class TooManyMaterials extends Schema.ErrorClass<TooManyMaterials>("TooManyMaterials")({

@@ -4,16 +4,17 @@ import {
   type QuestionCorrection,
   type QuestionReviewReason,
   type SolvableQuestion,
-  type TestAnswer
+  type TestAnswer,
 } from "@proxus/shared";
-import { QuestionSourceLine } from "./QuestionSourceLine.tsx";
+import { MaterialCitation } from "../ui/MaterialCitation.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El motivo de repaso, por pregunta (§6.11, F3-33): la señal del perfil que trajo la pregunta. Nunca
 // un número resumen (invariante 5).
 const reviewReasonLabel: Record<QuestionReviewReason, string> = {
   fallada: "Está en el repaso porque fallaste este tema",
   pista: "Está en el repaso porque abriste una pista en este tema",
-  marcada: "Está en el repaso porque marcaste este tema como importante"
+  marcada: "Está en el repaso porque marcaste este tema como importante",
 };
 
 // La vista de una pregunta y su corrección. La comparten el solucionador de práctica
@@ -25,7 +26,7 @@ export const questionTypeLabels = {
   "multiple-choice": "respuesta única",
   "multiple-response": "respuesta múltiple",
   "true-false": "verdadero/falso",
-  "short-answer": "respuesta corta"
+  "short-answer": "respuesta corta",
 } as const;
 
 export interface LocalAnswers {
@@ -47,7 +48,8 @@ export function QuestionCard({
   onRevealHint,
   showSource = true,
   correction,
-  onDispute
+  onDispute,
+  onOpenCitation,
 }: {
   readonly index: number;
   readonly question: SolvableQuestion;
@@ -63,24 +65,37 @@ export function QuestionCard({
   readonly showSource?: boolean;
   readonly correction: QuestionCorrection | undefined;
   readonly onDispute: () => void;
+  // Cita común (decisión 26, §4.10): ausente solo en el Examen real, que ya no pinta `showSource`.
+  readonly onOpenCitation?: (materialId: string, page: number) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-surface p-5">
+    <section className="border-border border-b pb-6">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-2 text-muted text-sm">Pregunta {index + 1} · {questionTypeLabels[question.type]}</p>
-          <h3 className="font-semibold text-heading text-lg">{question.prompt}</h3>
+          <p className="mb-2 text-muted text-sm">
+            Pregunta {index + 1} · {questionTypeLabels[question.type]}
+          </p>
+          <h3 className="font-semibold text-heading text-lg">
+            {question.prompt}
+          </h3>
         </div>
-        {correction !== undefined && <CorrectionBadge correction={correction} />}
+        {correction !== undefined && (
+          <CorrectionBadge correction={correction} />
+        )}
       </div>
 
       {showSource && question.source.reviewReason !== null && (
-        <p className="mb-3 inline-block rounded-full bg-brand-soft px-3 py-1 text-heading text-xs">
+        <p className="mb-3 inline-block bg-brand-soft px-3 py-1 text-heading text-xs">
           {reviewReasonLabel[question.source.reviewReason]}
         </p>
       )}
 
-      <QuestionInput question={question} answers={answers} setAnswers={setAnswers} disabled={locked} />
+      <QuestionInput
+        question={question}
+        answers={answers}
+        setAnswers={setAnswers}
+        disabled={locked}
+      />
 
       {onRevealHint !== undefined && (
         <HintDisclosure
@@ -92,10 +107,26 @@ export function QuestionCard({
       )}
 
       {correction !== undefined && (
-        <CorrectionDetails correction={correction} question={question} onDispute={onDispute} />
+        <CorrectionDetails
+          correction={correction}
+          question={question}
+          onDispute={onDispute}
+        />
       )}
 
-      {showSource && <QuestionSourceLine source={question.source} />}
+      {showSource && onOpenCitation !== undefined && (
+        <div className="mt-3 border-border border-t pt-3">
+          <MaterialCitation
+            materialId={question.source.materialId}
+            pages={question.source.pages}
+            transcribed={question.source.transcribed}
+            {...(question.source.unanchoredReason !== null
+              ? { unanchoredReason: question.source.unanchoredReason }
+              : {})}
+            onOpen={onOpenCitation}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -104,7 +135,7 @@ function QuestionInput({
   question,
   answers,
   setAnswers,
-  disabled
+  disabled,
 }: {
   readonly question: SolvableQuestion;
   readonly answers: LocalAnswers;
@@ -116,16 +147,21 @@ function QuestionInput({
     return (
       <div className="grid gap-2">
         {question.options.map((option) => (
-          <label key={option.id} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand">
+          <label
+            key={option.id}
+            className="flex cursor-pointer items-center gap-3 border border-border bg-canvas/70 p-3 hover:border-brand"
+          >
             <input
               type="radio"
               name={question.id}
               checked={value === option.id}
               disabled={disabled}
-              onChange={() => setAnswers((current) => ({
-                ...current,
-                choice: { ...current.choice, [question.id]: option.id }
-              }))}
+              onChange={() =>
+                setAnswers((current) => ({
+                  ...current,
+                  choice: { ...current.choice, [question.id]: option.id },
+                }))
+              }
             />
             <span>{option.text}</span>
           </label>
@@ -140,18 +176,26 @@ function QuestionInput({
       <div className="grid gap-2">
         <p className="text-muted text-xs">Marca todas las que correspondan.</p>
         {question.options.map((option) => (
-          <label key={option.id} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand">
+          <label
+            key={option.id}
+            className="flex cursor-pointer items-center gap-3 border border-border bg-canvas/70 p-3 hover:border-brand"
+          >
             <input
               type="checkbox"
               checked={selected.includes(option.id)}
               disabled={disabled}
-              onChange={() => setAnswers((current) => {
-                const prev = current.multi[question.id] ?? [];
-                const next = prev.includes(option.id)
-                  ? prev.filter((id) => id !== option.id)
-                  : [...prev, option.id];
-                return { ...current, multi: { ...current.multi, [question.id]: next } };
-              })}
+              onChange={() =>
+                setAnswers((current) => {
+                  const prev = current.multi[question.id] ?? [];
+                  const next = prev.includes(option.id)
+                    ? prev.filter((id) => id !== option.id)
+                    : [...prev, option.id];
+                  return {
+                    ...current,
+                    multi: { ...current.multi, [question.id]: next },
+                  };
+                })
+              }
             />
             <span>{option.text}</span>
           </label>
@@ -164,17 +208,27 @@ function QuestionInput({
     const value = answers.choice[question.id] ?? "";
     return (
       <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-        {([["true", "Verdadero"], ["false", "Falso"]] as const).map(([nextValue, label]) => (
-          <label key={nextValue} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-canvas/70 p-3 hover:border-brand">
+        {(
+          [
+            ["true", "Verdadero"],
+            ["false", "Falso"],
+          ] as const
+        ).map(([nextValue, label]) => (
+          <label
+            key={nextValue}
+            className="flex cursor-pointer items-center gap-3 border border-border bg-canvas/70 p-3 hover:border-brand"
+          >
             <input
               type="radio"
               name={`tf-${question.id}`}
               checked={value === nextValue}
               disabled={disabled}
-              onChange={() => setAnswers((current) => ({
-                ...current,
-                choice: { ...current.choice, [question.id]: nextValue }
-              }))}
+              onChange={() =>
+                setAnswers((current) => ({
+                  ...current,
+                  choice: { ...current.choice, [question.id]: nextValue },
+                }))
+              }
             />
             <span>{label}</span>
           </label>
@@ -187,7 +241,7 @@ function QuestionInput({
   return (
     <div>
       <textarea
-        className="min-h-32 w-full rounded-2xl border border-border-strong bg-canvas p-3 text-heading outline-none focus:border-brand disabled:opacity-70"
+        className="min-h-32 w-full border border-border-strong bg-canvas p-3 text-heading outline-none focus:border-brand disabled:opacity-70"
         value={text}
         disabled={disabled}
         maxLength={LIMITS.maxOpenAnswerCharacters}
@@ -197,7 +251,7 @@ function QuestionInput({
           const value = event.currentTarget.value;
           setAnswers((current) => ({
             ...current,
-            text: { ...current.text, [question.id]: value }
+            text: { ...current.text, [question.id]: value },
           }));
         }}
         placeholder="Escribe tu respuesta…"
@@ -213,7 +267,7 @@ function HintDisclosure({
   hasHint,
   hint,
   hintError,
-  onReveal
+  onReveal,
 }: {
   readonly hasHint: boolean;
   readonly hint: string | undefined;
@@ -221,95 +275,148 @@ function HintDisclosure({
   readonly onReveal: () => void;
 }) {
   if (!hasHint) {
-    return <p className="mt-3 text-muted text-xs">Esta pregunta no tiene pista.</p>;
+    return (
+      <p className="mt-3 text-muted text-xs">Esta pregunta no tiene pista.</p>
+    );
   }
 
   return (
     <details
-      className="mt-3 rounded-2xl border border-border bg-canvas/60 p-3 text-sm"
+      className="mt-3 border border-border bg-canvas/60 p-3 text-sm"
       onToggle={(event) => {
         if (event.currentTarget.open) {
           onReveal();
         }
       }}
     >
-      <summary className="cursor-pointer font-medium text-body marker:text-brand">Pista</summary>
-      {hintError !== undefined
-        ? <p className="mt-2 text-danger-ink">No se pudo abrir la pista: {hintError}</p>
-        : hint === undefined
-          ? <p className="mt-2 text-muted">Abriendo la pista…</p>
-          : <p className="mt-2 text-body">{hint}</p>}
+      <summary className="cursor-pointer font-medium text-body marker:text-brand">
+        Pista
+      </summary>
+      {hintError !== undefined ? (
+        <p className="mt-2 text-danger-ink">
+          No se pudo abrir la pista: {hintError}
+        </p>
+      ) : hint === undefined ? (
+        <p className="mt-2 text-muted">Abriendo la pista…</p>
+      ) : (
+        <p className="mt-2 text-body">{hint}</p>
+      )}
     </details>
   );
 }
 
 // --- Corrección ---------------------------------------------------------------------------------
 
-function CorrectionBadge({ correction }: { readonly correction: QuestionCorrection }) {
+function CorrectionBadge({
+  correction,
+}: {
+  readonly correction: QuestionCorrection;
+}) {
   if (correction.questionType === "short-answer") {
     if (correction.status === "disputed") {
-      return <span className="rounded-full bg-border px-3 py-1 font-semibold text-muted text-sm">Retirada del perfil</span>;
+      return (
+        <span className=" bg-border px-3 py-1 font-semibold text-muted text-sm">
+          Retirada del perfil
+        </span>
+      );
     }
     if (correction.status === "unevaluated" || correction.score === null) {
-      return <span className="rounded-full bg-warning/20 px-3 py-1 font-semibold text-warning-ink text-sm">Sin evaluar</span>;
+      return (
+        <span className=" bg-warning/20 px-3 py-1 font-semibold text-warning-ink text-sm">
+          Sin evaluar
+        </span>
+      );
     }
-    return <span className="rounded-full bg-brand px-3 py-1 font-semibold text-on-brand text-sm">{correction.score}/{correction.maxScore}</span>;
+    return (
+      <span className=" bg-brand px-3 py-1 font-semibold text-on-brand text-sm">
+        {round2(correction.score)}/{round2(correction.maxScore)}
+      </span>
+    );
   }
 
   if (correction.questionType === "multiple-response") {
     return (
-      <span className={`rounded-full px-3 py-1 font-semibold text-sm ${
-        correction.fullyCorrect ? "bg-success/20 text-success-ink" : "bg-danger/20 text-danger-ink"
-      }`}>
-        {correction.score}/{correction.maxScore}
+      <span
+        className={` px-3 py-1 font-semibold text-sm ${
+          correction.fullyCorrect
+            ? "bg-success/20 text-success-ink"
+            : "bg-danger/20 text-danger-ink"
+        }`}
+      >
+        {round2(correction.score)}/{round2(correction.maxScore)}
       </span>
     );
   }
 
   if (correction.questionType === "blank") {
-    return <span className="rounded-full bg-border px-3 py-1 font-semibold text-muted text-sm">Sin responder</span>;
+    return (
+      <span className=" bg-border px-3 py-1 font-semibold text-muted text-sm">
+        Sin responder
+      </span>
+    );
   }
 
-  return correction.correct
-    ? <span className="rounded-full bg-success/20 px-3 py-1 font-semibold text-success-ink text-sm">Correcta</span>
-    : <span className="rounded-full bg-danger/20 px-3 py-1 font-semibold text-danger-ink text-sm">Revisar</span>;
+  return correction.correct ? (
+    <span className=" bg-success/20 px-3 py-1 font-semibold text-success-ink text-sm">
+      Correcta
+    </span>
+  ) : (
+    <span className=" bg-danger/20 px-3 py-1 font-semibold text-danger-ink text-sm">
+      Revisar
+    </span>
+  );
 }
 
 function CorrectionDetails({
   correction,
   question,
-  onDispute
+  onDispute,
 }: {
   readonly correction: QuestionCorrection;
   readonly question: SolvableQuestion;
   readonly onDispute: () => void;
 }) {
   const optionText = (optionId: string): string => {
-    if (question.type !== "multiple-choice" && question.type !== "multiple-response") {
+    if (
+      question.type !== "multiple-choice" &&
+      question.type !== "multiple-response"
+    ) {
       return optionId;
     }
-    return question.options.find((option) => option.id === optionId)?.text ?? optionId;
+    return (
+      question.options.find((option) => option.id === optionId)?.text ??
+      optionId
+    );
   };
 
   return (
-    <div className="mt-4 rounded-2xl border border-border bg-canvas p-4 text-sm">
+    <div className="mt-4 border border-border bg-canvas p-4 text-sm">
       {correction.questionType === "multiple-choice" && (
         <>
-          <p className="text-body">Respuesta correcta: <strong>{optionText(correction.correctOptionId)}</strong></p>
+          <p className="text-body">
+            Respuesta correcta:{" "}
+            <strong>{optionText(correction.correctOptionId)}</strong>
+          </p>
           <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "multiple-response" && (
         <>
           <p className="text-body">
-            Correctas: <strong>{correction.correctOptionIds.map(optionText).join(", ")}</strong>
+            Correctas:{" "}
+            <strong>
+              {correction.correctOptionIds.map(optionText).join(", ")}
+            </strong>
           </p>
           <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "true-false" && (
         <>
-          <p className="text-body">Respuesta correcta: <strong>{correction.correctAnswer ? "Verdadero" : "Falso"}</strong></p>
+          <p className="text-body">
+            Respuesta correcta:{" "}
+            <strong>{correction.correctAnswer ? "Verdadero" : "Falso"}</strong>
+          </p>
           <p className="mt-2 text-muted">{correction.explanation}</p>
         </>
       )}
@@ -317,7 +424,10 @@ function CorrectionDetails({
         <p className="text-muted">{correction.explanation}</p>
       )}
       {correction.questionType === "short-answer" && (
-        <ShortAnswerCorrectionBody correction={correction} onDispute={onDispute} />
+        <ShortAnswerCorrectionBody
+          correction={correction}
+          onDispute={onDispute}
+        />
       )}
     </div>
   );
@@ -325,28 +435,38 @@ function CorrectionDetails({
 
 function ShortAnswerCorrectionBody({
   correction,
-  onDispute
+  onDispute,
 }: {
-  readonly correction: Extract<QuestionCorrection, { readonly questionType: "short-answer" }>;
+  readonly correction: Extract<
+    QuestionCorrection,
+    { readonly questionType: "short-answer" }
+  >;
   readonly onDispute: () => void;
 }) {
   return (
     <div className="grid gap-3">
-      {correction.status === "unevaluated" && correction.unevaluatedReason !== null && (
-        <p className="rounded-xl border border-warning/40 bg-warning/10 p-2 text-warning-ink">
-          El juez no pudo corregir esta respuesta: {correction.unevaluatedReason}. No cuenta ni a favor ni en contra.
-        </p>
-      )}
+      {correction.status === "unevaluated" &&
+        correction.unevaluatedReason !== null && (
+          <p className=" border border-warning/40 bg-warning/10 p-2 text-warning-ink">
+            El juez no pudo corregir esta respuesta:{" "}
+            {correction.unevaluatedReason}. No cuenta ni a favor ni en contra.
+          </p>
+        )}
       {correction.status === "disputed" && (
-        <p className="rounded-xl border border-border bg-surface p-2 text-muted">
-          Marcaste "esto sí lo dije": esta pregunta ya no mueve tu perfil, en ninguna dirección.
+        <p className=" border border-border bg-surface p-2 text-muted">
+          Marcaste "esto sí lo dije": esta pregunta ya no mueve tu perfil, en
+          ninguna dirección.
         </p>
       )}
       {correction.criteria.length > 0 && (
         <ul className="grid gap-1">
           {correction.criteria.map((criterion) => (
             <li key={criterion.id} className="flex items-start gap-2">
-              <span className={criterion.met ? "text-success-ink" : "text-danger-ink"}>
+              <span
+                className={
+                  criterion.met ? "text-success-ink" : "text-danger-ink"
+                }
+              >
                 {criterion.met ? "✓" : "✗"}
               </span>
               <span className="text-body">{criterion.text}</span>
@@ -354,16 +474,19 @@ function ShortAnswerCorrectionBody({
           ))}
         </ul>
       )}
-      {correction.feedback.length > 0 && <p className="text-muted">{correction.feedback}</p>}
+      {correction.feedback.length > 0 && (
+        <p className="text-muted">{correction.feedback}</p>
+      )}
       {correction.status !== "disputed" && (
         <div>
-          <button
-            type="button"
+          <ActionButton
+            icon="check-circle"
+            variant="brand"
+            size="compact"
             onClick={onDispute}
-            className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
           >
             Esto sí lo dije
-          </button>
+          </ActionButton>
         </div>
       )}
     </div>
@@ -374,17 +497,20 @@ function ShortAnswerCorrectionBody({
 // decimales largos (un tercio por fallo en examen). Se enseñan con dos decimales como mucho.
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-export function AttemptSummary({ attempt }: { readonly attempt: GradedAttempt }) {
+export function AttemptSummary({
+  attempt,
+}: {
+  readonly attempt: GradedAttempt;
+}) {
   return (
-    <section className="mt-6 rounded-3xl border border-success/40 bg-success/10 p-5">
+    <section className="mt-6 border border-success/40 bg-success/10 p-5">
       <p className="font-bold text-success-ink text-xl">
-        Nota: {attempt.displayedScore} / 10
+        Nota: {round2(attempt.displayedScore)} / 10
       </p>
       <p className="mt-1 text-success-ink text-sm">
         Puntuación bruta {round2(attempt.rawScore)} / {attempt.maxScore}
         {attempt.penalty > 0 && ` · penalización ${round2(attempt.penalty)}`}
       </p>
-      <p className="mt-2 text-success-ink">{attempt.summary}</p>
     </section>
   );
 }
@@ -393,36 +519,55 @@ export function AttemptSummary({ attempt }: { readonly attempt: GradedAttempt })
 
 export function buildAnswers(
   questions: readonly SolvableQuestion[],
-  answers: LocalAnswers
+  answers: LocalAnswers,
 ): readonly TestAnswer[] {
   const built: TestAnswer[] = [];
   for (const question of questions) {
     if (question.type === "multiple-choice") {
       const selectedOptionId = answers.choice[question.id];
       if (selectedOptionId !== undefined && selectedOptionId.length > 0) {
-        built.push({ questionType: "multiple-choice", questionId: question.id, selectedOptionId });
+        built.push({
+          questionType: "multiple-choice",
+          questionId: question.id,
+          selectedOptionId,
+        });
       }
     } else if (question.type === "multiple-response") {
       const selectedOptionIds = answers.multi[question.id] ?? [];
       if (selectedOptionIds.length > 0) {
-        built.push({ questionType: "multiple-response", questionId: question.id, selectedOptionIds });
+        built.push({
+          questionType: "multiple-response",
+          questionId: question.id,
+          selectedOptionIds,
+        });
       }
     } else if (question.type === "true-false") {
       const value = answers.choice[question.id];
       if (value === "true" || value === "false") {
-        built.push({ questionType: "true-false", questionId: question.id, answer: value === "true" });
+        built.push({
+          questionType: "true-false",
+          questionId: question.id,
+          answer: value === "true",
+        });
       }
     } else {
       const answer = (answers.text[question.id] ?? "").trim();
       if (answer.length > 0) {
-        built.push({ questionType: "short-answer", questionId: question.id, answer });
+        built.push({
+          questionType: "short-answer",
+          questionId: question.id,
+          answer,
+        });
       }
     }
   }
   return built;
 }
 
-export function countUnanswered(questions: readonly SolvableQuestion[], answers: LocalAnswers): number {
+export function countUnanswered(
+  questions: readonly SolvableQuestion[],
+  answers: LocalAnswers,
+): number {
   return questions.length - buildAnswers(questions, answers).length;
 }
 

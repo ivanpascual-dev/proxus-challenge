@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { ActionButton } from "./ui/ActionButton.tsx";
 
 // La red de seguridad de render. Una excepción lanzada mientras React pinta (un `undefined` donde se
 // esperaba un objeto, un `.map` sobre algo que no es lista) desmonta el árbol entero: sin esto, la
@@ -28,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    // El detalle técnico va a la consola del navegador, nunca a la pantalla (error-message.ts).
+    // El detalle técnico va a la consola del navegador, nunca a la pantalla (user-feedback.ts).
     console.error("Fallo en render capturado por ErrorBoundary:", error, info.componentStack);
   }
 
@@ -57,20 +58,20 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
+          <ActionButton
+            icon="refresh"
+            variant="primary"
             onClick={this.reset}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand text-sm hover:bg-brand/90"
           >
             Reintentar
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="refresh"
+            variant="neutral"
             onClick={() => window.location.reload()}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
           >
             Recargar la página
-          </button>
+          </ActionButton>
         </div>
       </div>
     );

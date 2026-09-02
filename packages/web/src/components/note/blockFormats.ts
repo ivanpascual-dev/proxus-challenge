@@ -26,6 +26,15 @@ export const BLOCK_FORMATS: readonly BlockFormat[] = [
     }
   },
   {
+    title: "Título grande",
+    short: "H1",
+    description: "Encabezado principal del bloque (H1)",
+    isActive: (editor) => editor.isActive("heading", { level: 1 }),
+    apply: (editor) => {
+      editor.chain().focus().toggleHeading({ level: 1 }).run();
+    }
+  },
+  {
     title: "Título",
     short: "H2",
     description: "Encabezado de sección (H2)",

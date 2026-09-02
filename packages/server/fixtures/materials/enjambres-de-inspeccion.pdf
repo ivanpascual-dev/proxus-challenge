@@ -1,0 +1,275 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Length 3232 >>
+stream
+BT /F2 22 Tf 48 778.0 Td (Enjambres de Inspección Autónoma) Tj ET
+BT /F1 12 Tf 48 738.0 Td (Manual del operador, edición 3 \(documento sintético de demostración\)) Tj ET
+BT /F1 11 Tf 48 700.0 Td (Este manual describe la operación de enjambres de inspección autónoma \(EIA\) en) Tj ET
+BT /F1 11 Tf 48 684.0 Td (instalaciones industriales cerradas. Todo su contenido es inventado: ni la disciplina,) Tj ET
+BT /F1 11 Tf 48 668.0 Td (ni las normas que cita, ni las cifras que da corresponden a ningún sistema real.) Tj ET
+BT /F1 11 Tf 48 652.0 Td (Existe para que se pueda probar una aplicación de estudio con un documento denso y sin) Tj ET
+BT /F1 11 Tf 48 636.0 Td (derechos de terceros.) Tj ET
+BT /F2 15 Tf 48 590.0 Td (1. Fundamentos y vocabulario) Tj ET
+BT /F1 11 Tf 48 560.0 Td (Un enjambre de inspección autónoma es un conjunto de entre 6 y 48 unidades móviles que) Tj ET
+BT /F1 11 Tf 48 544.0 Td (recorren una instalación sin operador a los mandos, coordinándose entre ellas para) Tj ET
+BT /F1 11 Tf 48 528.0 Td (cubrir una superficie acordada de antemano. Se distingue de una flota teledirigida en) Tj ET
+BT /F1 11 Tf 48 512.0 Td (tres propiedades, y las tres tienen que darse a la vez: reparto interno del trabajo,) Tj ET
+BT /F1 11 Tf 48 496.0 Td (tolerancia a la pérdida de unidades y cierre de misión sin intervención externa.) Tj ET
+BT /F1 11 Tf 48 468.0 Td (El vocabulario del manual es fijo y conviene no mezclarlo. Se llama nodo a cada unidad) Tj ET
+BT /F1 11 Tf 48 452.0 Td (móvil. Se llama célula al grupo de nodos que comparte una zona y un mismo nodo guía.) Tj ET
+BT /F1 11 Tf 48 436.0 Td (Se llama malla a la red de radio que une a todos los nodos de una misión, y relevo al) Tj ET
+BT /F1 11 Tf 48 420.0 Td (cambio programado de un nodo que agota su carga por otro que estaba en reserva. La) Tj ET
+BT /F1 11 Tf 48 404.0 Td (superficie que un enjambre se compromete a recorrer se llama pliego, y el registro de) Tj ET
+BT /F1 11 Tf 48 388.0 Td (lo que efectivamente recorrió se llama acta de cobertura.) Tj ET
+BT /F1 11 Tf 48 360.0 Td (Un enjambre nunca inspecciona: recorre y registra. La inspección propiamente dicha, es) Tj ET
+BT /F1 11 Tf 48 344.0 Td (decir el juicio sobre si lo registrado indica un defecto, es siempre posterior y) Tj ET
+BT /F1 11 Tf 48 328.0 Td (humana. Esta separación es la razón de que el manual hable de cobertura y no de) Tj ET
+BT /F1 11 Tf 48 312.0 Td (hallazgos: un enjambre que cubre el 100% del pliego y no encuentra nada ha hecho su) Tj ET
+BT /F1 11 Tf 48 296.0 Td (trabajo completo.) Tj ET
+BT /F2 15 Tf 48 250.0 Td (2. Clasificación por grado de autonomía) Tj ET
+BT /F1 11 Tf 48 220.0 Td (Los enjambres se clasifican en tres clases según cuánto pueden decidir sin consultar.) Tj ET
+BT /F1 11 Tf 48 204.0 Td (La clase determina qué instalaciones tienen permitidas y con cuánta supervisión.) Tj ET
+BT /F1 11 Tf 56 176.0 Td (• Clase A, autonomía asistida: el enjambre propone el reparto de zonas y espera) Tj ET
+BT /F1 11 Tf 56 160.0 Td (  confirmación humana antes de arrancar. Puede operar en cualquier instalación.) Tj ET
+BT /F1 11 Tf 56 144.0 Td (  Requiere un operador presente durante toda la misión. Tiempo máximo de misión: 90) Tj ET
+BT /F1 11 Tf 56 128.0 Td (  minutos.) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 3491 >>
+stream
+BT /F1 11 Tf 56 778.0 Td (• Clase B, autonomía supervisada: el enjambre reparte zonas y arranca por su cuenta,) Tj ET
+BT /F1 11 Tf 56 762.0 Td (  pero cada relevo y cada cambio de pliego se notifica y puede vetarse en los 30) Tj ET
+BT /F1 11 Tf 56 746.0 Td (  segundos siguientes. Prohibida en instalaciones con presencia de personal. Tiempo) Tj ET
+BT /F1 11 Tf 56 730.0 Td (  máximo de misión: 240 minutos.) Tj ET
+BT /F1 11 Tf 56 706.0 Td (• Clase C, autonomía plena: el enjambre decide reparto, relevos y cierre sin) Tj ET
+BT /F1 11 Tf 56 690.0 Td (  consulta, y solo entrega el acta al terminar. Permitida únicamente en) Tj ET
+BT /F1 11 Tf 56 674.0 Td (  instalaciones desalojadas y con certificado de aislamiento vigente. Tiempo máximo) Tj ET
+BT /F1 11 Tf 56 658.0 Td (  de misión: 12 horas.) Tj ET
+BT /F1 11 Tf 48 628.0 Td (La clase no es una propiedad del hardware sino de la configuración de la misión: el) Tj ET
+BT /F1 11 Tf 48 612.0 Td (mismo enjambre puede operar como clase A por la mañana y como clase C por la noche.) Tj ET
+BT /F1 11 Tf 48 596.0 Td (Bajar de clase durante una misión en curso está permitido y es inmediato. Subir de) Tj ET
+BT /F1 11 Tf 48 580.0 Td (clase durante una misión en curso está prohibido sin excepción: obliga a cerrar el) Tj ET
+BT /F1 11 Tf 48 564.0 Td (acta y abrir una misión nueva.) Tj ET
+BT /F2 15 Tf 48 518.0 Td (3. Arquitectura de una célula) Tj ET
+BT /F1 11 Tf 48 488.0 Td (Toda célula tiene exactamente cuatro roles, y los cuatro tienen que estar cubiertos) Tj ET
+BT /F1 11 Tf 48 472.0 Td (para que la célula se considere operativa. Un nodo desempeña un solo rol a la vez,) Tj ET
+BT /F1 11 Tf 48 456.0 Td (pero puede cambiar de rol entre fases.) Tj ET
+BT /F1 11 Tf 56 428.0 Td (• Guía: fija el orden del recorrido y es el único que habla con las otras células.) Tj ET
+BT /F1 11 Tf 56 412.0 Td (  Uno por célula, nunca dos.) Tj ET
+BT /F1 11 Tf 56 388.0 Td (• Testigo: registra. Es el rol que produce el dato que se va a inspeccionar después.) Tj ET
+BT /F1 11 Tf 56 372.0 Td (  Mínimo dos por célula, porque un solo testigo deja el registro sin contraste.) Tj ET
+BT /F1 11 Tf 56 348.0 Td (• Repetidor: mantiene la malla cuando la geometría de la instalación corta la radio.) Tj ET
+BT /F1 11 Tf 56 332.0 Td (  Su número depende del pliego, no de la célula: uno por cada tramo sin línea de) Tj ET
+BT /F1 11 Tf 56 316.0 Td (  vista.) Tj ET
+BT /F1 11 Tf 56 292.0 Td (• Reserva: no recorre. Espera en el punto de relevo con carga completa. Mínimo uno) Tj ET
+BT /F1 11 Tf 56 276.0 Td (  por célula si la misión pasa de 60 minutos; ninguno si no los pasa.) Tj ET
+BT /F1 11 Tf 48 246.0 Td (El tamaño mínimo de una célula operativa es por tanto de cuatro nodos para misiones) Tj ET
+BT /F1 11 Tf 48 230.0 Td (cortas \(un guía, dos testigos y un repetidor\) y de cinco para misiones de más de 60) Tj ET
+BT /F1 11 Tf 48 214.0 Td (minutos. El tamaño máximo es de doce: por encima, el guía tarda más en cerrar una) Tj ET
+BT /F1 11 Tf 48 198.0 Td (ronda de coordinación que lo que dura el tramo más corto del recorrido, y la célula se) Tj ET
+BT /F1 11 Tf 48 182.0 Td (pasa el tiempo esperándose a sí misma.) Tj ET
+BT /F1 11 Tf 48 154.0 Td (Cuando un guía cae, la célula elige guía nuevo por antigüedad de carga: manda el nodo) Tj ET
+BT /F1 11 Tf 48 138.0 Td (cuya batería lleve menos tiempo en uso. No se elige por proximidad ni por rol previo.) Tj ET
+BT /F1 11 Tf 48 122.0 Td (La razón es que un guía se elige para que dure, no para que llegue rápido.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 3120 >>
+stream
+BT /F2 15 Tf 48 760.0 Td (4. Ciclo de misión: las cinco fases) Tj ET
+BT /F1 11 Tf 48 730.0 Td (Una misión pasa siempre por las mismas cinco fases y siempre en el mismo orden.) Tj ET
+BT /F1 11 Tf 48 714.0 Td (Saltarse una fase invalida el acta de cobertura, aunque el recorrido haya sido) Tj ET
+BT /F1 11 Tf 48 698.0 Td (correcto.) Tj ET
+BT /F1 11 Tf 56 670.0 Td (• Fase 1, reconocimiento: el enjambre recorre el perímetro del pliego sin registrar,) Tj ET
+BT /F1 11 Tf 56 654.0 Td (  para medir la geometría real y colocar los repetidores. Duración típica: 8) Tj ET
+BT /F1 11 Tf 56 638.0 Td (  minutos. No cuenta como cobertura.) Tj ET
+BT /F1 11 Tf 56 614.0 Td (• Fase 2, reparto: el guía de cada célula recibe su zona y confirma que puede) Tj ET
+BT /F1 11 Tf 56 598.0 Td (  cubrirla con la carga que tiene. Una célula que no confirma devuelve su zona al) Tj ET
+BT /F1 11 Tf 56 582.0 Td (  reparto. Duración típica: 2 minutos.) Tj ET
+BT /F1 11 Tf 56 558.0 Td (• Fase 3, barrido: es el recorrido propiamente dicho. Ocupa entre el 70% y el 85%) Tj ET
+BT /F1 11 Tf 56 542.0 Td (  del tiempo total de la misión. Es la única fase en la que se registra.) Tj ET
+BT /F1 11 Tf 56 518.0 Td (• Fase 4, recosido: el enjambre vuelve sobre los huecos que dejó el barrido,) Tj ET
+BT /F1 11 Tf 56 502.0 Td (  normalmente por sombras de radio o por relevos mal encadenados. Si el recosido) Tj ET
+BT /F1 11 Tf 56 486.0 Td (  pasa del 15% del pliego, la misión se marca como deficiente aunque acabe cubriendo) Tj ET
+BT /F1 11 Tf 56 470.0 Td (  el 100%.) Tj ET
+BT /F1 11 Tf 56 446.0 Td (• Fase 5, cierre: se consolida el acta, se firma con la clase de la misión y se) Tj ET
+BT /F1 11 Tf 56 430.0 Td (  descargan los registros. Un cierre incompleto deja el acta en estado provisional) Tj ET
+BT /F1 11 Tf 56 414.0 Td (  durante 72 horas, y pasado ese plazo la misión se descarta entera.) Tj ET
+BT /F2 15 Tf 48 366.0 Td (5. Métricas y umbrales de aceptación) Tj ET
+BT /F1 11 Tf 48 336.0 Td (Una misión se acepta o se rechaza contra cuatro números, y basta que uno falle para) Tj ET
+BT /F1 11 Tf 48 320.0 Td (rechazarla. Los umbrales son los mismos para las tres clases: la clase cambia quién) Tj ET
+BT /F1 11 Tf 48 304.0 Td (puede autorizar una excepción, no dónde está el listón.) Tj ET
+BT /F1 11 Tf 56 276.0 Td (• Cobertura efectiva: porcentaje del pliego recorrido por al menos un testigo.) Tj ET
+BT /F1 11 Tf 56 260.0 Td (  Umbral de aceptación: 92%. Por debajo de 80% la misión no se rechaza, se anula, y) Tj ET
+BT /F1 11 Tf 56 244.0 Td (  no genera acta.) Tj ET
+BT /F1 11 Tf 56 220.0 Td (• Deriva de posición: distancia entre dónde el nodo cree que está y dónde está.) Tj ET
+BT /F1 11 Tf 56 204.0 Td (  Umbral: 0,4 metros de media y 1,2 metros de pico. Se mide contra los balizamientos) Tj ET
+BT /F1 11 Tf 56 188.0 Td (  fijos del perímetro.) Tj ET
+BT /F1 11 Tf 56 164.0 Td (• Latencia de malla: tiempo que tarda un mensaje del guía en llegar al último nodo) Tj ET
+BT /F1 11 Tf 56 148.0 Td (  de su célula. Umbral: 300 milisegundos. Por encima, los relevos se encadenan mal y) Tj ET
+BT /F1 11 Tf 56 132.0 Td (  aparece el recosido.) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 3167 >>
+stream
+BT /F1 11 Tf 56 778.0 Td (• Reserva al cierre: carga que le queda al enjambre cuando termina. Umbral: 15% de) Tj ET
+BT /F1 11 Tf 56 762.0 Td (  la carga total inicial. Terminar por debajo de 15% se registra como incidencia) Tj ET
+BT /F1 11 Tf 56 746.0 Td (  aunque la cobertura sea del 100%.) Tj ET
+BT /F1 11 Tf 48 716.0 Td (Las cuatro métricas se calculan sobre la misión entera, nunca por célula. Una célula) Tj ET
+BT /F1 11 Tf 48 700.0 Td (puede bajar de 92% de cobertura sin que la misión se rechace, siempre que otra la) Tj ET
+BT /F1 11 Tf 48 684.0 Td (compense. Esto es deliberado: el compromiso se adquiere sobre el pliego, y el pliego) Tj ET
+BT /F1 11 Tf 48 668.0 Td (es del enjambre, no de la célula.) Tj ET
+BT /F2 15 Tf 48 622.0 Td (6. Fallos típicos y protocolo de recuperación) Tj ET
+BT /F1 11 Tf 48 592.0 Td (Seis fallos concentran la mayoría de las misiones rechazadas. Cada uno tiene un) Tj ET
+BT /F1 11 Tf 48 576.0 Td (protocolo fijo, y el protocolo se aplica sin deliberar: la deliberación es lo que) Tj ET
+BT /F1 11 Tf 48 560.0 Td (convierte un fallo recuperable en una misión perdida.) Tj ET
+BT /F1 11 Tf 56 532.0 Td (• Guía mudo: el guía deja de emitir pero sigue moviéndose. Es el más peligroso) Tj ET
+BT /F1 11 Tf 56 516.0 Td (  porque la célula no lo detecta como caída. Protocolo: la célula espera dos rondas) Tj ET
+BT /F1 11 Tf 56 500.0 Td (  de coordinación y, si no hay respuesta, elige guía nuevo y marca al mudo como) Tj ET
+BT /F1 11 Tf 56 484.0 Td (  obstáculo móvil.) Tj ET
+BT /F1 11 Tf 56 460.0 Td (• Sombra persistente: un tramo del pliego sin cobertura de radio que el) Tj ET
+BT /F1 11 Tf 56 444.0 Td (  reconocimiento no detectó. Protocolo: colocar un repetidor adicional y reintentar) Tj ET
+BT /F1 11 Tf 56 428.0 Td (  el tramo en la fase de recosido, nunca en el barrido.) Tj ET
+BT /F1 11 Tf 56 404.0 Td (• Relevo cruzado: dos nodos de células distintas coinciden en el mismo punto de) Tj ET
+BT /F1 11 Tf 56 388.0 Td (  relevo. Protocolo: cede el que tenga menos carga; si están igualados, cede el de) Tj ET
+BT /F1 11 Tf 56 372.0 Td (  identificador mayor.) Tj ET
+BT /F1 11 Tf 56 348.0 Td (• Deriva acumulada: la posición estimada se degrada a lo largo de la misión sin) Tj ET
+BT /F1 11 Tf 56 332.0 Td (  ningún salto brusco. Protocolo: rebalizar contra el perímetro cada 20 minutos. No) Tj ET
+BT /F1 11 Tf 56 316.0 Td (  se corrige con un solo rebalizado.) Tj ET
+BT /F1 11 Tf 56 292.0 Td (• Pliego caliente: la instalación cambia durante la misión \(se abre una puerta, se) Tj ET
+BT /F1 11 Tf 56 276.0 Td (  mueve una máquina\). Protocolo: congelar el reparto, repetir la fase 1 solo en la) Tj ET
+BT /F1 11 Tf 56 260.0 Td (  zona afectada y reanudar. El tiempo de la fase 1 repetida no cuenta contra el) Tj ET
+BT /F1 11 Tf 56 244.0 Td (  máximo de la clase.) Tj ET
+BT /F1 11 Tf 56 220.0 Td (• Cierre huérfano: la misión termina pero ningún nodo consigue entregar el acta.) Tj ET
+BT /F1 11 Tf 56 204.0 Td (  Protocolo: el acta queda provisional 72 horas y cualquier nodo del enjambre puede) Tj ET
+BT /F1 11 Tf 56 188.0 Td (  entregarla en ese plazo.) Tj ET
+BT /F2 15 Tf 48 140.0 Td (7. Energía, relevos y cálculo de reserva) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 3163 >>
+stream
+BT /F1 11 Tf 48 778.0 Td (El consumo de un nodo no es constante: recorrer cuesta aproximadamente el triple que) Tj ET
+BT /F1 11 Tf 48 762.0 Td (esperar en el punto de relevo, y registrar cuesta un 40% más que recorrer sin) Tj ET
+BT /F1 11 Tf 48 746.0 Td (registrar. Por eso el cálculo de reserva se hace sobre tiempo de barrido, no sobre) Tj ET
+BT /F1 11 Tf 48 730.0 Td (tiempo de misión.) Tj ET
+BT /F1 11 Tf 48 702.0 Td (La regla práctica del manual es la regla del tercio: un nodo no debe entrar en barrido) Tj ET
+BT /F1 11 Tf 48 686.0 Td (con menos de un tercio más de carga de la que su tramo requiere en teoría. Un tramo) Tj ET
+BT /F1 11 Tf 48 670.0 Td (que en el papel pide 30 minutos de barrido exige entrar con carga para 40. El tercio) Tj ET
+BT /F1 11 Tf 48 654.0 Td (cubre la deriva, el recosido previsible y el trayecto hasta el punto de relevo, que) Tj ET
+BT /F1 11 Tf 48 638.0 Td (nunca está donde termina el tramo.) Tj ET
+BT /F1 11 Tf 48 610.0 Td (El número de nodos en reserva se calcula dividiendo la duración prevista del barrido) Tj ET
+BT /F1 11 Tf 48 594.0 Td (entre la autonomía útil de un nodo y redondeando hacia arriba, con un mínimo de uno) Tj ET
+BT /F1 11 Tf 48 578.0 Td (por célula. Una misión de 200 minutos de barrido con nodos de 75 minutos de autonomía) Tj ET
+BT /F1 11 Tf 48 562.0 Td (útil necesita tres nodos en reserva por célula. Redondear hacia abajo es el error más) Tj ET
+BT /F1 11 Tf 48 546.0 Td (común y produce cierres por debajo del 15% de reserva.) Tj ET
+BT /F2 15 Tf 48 500.0 Td (8. Límites operativos y normativa interna) Tj ET
+BT /F1 11 Tf 48 470.0 Td (Los límites siguientes no admiten excepción por parte del operador de turno.) Tj ET
+BT /F1 11 Tf 48 454.0 Td (Levantarlos requiere autorización escrita del responsable de instalación y queda) Tj ET
+BT /F1 11 Tf 48 438.0 Td (registrado en el acta.) Tj ET
+BT /F1 11 Tf 56 410.0 Td (• Ningún enjambre opera con menos de 6 nodos ni con más de 48.) Tj ET
+BT /F1 11 Tf 56 386.0 Td (• Ninguna misión de clase B o C arranca sin certificado de aislamiento con menos de) Tj ET
+BT /F1 11 Tf 56 370.0 Td (  24 horas.) Tj ET
+BT /F1 11 Tf 56 346.0 Td (• Ningún nodo permanece en barrido más de 75 minutos seguidos, aunque le sobre) Tj ET
+BT /F1 11 Tf 56 330.0 Td (  carga.) Tj ET
+BT /F1 11 Tf 56 306.0 Td (• Ninguna instalación admite dos enjambres simultáneos con pliegos que se solapen) Tj ET
+BT /F1 11 Tf 56 290.0 Td (  más del 10%.) Tj ET
+BT /F1 11 Tf 56 266.0 Td (• Ningún acta se firma sin las cuatro métricas de la sección 5, aunque las cuatro) Tj ET
+BT /F1 11 Tf 56 250.0 Td (  estén en verde.) Tj ET
+BT /F1 11 Tf 56 226.0 Td (• Ninguna misión rechazada se repite el mismo día sin cambiar al menos un parámetro) Tj ET
+BT /F1 11 Tf 56 210.0 Td (  del pliego.) Tj ET
+BT /F1 11 Tf 48 180.0 Td (El incumplimiento de un límite no invalida los datos registrados: invalida el acta.) Tj ET
+BT /F1 11 Tf 48 164.0 Td (Los registros siguen siendo utilizables para una inspección humana, pero la misión no) Tj ET
+BT /F1 11 Tf 48 148.0 Td (cuenta como cobertura declarada de la instalación, que es lo que se audita.) Tj ET
+BT /F2 15 Tf 48 102.0 Td (9. Cierre, actas y auditoría) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 2692 >>
+stream
+BT /F1 11 Tf 48 778.0 Td (El acta de cobertura es el único producto de una misión que sale del enjambre.) Tj ET
+BT /F1 11 Tf 48 762.0 Td (Contiene el pliego comprometido, el recorrido efectivo, las cuatro métricas, la clase) Tj ET
+BT /F1 11 Tf 48 746.0 Td (con la que se operó, la lista de relevos y la lista de incidencias. No contiene juicio) Tj ET
+BT /F1 11 Tf 48 730.0 Td (alguno sobre lo registrado.) Tj ET
+BT /F1 11 Tf 48 702.0 Td (Un acta es firme cuando la firma el guía de la célula con más cobertura y la) Tj ET
+BT /F1 11 Tf 48 686.0 Td (contrafirma el operador, o, en clase C, cuando pasan 30 minutos sin objeción desde su) Tj ET
+BT /F1 11 Tf 48 670.0 Td (entrega. Un acta firme no se modifica: si aparece un error, se emite un acta) Tj ET
+BT /F1 11 Tf 48 654.0 Td (correctora que cita a la anterior y explica la diferencia. Borrar un acta es imposible) Tj ET
+BT /F1 11 Tf 48 638.0 Td (por diseño.) Tj ET
+BT /F1 11 Tf 48 610.0 Td (La auditoría anual revisa una de cada veinte actas, elegidas al azar, y comprueba tres) Tj ET
+BT /F1 11 Tf 48 594.0 Td (cosas: que la cobertura declarada se sostiene con los registros, que las incidencias) Tj ET
+BT /F1 11 Tf 48 578.0 Td (registradas tienen protocolo aplicado y que ningún límite de la sección 8 se levantó) Tj ET
+BT /F1 11 Tf 48 562.0 Td (sin autorización escrita. Una sola acta que falle los tres puntos obliga a auditar la) Tj ET
+BT /F1 11 Tf 48 546.0 Td (totalidad del año.) Tj ET
+BT /F2 15 Tf 48 500.0 Td (10. Glosario) Tj ET
+BT /F1 11 Tf 56 470.0 Td (• Acta de cobertura: registro de lo que un enjambre recorrió efectivamente, con sus) Tj ET
+BT /F1 11 Tf 56 454.0 Td (  métricas.) Tj ET
+BT /F1 11 Tf 56 430.0 Td (• Barrido: fase 3, la única en la que se registra.) Tj ET
+BT /F1 11 Tf 56 406.0 Td (• Célula: grupo de nodos con una zona y un guía comunes.) Tj ET
+BT /F1 11 Tf 56 382.0 Td (• Cobertura efectiva: porcentaje del pliego recorrido por al menos un testigo.) Tj ET
+BT /F1 11 Tf 56 358.0 Td (• Deriva: distancia entre la posición estimada de un nodo y la real.) Tj ET
+BT /F1 11 Tf 56 334.0 Td (• Malla: red de radio que une a los nodos de una misión.) Tj ET
+BT /F1 11 Tf 56 310.0 Td (• Nodo: cada unidad móvil del enjambre.) Tj ET
+BT /F1 11 Tf 56 286.0 Td (• Pliego: superficie que el enjambre se compromete a recorrer.) Tj ET
+BT /F1 11 Tf 56 262.0 Td (• Recosido: fase 4, vuelta sobre los huecos que dejó el barrido.) Tj ET
+BT /F1 11 Tf 56 238.0 Td (• Relevo: cambio programado de un nodo agotado por uno en reserva.) Tj ET
+BT /F1 11 Tf 56 214.0 Td (• Regla del tercio: entrar en barrido con un tercio más de carga de la teórica.) Tj ET
+BT /F1 11 Tf 56 190.0 Td (• Sombra: tramo del pliego sin cobertura de radio.) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+15 0 obj
+<< /Type /Pages /Kids [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R] /Count 6 >>
+endobj
+16 0 obj
+<< /Type /Catalog /Pages 15 0 R >>
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000009 00000 n 
+0000000106 00000 n 
+0000000208 00000 n 
+0000003492 00000 n 
+0000007035 00000 n 
+0000010207 00000 n 
+0000013426 00000 n 
+0000016641 00000 n 
+0000019385 00000 n 
+0000019522 00000 n 
+0000019660 00000 n 
+0000019798 00000 n 
+0000019936 00000 n 
+0000020074 00000 n 
+0000020212 00000 n 
+0000020305 00000 n 
+trailer
+<< /Size 17 /Root 16 0 R >>
+startxref
+20356
+%%EOF

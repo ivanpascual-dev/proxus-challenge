@@ -26,6 +26,10 @@ La sesión vive en el servidor (fase 4, decisión 6): `POST /chat` y `/chat/stre
 techo (`LIMITS.maxConversations`, 50); `POST /conversations` crea una vacía, `GET /conversations` las
 lista sin su historial (para la barra lateral), `GET /conversations/:id` trae una con sus turnos.
 
+El `context` se comprueba contra los repositorios antes de llegar al modelo (ADR-032): una referencia
+que nombre un material que no existe, una página fuera de rango, una prueba que no lo es o un bloque
+borrado se rechaza con `InvalidScreenContext` (400) en `/chat`, y como evento `error` en `/stream`.
+
 `/stream` devuelve NDJSON (`TutorChatStreamEvent`, `packages/shared/src/api/tutor.ts`):
 
 ```json
@@ -63,10 +67,10 @@ POST   /api/materials/:id/assessments
 
 Los materiales representan PDFs disponibles para el tutor. El server puede renderizar páginas vía Poppler para que Gemini las procese como imágenes.
 
-`POST /` sube hasta `maxFilesPerUpload` PDFs a la vez (multipart, `maxUploadBytes` por fichero), solo
+`POST /` sube hasta `maxFilesPerUpload` PDFs a la vez (multipart, `maxUploadBytes` y `maxPagesPerMaterial` por fichero), solo
 PDF (fase 4, decisión 2); al subir, cada material se indexa y se le generan los apuntes en cadena, sin
 pulsar nada más (decisión 3). El fallo de un fichero concreto (tipo, nombre duplicado) va dentro de la
-respuesta, uno por fichero; solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
+respuesta, uno por fichero (el techo de páginas incluido: `MaterialTooManyPages`); solo los fallos agregados (frecuencia, número de ficheros, `maxMaterials`)
 abortan la subida entera, antes de escribir nada.
 
 `POST /validate` (cierre de fase 4) comprueba el mismo lote (multipart, mismo `UploadPayload`) sin

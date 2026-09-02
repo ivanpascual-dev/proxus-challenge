@@ -99,8 +99,8 @@ const generateTopic = (topic: TopicFixture, mode: ThinkingMode): Effect.Effect<T
     }
 
     const parsed = parseGeneratedQuestions(response.text);
-    if (parsed.kind === "insufficient") {
-      return { questions: [], note: `el modelo dijo "insufficientContent" (maxPossible ${parsed.maxPossible})`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
+    if (parsed.kind === "legacy-insufficient") {
+      return { questions: [], note: `el modelo dijo "insufficientContent" en formato antiguo (maxPossible ${parsed.maxPossible})`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
     }
     if (parsed.kind === "unparseable") {
       return { questions: [], note: `no se pudo parsear la respuesta (${parsed.reason})${lengthNote}`, reasoningTokens: response.reasoning, finishReason: response.finishReason };
@@ -111,7 +111,10 @@ const generateTopic = (topic: TopicFixture, mode: ThinkingMode): Effect.Effect<T
         ? [{ prompt: question.prompt, options: question.options, correctOptionId: question.correctOptionId }]
         : []
     );
-    const note = parsed.dropped.length > 0 ? `${parsed.dropped.length} pregunta(s) descartada(s) al parsear${lengthNote}` : lengthNote.trim();
+    const insufficientNote = parsed.insufficientContent ? " (insufficientContent: true)" : "";
+    const note = parsed.dropped.length > 0
+      ? `${parsed.dropped.length} pregunta(s) descartada(s) al parsear${lengthNote}${insufficientNote}`
+      : `${lengthNote}${insufficientNote}`.trim();
     return { questions, note, reasoningTokens: response.reasoning, finishReason: response.finishReason };
   });
 

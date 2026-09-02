@@ -3,8 +3,9 @@ import type { AbandonedAttempt, ArtifactAttempt, GradedAttempt, SolvableAssessme
 import { useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { attemptHistoryQuery, disputeAction, solvableAssessmentQuery } from "../../domain/assessments/atoms.ts";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { answersFromStored, AttemptSummary, type LocalAnswers, QuestionCard } from "./question-view.tsx";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El historial de una prueba (paso 23 del plan): todos sus intentos, los abandonados incluidos con su
 // motivo y sus interrupciones. Un intento corregido se abre entero con sus correcciones; uno
@@ -13,11 +14,13 @@ import { answersFromStored, AttemptSummary, type LocalAnswers, QuestionCard } fr
 export function AttemptHistory({
   artifactId,
   title,
-  onExit
+  onExit,
+  onOpenCitation
 }: {
   readonly artifactId: string;
   readonly title: string;
   readonly onExit: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const history = useAtomValue(attemptHistoryQuery(artifactId));
   const [openId, setOpenId] = useState<string | null>(null);
@@ -25,13 +28,14 @@ export function AttemptHistory({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
+        <ActionButton
+          icon="chevron-left"
+          variant="brand"
+          size="compact"
           onClick={onExit}
-          className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
         >
-          ← Volver a la lista
-        </button>
+          Volver a la lista
+        </ActionButton>
       </div>
 
       <h2 className="mb-1 font-bold text-heading text-xl">{title}</h2>
@@ -39,14 +43,15 @@ export function AttemptHistory({
 
       {AsyncResult.matchWithError(history, {
         onInitial: () => <p className="text-muted">Cargando el historial…</p>,
-        onError: (error) => (
-          <p className="text-danger-ink">No se pudo cargar el historial: {messageOf(error)}</p>
-        ),
-        onDefect: () => <p className="text-danger-ink">No se pudo cargar el historial: {DEFECT_MESSAGE}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "history" }, "AttemptHistory");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
+        onDefect: () => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
         onSuccess: ({ value }) => {
           if (value.length === 0) {
             return (
-              <p className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
+              <p className=" border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
                 Esta prueba no tiene intentos todavía.
               </p>
             );
@@ -55,7 +60,14 @@ export function AttemptHistory({
           const open = openId === null ? null : sorted.find((attempt) => attempt.id === openId) ?? null;
 
           if (open !== null) {
-            return <OpenAttempt attempt={open} artifactId={artifactId} onBack={() => setOpenId(null)} />;
+            return (
+              <OpenAttempt
+                attempt={open}
+                artifactId={artifactId}
+                onBack={() => setOpenId(null)}
+                onOpenCitation={onOpenCitation}
+              />
+            );
           }
 
           return (
@@ -85,7 +97,7 @@ function AttemptRow({
   readonly onOpen: (() => void) | undefined;
 }) {
   return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
+    <li className="border-border border-b py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="mb-1 text-muted text-xs uppercase tracking-widest">
@@ -97,13 +109,14 @@ function AttemptRow({
           )}
         </div>
         {onOpen !== undefined && (
-          <button
-            type="button"
-            className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+          <ActionButton
+            icon="arrow-right"
+            variant="brand"
+            size="compact"
             onClick={onOpen}
           >
             {attempt.status === "graded" ? "Ver correcciones" : "Ver detalle"}
-          </button>
+          </ActionButton>
         )}
       </div>
     </li>
@@ -114,7 +127,7 @@ function statusLine(attempt: ArtifactAttempt): string {
   if (attempt.status === "graded") {
     const time = formatSeconds(attempt.elapsedSeconds);
     const penalty = attempt.penalty > 0 ? ` · penalización ${round2(attempt.penalty)}` : "";
-    return `Nota ${attempt.displayedScore} / 10 · ${time}${penalty}`;
+    return `Nota ${round2(attempt.displayedScore)} / 10 · ${time}${penalty}`;
   }
   if (attempt.status === "abandoned") {
     return attempt.reason === "cancelled" ? "Cancelado por ti" : "Caducado al agotarse el tiempo";
@@ -127,25 +140,29 @@ function statusLine(attempt: ArtifactAttempt): string {
 function OpenAttempt({
   attempt,
   artifactId,
-  onBack
+  onBack,
+  onOpenCitation
 }: {
   readonly attempt: ArtifactAttempt;
   readonly artifactId: string;
   readonly onBack: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const solvable = useAtomValue(solvableAssessmentQuery(artifactId));
 
   return (
     <article className="mx-auto max-w-3xl pb-8">
-      <button
-        type="button"
+      <ActionButton
+        icon="chevron-left"
+        variant="brand"
+        size="compact"
         onClick={onBack}
-        className="mb-4 rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
+        className="mb-4"
       >
-        ← Volver al historial
-      </button>
+        Volver al historial
+      </ActionButton>
 
-      <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
+      <header className="mb-5 border-border border-b pb-4">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">
           {attempt.mode === "practice" ? "Práctica" : "Examen"} · {formatDate(attempt.startedAt)}
         </p>
@@ -156,11 +173,12 @@ function OpenAttempt({
 
       {attempt.status === "graded" && AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando las preguntas…</p>,
-        onError: (error) => (
-          <p className="text-danger-ink">No se pudieron cargar las preguntas: {messageOf(error)}</p>
-        ),
-        onDefect: () => <p className="text-danger-ink">No se pudieron cargar las preguntas: {DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => <GradedDetail attempt={attempt} assessment={value} />
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "AttemptHistory");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
+        onDefect: () => <p className="text-danger-ink">{DEFECT_MESSAGE}</p>,
+        onSuccess: ({ value }) => <GradedDetail attempt={attempt} assessment={value} onOpenCitation={onOpenCitation} />
       })}
     </article>
   );
@@ -168,10 +186,12 @@ function OpenAttempt({
 
 function GradedDetail({
   attempt,
-  assessment
+  assessment,
+  onOpenCitation
 }: {
   readonly attempt: GradedAttempt;
   readonly assessment: SolvableAssessment;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const dispute = useAtomSet(disputeAction, { mode: "promise" });
   const answers: LocalAnswers = answersFromStored(attempt.answers);
@@ -189,6 +209,7 @@ function GradedDetail({
             locked
             correction={attempt.corrections.find((item) => item.questionId === question.id)}
             onDispute={() => void dispute({ attemptId: attempt.id, questionId: question.id }).catch(() => {})}
+            onOpenCitation={onOpenCitation}
           />
         ))}
       </div>
@@ -200,14 +221,14 @@ function GradedDetail({
 function AbandonedDetail({ attempt }: { readonly attempt: AbandonedAttempt }) {
   return (
     <div className="grid gap-4">
-      <p className="rounded-2xl border border-border bg-surface p-4 text-body">
+      <p className=" border border-border bg-surface p-4 text-body">
         {attempt.reason === "cancelled"
           ? "Cancelaste este intento antes de entregarlo."
           : "Se agotó el tiempo conectado antes de entregar."}{" "}
         Un intento cerrado sin entregar no se corrige y no mueve tu perfil.
       </p>
       {attempt.interruptions.length > 0 && (
-        <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className=" border border-border bg-surface p-4">
           <p className="mb-2 font-semibold text-heading text-sm">
             {interruptionLabel(attempt.interruptions.length)}
           </p>

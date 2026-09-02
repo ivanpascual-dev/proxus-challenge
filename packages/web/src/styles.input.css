@@ -48,20 +48,24 @@
 @layer base {
   :root { color-scheme: light; }
 
+  /* Carbón violeta (fase 5, decisión 4 y §4.3): sustituye el azul tinta anterior. Contrastes medidos
+     antes de escribir el plan: heading/canvas 17.03:1, body/canvas 13.17:1, muted/canvas 7.13:1,
+     brand/canvas 6.82:1, on-brand/brand 6.76:1 y border-strong/surface 3.06:1. Los tokens semánticos
+     (success/danger/warning-ink) se vuelven a medir en sus combinaciones reales durante el QA de cierre. */
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --color-canvas:        #0B1020;
-    --color-surface:       #131A2E;
-    --color-surface-muted: #1B2439;
-    --color-border:        #2A3350;
-    --color-border-strong: #3A4665;
-    --color-heading:       #F8FAFC;
-    --color-body:          #E2E8F0;
-    --color-muted:         #94A3B8;
-    --color-disabled:      #64748B;
-    --color-brand:         #A67CFF;
-    --color-brand-soft:    #2B1E4D;
-    --color-on-brand:      #0B1020;
+    --color-canvas:        #151218;
+    --color-surface:       #1D1922;
+    --color-surface-muted: #27212D;
+    --color-border:        #39313F;
+    --color-border-strong: #72617D;
+    --color-heading:       #F7F4FA;
+    --color-body:          #DDD7E3;
+    --color-muted:         #A79DAD;
+    --color-disabled:      #746B7A;
+    --color-brand:         #A78BFA;
+    --color-brand-soft:    #302442;
+    --color-on-brand:      #17121D;
     --color-success-ink:   #A7F3D0;
     --color-danger-ink:    #FECACA;
     --color-warning-ink:   #FDE68A;
@@ -75,30 +79,75 @@
   textarea {
     font: inherit;
   }
+
+  /* §4.11: foco visible de 2px con offset en todo control interactivo, no solo en IconButton. Los
+     componentes que ya declaran su propio focus-visible (utilidad de Tailwind, más específica) ganan
+     por cascada de capas sin necesidad de excepción aquí. */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+/* F5-35: el movimiento reducido es una preferencia global. Los componentes no tienen que recordar
+   quitar por separado escalados, giros, highlights o transiciones al añadir una interacción nueva. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* Editor de bloque (TipTap). No hay plugin de tipografía, así que el ritmo vertical y los formatos
    del menú "/" se definen aquí, con los tokens del tema. */
 @layer components {
+  /* Correcciones posteriores a la sesión 4: las tres zonas (sidebar, material, Sym) ya no se separan
+     solo por una línea. El sidebar y el panel de Sym van sobre `surface` y el material sobre `canvas`,
+     un escalón de superficie; el sidebar añade además una sombra muy tenue con el color de heading a
+     baja opacidad. En tema oscuro el escalón de superficie es más marcado y la sombra casi no se ve. */
+  .zone-edge-right {
+    box-shadow: 10px 0 24px -16px color-mix(in srgb, var(--color-heading) 34%, transparent);
+  }
+
+  /* Fase 5: el texto del apunte es lo importante de la pantalla (§4.8, feedback de Iván), así que
+     lleva más cuerpo y más aire que el resto de la interfaz, no el tamaño de un dato secundario. */
   .tiptap-block {
     color: var(--color-body);
-    font-size: 0.95rem;
-    line-height: 1.65;
+    font-size: 1.0625rem;
+    line-height: 1.8;
     min-height: 2.5rem;
   }
 
   .tiptap-block > * + * {
-    margin-top: 0.6em;
+    margin-top: 0.9em;
+  }
+
+  /* F5-50: el H1 es el encabezado principal de un bloque y tiene que verse mayor que el H2. Sin esta
+     regla se serializaría como `#` pero se leería igual que el texto normal. */
+  .tiptap-block h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-heading);
   }
 
   .tiptap-block h2 {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--color-heading);
   }
 
   .tiptap-block h3 {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-heading);
   }

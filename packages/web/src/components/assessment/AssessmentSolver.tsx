@@ -22,37 +22,45 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // --- Entrada al solucionador ----------------------------------------------------------------------
 
 export function AssessmentSolver({
   artifactId,
   title,
-  onExit
+  onExit,
+  onOpenCitation
 }: {
   readonly artifactId: string;
   readonly title: string;
   readonly onExit: () => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const solvable = useAtomValue(solvableAssessmentQuery(artifactId));
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
+        <ActionButton
+          icon="chevron-left"
+          variant="brand"
+          size="compact"
           onClick={onExit}
-          className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
         >
-          ← Volver a la lista
-        </button>
+          Volver a la lista
+        </ActionButton>
       </div>
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <p className="text-muted">Cargando la prueba…</p>,
-        onError: (error) => <p className="text-danger-ink">No se pudo cargar la prueba: {messageOf(error)}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "AssessmentSolver");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
         onDefect: (defect) => <p className="text-danger-ink">No se pudo cargar la prueba: {DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} />
+        onSuccess: ({ value }) => <PracticeRun assessment={value} title={title} onOpenCitation={onOpenCitation} />
       })}
     </div>
   );
@@ -60,7 +68,15 @@ export function AssessmentSolver({
 
 // --- La sesión de práctica -----------------------------------------------------------------------
 
-function PracticeRun({ assessment, title }: { readonly assessment: SolvableAssessment; readonly title: string }) {
+function PracticeRun({
+  assessment,
+  title,
+  onOpenCitation
+}: {
+  readonly assessment: SolvableAssessment;
+  readonly title: string;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
+}) {
   const [attempt, setAttempt] = useState<InProgressAttempt | GradedAttempt | null>(null);
   const [answers, setAnswers] = useState<LocalAnswers>(emptyAnswers);
   const [hints, setHints] = useState<Record<string, string>>({});
@@ -93,7 +109,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió un intento en curso.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "start" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     } finally {
       setStarting(false);
     }
@@ -107,9 +124,10 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
       const result = await reveal({ artifactId: assessment.id, attemptId: attempt.id, questionId });
       setHints((current) => ({ ...current, [questionId]: result.hint }));
     } catch (cause) {
+      const notice = describeFailure(cause, { area: "assessments", action: "hint" }, "AssessmentSolver");
       setHintErrors((current) => ({
         ...current,
-        [questionId]: messageOf(cause)
+        [questionId]: notice.description ?? notice.title
       }));
     }
   };
@@ -132,7 +150,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setError("El servidor no devolvió el intento corregido.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +167,8 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
         setAttempt(result);
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "AssessmentSolver");
+      setError(notice.description ?? notice.title);
     }
   };
 
@@ -156,7 +176,7 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
 
   return (
     <article className="mx-auto max-w-3xl pb-8">
-      <header className="mb-5 rounded-3xl border border-border bg-surface p-6">
+      <header className="mb-5 border-border border-b pb-4">
         <p className="mb-2 font-bold text-brand text-xs uppercase tracking-widest">
           {assessment.kind === "quiz" ? "Control" : "Examen"} · práctica
         </p>
@@ -165,11 +185,15 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
           En práctica no hay reloj ni penalización. Puedes abrir las pistas, mirar el material en las
           otras pestañas y preguntarle al tutor. La corrección sale al entregar.
         </p>
+        {(() => {
+          const notice = partialAssessmentNotice(assessment.requestedQuestionCount, assessment.questions.length);
+          return notice === null ? null : <p className="mt-2 text-muted text-sm">{notice}</p>;
+        })()}
       </header>
 
       {attempt === null
         ? (
-            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/40 p-10 text-center">
+            <div className="grid place-items-center border border-dashed border-border bg-surface/40 p-10 text-center">
               <div>
                 <h3 className="font-bold text-heading text-lg">
                   {assessment.questions.length} {assessment.questions.length === 1 ? "pregunta" : "preguntas"}
@@ -178,14 +202,15 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
                   Empezar cuenta como un intento (tienes {LIMITS.maxPracticeAttemptsPerAssessment} en
                   práctica por prueba). El intento se guarda aunque lo dejes a medias.
                 </p>
-                <button
-                  type="button"
-                  className="mt-4 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                <ActionButton
+                  icon="play"
+                  variant="primary"
+                  className="mt-4"
                   onClick={() => void onStart()}
                   disabled={starting}
                 >
                   {starting ? "Empezando…" : "Empezar la práctica"}
-                </button>
+                </ActionButton>
               </div>
             </div>
           )
@@ -204,33 +229,34 @@ function PracticeRun({ assessment, title }: { readonly assessment: SolvableAsses
                   onRevealHint={() => void onRevealHint(question.id)}
                   correction={graded?.corrections.find((item) => item.questionId === question.id)}
                   onDispute={() => void onDispute(question.id)}
+                  onOpenCitation={onOpenCitation}
                 />
               ))}
             </div>
           )}
 
       {error !== undefined && (
-        <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
+        <p className="mt-4 border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
       )}
 
       {graded !== null && <AttemptSummary attempt={graded} />}
 
       {attempt !== null && graded === null && (
-        <footer className="sticky bottom-0 mt-6 rounded-3xl border border-border bg-canvas/95 p-4 backdrop-blur">
+        <footer className="sticky bottom-0 mt-6 border-border border-t bg-canvas/95 p-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted text-sm">
               {unanswered === 0
                 ? "Todo respondido."
                 : `${unanswered} ${unanswered === 1 ? "pregunta sin responder" : "preguntas sin responder"} (contarán como en blanco).`}
             </p>
-            <button
-              type="button"
-              className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+            <ActionButton
+              icon="check-circle"
+              variant="primary"
               onClick={() => void onSubmit()}
               disabled={submitting}
             >
               {submitting ? "Corrigiendo…" : "Entregar y corregir"}
-            </button>
+            </ActionButton>
           </div>
         </footer>
       )}

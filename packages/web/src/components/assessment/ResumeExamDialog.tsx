@@ -1,7 +1,8 @@
 import { useAtomSet } from "@effect/atom-react";
 import { useState } from "react";
 import { abandonAttemptAction } from "../../domain/assessments/atoms.ts";
-import { messageOf } from "../../lib/error-message.ts";
+import { describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
 
 // El diálogo de la decisión 19d: lo primero que se ve al arrancar la aplicación si hay un examen a
 // medias. Es también la llave de la puerta cerrada (decisión 18): elijas lo que elijas, sales del
@@ -39,14 +40,15 @@ export function ResumeExamDialog({
       // refresca solo y App vuelve a la aplicación normal.
       await abandon({ artifactId, attemptId });
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "cancel" }, "ResumeExamDialog");
+      setError(notice.description ?? notice.title);
       setBusy(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-canvas p-6 text-heading">
-      <div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6">
+      <div className="w-full max-w-md border border-border bg-surface p-6">
         <p className="font-bold text-brand text-xs uppercase tracking-widest">Examen a medias</p>
         <h2 className="mt-2 font-bold text-heading text-xl">
           Tienes un examen a medias{title === null ? "" : `: ${title}`}
@@ -58,26 +60,26 @@ export function ResumeExamDialog({
         </p>
 
         {error !== undefined && (
-          <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
         )}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
+          <ActionButton
+            icon="play"
+            variant="primary"
             onClick={onResume}
             disabled={busy}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:opacity-50"
           >
             Volver al examen
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="close"
+            variant="danger"
             onClick={() => void onCancel()}
             disabled={busy}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
           >
             {busy ? "Cancelando…" : "Cancelarlo"}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

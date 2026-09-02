@@ -1,20 +1,32 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { LIMITS, type AssessmentListEntry, type GenerateAssessmentInput, type StudyProfile } from "@proxus/shared";
 import { useEffect, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { materialAssessmentsQuery } from "../../domain/assessments/atoms.ts";
+import { deleteArtifactAction } from "../../domain/artifacts/atoms.ts";
 import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
+import { groupAssessments } from "../../domain/assessments/group-assessments.ts";
+import {
+  ASSESSMENT_STARTING_LINE,
+  assessmentProgressLine,
+  type ProgressLine
+} from "../../domain/progress/progress-line.ts";
+import { AssessmentGroupTabs, type AssessmentGroup } from "./AssessmentGroupTabs.tsx";
+import { AssessmentList } from "./AssessmentList.tsx";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
-import { StudyProfilePanel } from "./StudyProfilePanel.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
+import { GenerationProgress } from "../ui/GenerationProgress.tsx";
+import type { IconName } from "../ui/Icon.tsx";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
 // como prop; la pestaña la convierte en la tarjeta de generación con su selector de preguntas.
 export interface PendingControl {
   readonly topicId: string;
   readonly topicLabel: string;
+  readonly origin?: "material" | "review";
 }
 
 type View =
@@ -24,47 +36,77 @@ type View =
 
 type GenTarget =
   | { readonly kind: "test" }
-  | { readonly kind: "quiz"; readonly topicId: string; readonly topicLabel: string };
+  | {
+      readonly kind: "quiz";
+      readonly topicId: string;
+      readonly topicLabel: string;
+      readonly initialOrigin: "material" | "review";
+    };
 
-// Cómo se resuelve una prueba, a partir de su tipo y su modo. Un Control y un Examen de prueba se
-// resuelven en el mismo sitio (a libro abierto); un Examen real toma la aplicación entera.
-function rowKindLabel(entry: AssessmentListEntry): string {
-  if (entry.kind === "quiz") {
-    return "Control";
-  }
-  return entry.mode === "exam" ? "Examen real" : "Examen de prueba";
-}
+const EMPTY_MESSAGE: Record<AssessmentGroup, string> = {
+  controls: "Todavía no hay ningún Control. Genera uno desde un tema del mapa mental.",
+  practiceExams: "Todavía no hay ningún Examen de prueba. Genera uno con el botón de arriba.",
+  realExams: "Todavía no hay ningún Examen real. Genera uno de prueba y elige el modo «Real»."
+};
 
 export function AssessmentsTab({
   materialId,
   pendingControl,
   onPendingControlConsumed,
   onStartExam,
-  onActiveArtifactChange
+  onActiveArtifactChange,
+  onOpenCitation
 }: {
   readonly materialId: string;
   readonly pendingControl: PendingControl | null;
   readonly onPendingControlConsumed: () => void;
   readonly onStartExam: (artifactId: string, title: string) => void;
-  // Contexto de pantalla (fase 4, decisión 5): la prueba abierta en detalle, para el chip del tutor.
-  // `undefined` mientras se está en la lista, sin ninguna prueba concreta abierta.
-  readonly onActiveArtifactChange?: (artifact: { readonly id: string; readonly title: string } | undefined) => void;
+  // Contexto de pantalla (fase 4, decisión 5; fase 5, §5.2): la prueba abierta en detalle y en qué
+  // vista, para el chip del tutor. `undefined` mientras se está en la lista, sin ninguna prueba
+  // concreta abierta: la lista no finge que haya una seleccionada. El tipo y el modo NO viajan, los
+  // deriva el servidor del artefacto.
+  readonly onActiveArtifactChange?: (
+    artifact: { readonly id: string; readonly title: string; readonly view: "solve" | "history" } | undefined
+  ) => void;
+  readonly onOpenCitation: (materialId: string, page: number) => void;
 }) {
   const assessments = useAtomValue(materialAssessmentsQuery(materialId));
   const refresh = useAtomRefresh(materialAssessmentsQuery(materialId));
   const [view, setView] = useState<View>({ kind: "list" });
   const [genTarget, setGenTarget] = useState<GenTarget | null>(null);
+  const [activeGroup, setActiveGroup] = useState<AssessmentGroup>("controls");
+  const [deleteError, setDeleteError] = useState<string | undefined>();
+  const deleteArtifact = useAtomSet(deleteArtifactAction, { mode: "promise" });
+
+  const onDelete = async (entry: AssessmentListEntry) => {
+    if (!window.confirm(`¿Borrar "${entry.title}"? Se pierden también sus intentos guardados.`)) {
+      return;
+    }
+    setDeleteError(undefined);
+    try {
+      await deleteArtifact(entry.id);
+      refresh();
+    } catch (cause) {
+      const notice = describeFailure(cause, { area: "assessments", action: "delete" }, "AssessmentsTab");
+      setDeleteError(notice.description ?? notice.title);
+    }
+  };
 
   useEffect(() => {
     if (pendingControl !== null) {
-      setGenTarget({ kind: "quiz", topicId: pendingControl.topicId, topicLabel: pendingControl.topicLabel });
+      setGenTarget({
+        kind: "quiz",
+        topicId: pendingControl.topicId,
+        topicLabel: pendingControl.topicLabel,
+        initialOrigin: pendingControl.origin ?? "material",
+      });
       setView({ kind: "list" });
       onPendingControlConsumed();
     }
   }, [pendingControl, onPendingControlConsumed]);
 
   useEffect(() => {
-    onActiveArtifactChange?.(view.kind === "list" ? undefined : { id: view.id, title: view.title });
+    onActiveArtifactChange?.(view.kind === "list" ? undefined : { id: view.id, title: view.title, view: view.kind });
   }, [view, onActiveArtifactChange]);
 
   if (view.kind === "solve") {
@@ -73,6 +115,7 @@ export function AssessmentsTab({
         artifactId={view.id}
         title={view.title}
         onExit={() => setView({ kind: "list" })}
+        onOpenCitation={onOpenCitation}
       />
     );
   }
@@ -83,145 +126,95 @@ export function AssessmentsTab({
         artifactId={view.id}
         title={view.title}
         onExit={() => setView({ kind: "list" })}
+        onOpenCitation={onOpenCitation}
       />
     );
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted text-sm">Controles (un tema) y Exámenes (el material entero).</p>
-        <button
-          type="button"
-          className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90 disabled:opacity-50"
-          onClick={() => setGenTarget({ kind: "test" })}
-          disabled={genTarget !== null}
-        >
-          Examen del material
-        </button>
-      </div>
-
-      <StudyProfilePanel materialId={materialId} />
-
       {genTarget !== null && (
         <GenerateCard
           materialId={materialId}
           target={genTarget}
           onClose={() => setGenTarget(null)}
-          onGenerated={() => {
+          onGenerated={(generated) => {
+            // Navegación al terminar (§11.4, F5-47): un Control o un Examen de prueba se abren en su
+            // solver; un Examen real abre su pantalla previa con `attemptId: null`, que es el aviso
+            // de F3-39d: el intento nace al pulsar "Empezar el examen", no al generarlo.
             refresh();
             setGenTarget(null);
+            if (generated.kind === "test" && generated.mode === "exam") {
+              setActiveGroup("realExams");
+              onStartExam(generated.id, generated.title);
+              return;
+            }
+            setView({ kind: "solve", id: generated.id, title: generated.title });
           }}
         />
       )}
 
       {AsyncResult.matchWithError(assessments, {
         onInitial: () => <p className="text-muted">Cargando las pruebas…</p>,
-        onError: (error) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {messageOf(error)}</p>,
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "list" }, "AssessmentsTab");
+          return <p className="text-danger-ink">{notice.title} {notice.description}</p>;
+        },
         onDefect: (defect) => <p className="text-danger-ink">No se pudieron cargar las pruebas: {DEFECT_MESSAGE}</p>,
-        onSuccess: ({ value }) => value.assessments.length === 0
-          ? (
-              <p className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-muted">
-                Este material no tiene ninguna prueba todavía. Genera un Examen aquí arriba, o un Control
-                desde un tema del mapa mental.
-              </p>
-            )
-          : (
-              <ul className="grid gap-3">
-                {value.assessments.map((entry) => (
-                  <AssessmentRow
-                    key={entry.id}
-                    entry={entry}
-                    onOpen={() => setView({ kind: "solve", id: entry.id, title: entry.title })}
-                    onStartExam={() => onStartExam(entry.id, entry.title)}
-                    onHistory={() => setView({ kind: "history", id: entry.id, title: entry.title })}
-                  />
-                ))}
-              </ul>
-            )
+        onSuccess: ({ value }) => {
+          const grouped = groupAssessments(value.assessments);
+          return (
+            <>
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <AssessmentGroupTabs
+                  active={activeGroup}
+                  onChange={setActiveGroup}
+                  counts={{
+                    controls: grouped.controls.length,
+                    practiceExams: grouped.practiceExams.length,
+                    realExams: grouped.realExams.length
+                  }}
+                />
+                <ActionButton
+                  icon="plus"
+                  variant="brand"
+                  size="compact"
+                  className="mb-2"
+                  onClick={() => setGenTarget({ kind: "test" })}
+                  disabled={genTarget !== null}
+                >
+                  Examen del material
+                </ActionButton>
+              </div>
+              {deleteError !== undefined && (
+                <p className="mb-3 border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{deleteError}</p>
+              )}
+              <AssessmentList
+                entries={grouped[activeGroup]}
+                emptyMessage={EMPTY_MESSAGE[activeGroup]}
+                onOpen={(entry) => setView({ kind: "solve", id: entry.id, title: entry.title })}
+                onStartExam={(entry) => onStartExam(entry.id, entry.title)}
+                onHistory={(entry) => setView({ kind: "history", id: entry.id, title: entry.title })}
+                onDelete={(entry) => void onDelete(entry)}
+              />
+            </>
+          );
+        }
       })}
     </div>
   );
 }
 
-function AssessmentRow({
-  entry,
-  onOpen,
-  onStartExam,
-  onHistory
-}: {
-  readonly entry: AssessmentListEntry;
-  readonly onOpen: () => void;
-  readonly onStartExam: () => void;
-  readonly onHistory: () => void;
-}) {
-  const isRealExam = entry.kind === "test" && entry.mode === "exam";
-
-  return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mb-1 text-muted text-xs uppercase tracking-widest">
-            {rowKindLabel(entry)}
-            {entry.origin === "review" && " · de repaso"}
-          </p>
-          <h3 className="font-semibold text-heading">{entry.title}</h3>
-          <p className="mt-1 text-muted text-sm">
-            {entry.scope.topicLabel} · {entry.questionCount} {entry.questionCount === 1 ? "pregunta" : "preguntas"}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {entry.lastAttempt !== null && (
-            <button
-              type="button"
-              className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-              onClick={onHistory}
-            >
-              Ver intentos
-            </button>
-          )}
-          {isRealExam
-            ? (
-                <button
-                  type="button"
-                  className="rounded-full bg-brand px-4 py-1.5 font-semibold text-on-brand text-sm hover:bg-brand/90"
-                  onClick={onStartExam}
-                >
-                  Empezar el examen
-                </button>
-              )
-            : (
-                <button
-                  type="button"
-                  className="rounded-full border border-border-strong px-4 py-1.5 text-body text-sm hover:border-brand"
-                  onClick={onOpen}
-                >
-                  {entry.kind === "quiz" ? "Practicar" : "Abrir"}
-                </button>
-              )}
-        </div>
-      </div>
-      <p className="mt-2 text-muted text-sm">
-        {entry.lastAttempt === null
-          ? "Sin intentos."
-          : `Último intento: ${lastAttemptLabel(entry.lastAttempt)}`}
-      </p>
-    </li>
-  );
-}
-
-function lastAttemptLabel(last: NonNullable<AssessmentListEntry["lastAttempt"]>): string {
-  const mode = last.mode === "practice" ? "práctica" : "examen";
-  if (last.status === "in-progress") {
-    return `${mode}, en curso`;
-  }
-  if (last.status === "abandoned") {
-    return `${mode}, abandonado`;
-  }
-  return `${mode}, nota ${last.displayedScore ?? "sin evaluar"} / 10`;
-}
-
 // --- Tarjeta de generación ---------------------------------------------------------------------
+
+// Lo que hace falta para decidir a dónde se navega al terminar (§11.4): el id y el título salen del
+// evento `done`; el tipo y el modo, de lo que se pidió.
+export interface GeneratedAssessment {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: "quiz" | "test";
+  readonly mode: "practice" | "exam";
+}
 
 function GenerateCard({
   materialId,
@@ -232,15 +225,23 @@ function GenerateCard({
   readonly materialId: string;
   readonly target: GenTarget;
   readonly onClose: () => void;
-  readonly onGenerated: () => void;
+  readonly onGenerated: (generated: GeneratedAssessment) => void;
 }) {
   const range = target.kind === "test" ? LIMITS.questionsPerTest : LIMITS.questionsPerQuiz;
-  const [count, setCount] = useState<number>(range.default);
+  // El campo guarda lo que se está tecleando, no un número ya acotado. Acotar en cada tecla hacía
+  // imposible escribir una cifra: al borrar el contenido para poner "12", la primera tecla ("1") se
+  // acotaba al mínimo y la segunda formaba "52", que se acotaba al máximo. De ahí que solo salieran
+  // el mínimo o el máximo salvo usando las flechas. Se acota al salir del campo y al generar.
+  const [countText, setCountText] = useState<string>(String(range.default));
+  const parsedCount = Number.parseInt(countText, 10);
+  const count = clamp(Number.isNaN(parsedCount) ? range.default : parsedCount, range.min, range.max);
   // El modo solo se elige para el Examen; el Control es siempre de práctica.
   const [mode, setMode] = useState<"practice" | "exam">("practice");
   // De dónde salen las preguntas: "material" (nuevas) o "review" (concentradas en lo que llevas peor
   // de este alcance). El repaso solo se ofrece si el perfil tiene algo que repasar (F3-32).
-  const [origin, setOrigin] = useState<"material" | "review">("material");
+  const [origin, setOrigin] = useState<"material" | "review">(
+    target.kind === "quiz" ? target.initialOrigin : "material",
+  );
   const profile = AsyncResult.getOrElse(
     useAtomValue(studyProfileQuery(materialId)),
     () => ({ materialId, topics: [], updatedAt: null }) as StudyProfile
@@ -250,42 +251,54 @@ function GenerateCard({
   );
   const effectiveOrigin: "material" | "review" = canReview ? origin : "material";
   const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<readonly string[]>([]);
+  const [progress, setProgress] = useState<ProgressLine | null>(null);
   const [error, setError] = useState<string | undefined>();
-  const [done, setDone] = useState(false);
 
   const run = async () => {
     setRunning(true);
     setError(undefined);
-    setLines([]);
-    setDone(false);
+    setProgress(ASSESSMENT_STARTING_LINE);
+    const requestedMode = target.kind === "test" ? mode : "practice";
     const input: GenerateAssessmentInput = target.kind === "test"
       ? { kind: "test", topicId: null, origin: effectiveOrigin, questionCount: count, mode }
       : { kind: "quiz", topicId: target.topicId, origin: effectiveOrigin, questionCount: count, mode: "practice" };
     try {
       for await (const event of streamGenerateAssessment(materialId, input)) {
         if (event.type === "progress") {
-          setLines((current) => [...current, event.message]);
+          setProgress(assessmentProgressLine(event));
         } else if (event.type === "failed") {
+          // Una generación fallida no navega a ninguna parte (F5-47): se queda la tarjeta con su
+          // error y su "Cancelar", y la línea viva desaparece (F5-46).
+          setProgress(null);
           setError(event.message);
+          return;
         } else {
-          setLines((current) => [
-            ...current,
-            `Prueba lista: ${event.questionCount} ${event.questionCount === 1 ? "pregunta" : "preguntas"}` +
-              (event.retries > 0 ? ` (${event.retries} ${event.retries === 1 ? "reintento" : "reintentos"})` : "")
-          ]);
-          setDone(true);
+          setProgress({
+            phrase: `Prueba lista: ${event.questionCount} ${event.questionCount === 1 ? "pregunta" : "preguntas"}.`,
+            step: null,
+            total: null
+          });
+          // El tipo y el modo que deciden a dónde se navega son los que se PIDIERON: `ArtifactSummary`
+          // no lleva `mode` y no se amplía el contrato por un efecto de interfaz (decisión 32).
+          onGenerated({
+            id: event.assessment.id,
+            title: event.assessment.title,
+            kind: target.kind,
+            mode: requestedMode
+          });
         }
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "assessments", action: "generate" }, "AssessmentsTab");
+      setProgress(null);
+      setError(notice.description ?? notice.title);
     } finally {
       setRunning(false);
     }
   };
 
   return (
-    <div className="mb-4 rounded-2xl border border-dashed border-border bg-surface/50 p-4">
+    <div className="mb-4 border border-dashed border-border bg-surface/50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold text-heading">
@@ -297,18 +310,19 @@ function GenerateCard({
               : "Cubre solo este tema."}
           </p>
         </div>
-        {!running && !done && (
-          <button
-            type="button"
-            className="rounded-full border border-border-strong px-3 py-1.5 text-body text-sm hover:border-brand"
+        {!running && (
+          <ActionButton
+            icon="close"
+            variant="neutral"
+            size="compact"
             onClick={onClose}
           >
             Cancelar
-          </button>
+          </ActionButton>
         )}
       </div>
 
-      {!running && !done && (
+      {!running && (
         <div className="mt-3 grid gap-3">
           <div className="text-sm">
             <span className="block text-muted">Preguntas</span>
@@ -316,10 +330,10 @@ function GenerateCard({
               ? (
                   <>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <ModeChip active={origin === "material"} onClick={() => setOrigin("material")}>
+                      <ModeChip icon="sparkles" active={origin === "material"} onClick={() => setOrigin("material")}>
                         Nuevas
                       </ModeChip>
-                      <ModeChip active={origin === "review"} onClick={() => setOrigin("review")}>
+                      <ModeChip icon="refresh" active={origin === "review"} onClick={() => setOrigin("review")}>
                         De repaso
                       </ModeChip>
                     </div>
@@ -341,10 +355,10 @@ function GenerateCard({
             <div className="text-sm">
               <span className="block text-muted">Modo</span>
               <div className="mt-1 flex flex-wrap gap-2">
-                <ModeChip active={mode === "practice"} onClick={() => setMode("practice")}>
+                <ModeChip icon="book-open" active={mode === "practice"} onClick={() => setMode("practice")}>
                   De prueba
                 </ModeChip>
-                <ModeChip active={mode === "exam"} onClick={() => setMode("exam")}>
+                <ModeChip icon="lock" active={mode === "exam"} onClick={() => setMode("exam")}>
                   Real
                 </ModeChip>
               </div>
@@ -362,62 +376,50 @@ function GenerateCard({
                 type="number"
                 min={range.min}
                 max={range.max}
-                value={count}
-                onChange={(event) => setCount(clamp(Number(event.currentTarget.value), range.min, range.max))}
-                className="mt-1 w-24 rounded-xl border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
+                value={countText}
+                onChange={(event) => setCountText(event.currentTarget.value)}
+                onBlur={() => setCountText(String(count))}
+                className="mt-1 w-24 border border-border-strong bg-canvas p-2 text-heading outline-none focus:border-brand"
               />
             </label>
-            <button
-              type="button"
-              className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
+            <ActionButton
+              icon="sparkles"
+              variant="primary"
               onClick={() => void run()}
             >
               Generar
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
 
-      {lines.length > 0 && (
-        <ul className="mt-3 max-h-40 overflow-y-auto rounded-xl border border-border bg-canvas p-3 text-muted text-sm">
-          {lines.map((line, index) => <li key={index}>{line}</li>)}
-        </ul>
-      )}
+      {progress !== null && <GenerationProgress line={progress} className="mt-3" />}
       {error !== undefined && <p className="mt-3 text-danger-ink">La generación falló: {error}</p>}
-      {running && <p className="mt-3 text-muted text-sm">Generando…</p>}
-      {done && (
-        <button
-          type="button"
-          className="mt-3 rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90"
-          onClick={onGenerated}
-        >
-          Ver la prueba en la lista
-        </button>
-      )}
     </div>
   );
 }
 
 function ModeChip({
+  icon,
   active,
   onClick,
   children
 }: {
+  readonly icon: IconName;
   readonly active: boolean;
   readonly onClick: () => void;
   readonly children: string;
 }) {
   return (
-    <button
-      type="button"
+    <ActionButton
+      icon={icon}
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-4 py-1.5 text-sm ${
-        active ? "border border-brand bg-brand-soft text-heading" : "border border-border text-muted hover:text-heading"
-      }`}
+      variant={active ? "selected" : "neutral"}
+      size="compact"
     >
       {children}
-    </button>
+    </ActionButton>
   );
 }
 

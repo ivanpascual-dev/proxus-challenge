@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import type { ActiveAttemptResponse, ChatContextRef } from "@proxus/shared";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { Chat } from "./components/Chat.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { MaterialPanel } from "./components/MaterialPanel.tsx";
+import type { Tab } from "./components/material/MaterialTabs.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { AppShell } from "./components/shell/AppShell.tsx";
+import { SystemNoticeRegion } from "./components/shell/SystemNoticeRegion.tsx";
 import { ExamRun } from "./components/assessment/ExamRun.tsx";
 import { ResumeExamDialog } from "./components/assessment/ResumeExamDialog.tsx";
 import { activeAttemptQuery } from "./domain/assessments/atoms.ts";
@@ -29,13 +32,78 @@ const NO_ACTIVE_EXAM: ActiveAttemptResponse = {
   remainingSeconds: null
 };
 
+// Dónde tiene que aterrizar una cita (fase 5, decisión 26): material, página, consumida una vez.
+interface CitationTarget {
+  readonly materialId: string;
+  readonly page: number;
+}
+
+// Dónde aterriza un material recién preparado (§11.4, F5-48): mismo patrón que la cita, con la
+// pestaña como destino. `MaterialPanel` lo consume una sola vez cuando el material coincide.
+interface LandingTarget {
+  readonly materialId: string;
+  readonly tab: Tab;
+}
+
 export function App() {
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [enteredExam, setEnteredExam] = useState<EnteredExam | null>(null);
   // Contexto de pantalla (fase 4, decisión 5): lo reporta `MaterialPanel` (material más artefacto de
   // su pestaña activa); vacío cuando no hay panel de material abierto.
   const [screenContext, setScreenContext] = useState<readonly ChatContextRef[]>([]);
+  // Una cita común (apunte, corrección) siempre abre el material correcto, cambia a PDF y navega a
+  // la primera página (decisión 26, §4.10). "Material distinto cambia selección antes de abrir PDF":
+  // se cambia el material seleccionado y `MaterialPanel` consume el objetivo cuando coincide con el
+  // suyo, tanto si ya estaba abierto como si acaba de montarse por el cambio.
+  const [citationTarget, setCitationTarget] = useState<CitationTarget | null>(null);
+  const openCitation = (materialId: string, page: number) => {
+    setSelectedMaterialId(materialId);
+    setCitationTarget({ materialId, page });
+  };
+
+  // La página que el alumno adjunta desde el PDF con `Preguntar a Sym` (§5.2, F5-40). Vive aquí, y no
+  // en `MaterialPanel`, porque quien la retira es la × de su chip, que está en el chat: el panel la
+  // propone y el chat la quita. Adjuntar otra página del mismo material reemplaza a la anterior, que
+  // es lo que hace un único hueco de estado.
+  const [attachedPage, setAttachedPage] = useState<number | null>(null);
+  useEffect(() => {
+    setAttachedPage(null);
+  }, [selectedMaterialId]);
+
+  const [landingTarget, setLandingTarget] = useState<LandingTarget | null>(null);
+  // La cadena de preparación termina fuera del ciclo de render, así que la condición "no hay ningún
+  // material abierto" se lee de un ref al día, no del valor capturado cuando empezó la subida.
+  const openMaterialRef = useRef<string | null>(null);
+  useEffect(() => {
+    openMaterialRef.current = selectedMaterialId;
+  }, [selectedMaterialId]);
+
+  // Un único PDF recién preparado y ninguna pantalla que robar: se abre en Mapa, que es donde se ve
+  // de un vistazo lo que se acaba de construir (§11.4, decisión 33, F5-48). Si el alumno ya está
+  // mirando otro material, no se navega.
+  const onMaterialPrepared = (materialId: string) => {
+    if (openMaterialRef.current !== null) {
+      return;
+    }
+    openMaterialRef.current = materialId;
+    setSelectedMaterialId(materialId);
+    setLandingTarget({ materialId, tab: "mindmap" });
+  };
   const materials = useAtomValue(materialsQuery);
+  // Borrar el material abierto lo saca de la lista, así que `selectedMaterial` (más abajo) deja de
+  // resolver y el panel desaparece: la pantalla queda bien y por eso no se veía nada raro. Pero
+  // `selectedMaterialId` seguía apuntando a un material que ya no existe, y con él `openMaterialRef`,
+  // así que la siguiente subida de un solo PDF se creía que había una pantalla que robar y no
+  // navegaba a su Mapa. F5-48 dejaba de cumplirse sin que nada lo dijera. Se limpia solo cuando la
+  // consulta ha resuelto: mientras carga, una lista vacía no prueba que el material se haya ido.
+  useEffect(() => {
+    if (selectedMaterialId === null || !AsyncResult.isSuccess(materials)) {
+      return;
+    }
+    if (!materials.value.materials.some((material) => material.id === selectedMaterialId)) {
+      setSelectedMaterialId(null);
+    }
+  }, [materials, selectedMaterialId]);
   const refreshActiveExam = useAtomRefresh(activeAttemptQuery);
   const activeExam = AsyncResult.getOrElse(useAtomValue(activeAttemptQuery), () => NO_ACTIVE_EXAM);
 
@@ -90,37 +158,62 @@ export function App() {
   const hasMiddlePanel = selectedMaterial !== undefined;
 
   return (
-    <div
-      className="grid h-screen min-h-screen overflow-hidden bg-canvas text-heading"
-      style={{
-        gridTemplateColumns: hasMiddlePanel
-          ? "340px minmax(0, 1fr) 420px"
-          : "340px minmax(0, 1fr)"
-      }}
-    >
-      {/* Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red. */}
-      <ErrorBoundary label="la lista de materiales">
-        <Sidebar
-          selectedMaterialId={selectedMaterialId}
-          onSelectMaterial={setSelectedMaterialId}
-        />
-      </ErrorBoundary>
-      {selectedMaterial !== undefined && (
-        <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
-          <MaterialPanel
-            materialId={selectedMaterial.id}
-            indexState={selectedMaterial.indexState}
-            title={selectedMaterial.title}
-            pageCount={selectedMaterial.pageCount}
-            onStartExam={(artifactId, title) =>
-              setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
-            onContextChange={setScreenContext}
-          />
-        </ErrorBoundary>
-      )}
-      <ErrorBoundary label="el chat">
-        <Chat proposedContext={hasMiddlePanel ? screenContext : []} />
-      </ErrorBoundary>
-    </div>
+    <>
+      <SystemNoticeRegion />
+      <AppShell
+        sidebar={({ collapsed, onToggleCollapsed }) => (
+          // Un panel que se caiga no se lleva a los otros dos por delante: cada uno tiene su red.
+          <ErrorBoundary label="la lista de materiales">
+            <Sidebar
+              selectedMaterialId={selectedMaterialId}
+              onSelectMaterial={setSelectedMaterialId}
+              collapsed={collapsed}
+              onToggleCollapsed={onToggleCollapsed}
+              onMaterialPrepared={onMaterialPrepared}
+            />
+          </ErrorBoundary>
+        )}
+        material={selectedMaterial === undefined ? null : ({ focusMode, onToggleFocusMode, foldAll, onRevealChat }) => (
+          <ErrorBoundary key={selectedMaterial.id} label="el panel del material">
+            <MaterialPanel
+              focusMode={focusMode}
+              onToggleFocusMode={onToggleFocusMode}
+              foldAll={foldAll}
+              materialId={selectedMaterial.id}
+              indexState={selectedMaterial.indexState}
+              title={selectedMaterial.title}
+              pageCount={selectedMaterial.pageCount}
+              onClose={() => setSelectedMaterialId(null)}
+              onStartExam={(artifactId, title) =>
+                setEnteredExam({ artifactId, title, attemptId: null, remainingSeconds: null })}
+              onContextChange={setScreenContext}
+              onOpenCitation={openCitation}
+              citationTarget={citationTarget}
+              onCitationConsumed={() => setCitationTarget(null)}
+              landingTarget={landingTarget}
+              onLandingConsumed={() => setLandingTarget(null)}
+              attachedPage={attachedPage}
+              onAttachPage={setAttachedPage}
+              onRevealChat={onRevealChat}
+            />
+          </ErrorBoundary>
+        )}
+        chat={
+          <ErrorBoundary label="el chat">
+            <Chat
+              proposedContext={hasMiddlePanel ? screenContext : []}
+              onOpenCitation={openCitation}
+              onContextDismissed={(ref) => {
+                // Retirar el chip de la página es soltar el adjunto, no solo esconderlo: si no,
+                // volver a pulsar `Preguntar a Sym` en la misma página no traería nada de vuelta.
+                if (ref.type === "page") {
+                  setAttachedPage(null);
+                }
+              }}
+            />
+          </ErrorBoundary>
+        }
+      />
+    </>
   );
 }

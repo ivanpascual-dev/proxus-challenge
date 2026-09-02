@@ -10,6 +10,7 @@ import {
   MaterialRepositoryError,
   TooManyMaterials,
   UnsupportedFileType,
+  MaterialTooManyPages,
   type MaterialRepository as MaterialRepositoryType,
   type MaterialUploadOutcome,
   type MaterialValidationOutcome,
@@ -211,7 +212,7 @@ export const FileMaterialRepository = {
       knownIds: Set<string>
     ): Effect.Effect<
       { readonly ok: true; readonly id: string; readonly bytes: Uint8Array; readonly pageCount: number }
-      | { readonly ok: false; readonly reason: UnsupportedFileType | MaterialAlreadyExists },
+      | { readonly ok: false; readonly reason: UnsupportedFileType | MaterialAlreadyExists | MaterialTooManyPages },
       MaterialRepositoryError
     > => Effect.gen(function* () {
       const id = idFor(candidate.fileName);
@@ -251,6 +252,17 @@ export const FileMaterialRepository = {
             fileName: candidate.fileName,
             reason: "pdfinfo no pudo leer este fichero como PDF."
           })
+        };
+      }
+
+      // El techo que de verdad acota el coste, y por eso va aquí y no en el tamaño: cada página por
+      // debajo del umbral de densidad se renderiza y se transcribe con el modelo, así que las páginas
+      // son la unidad que se paga, no los megabytes. `pdfinfo` ya está hecho y la copia todavía no,
+      // así que el rechazo llega antes de escribir nada.
+      if (pageCount > LIMITS.maxPagesPerMaterial) {
+        return {
+          ok: false,
+          reason: new MaterialTooManyPages({ fileName: candidate.fileName, pageCount })
         };
       }
 
@@ -323,8 +335,37 @@ export const FileMaterialRepository = {
       return results;
     });
 
+    // Borra el PDF y, solo si era la última referencia viva a su huella, el índice y las páginas
+    // cacheadas que comparten esa huella (ADR-027). Dos PDF de nombre distinto y bytes idénticos
+    // comparten huella (ADR-011); borrar uno de los dos no debe dejar al otro sin índice ni caché.
     const remove = (id: string): Effect.Effect<void, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {
       const file = yield* getFile(id);
+      const hash = yield* contentHash(file.path);
+
+      const others = yield* listFiles();
+      const otherHashes = yield* Effect.forEach(
+        others.filter((other) => other.material.id !== id),
+        (other) => contentHash(other.path),
+        { concurrency: 4 }
+      );
+      const isLastReference = !otherHashes.includes(hash);
+
+      if (isLastReference) {
+        yield* indexRepository.removeByHash(hash).pipe(Effect.mapError(mapError));
+
+        const pagesExist = yield* fs.exists(pagesCacheDirectory).pipe(Effect.mapError(mapError));
+        if (pagesExist) {
+          const entries = yield* fs.readDirectory(pagesCacheDirectory).pipe(Effect.mapError(mapError));
+          const prefix = `${hash}-`;
+          yield* Effect.forEach(
+            entries.filter((entry) => entry.startsWith(prefix)),
+            (entry) => fs.remove(path.join(pagesCacheDirectory, entry)).pipe(Effect.mapError(mapError)),
+            { discard: true }
+          );
+        }
+      }
+
+      // El PDF se borra el último: si un paso anterior falla, el material sigue visible y reintentable.
       yield* fs.remove(file.path).pipe(Effect.mapError(mapError));
     });
 

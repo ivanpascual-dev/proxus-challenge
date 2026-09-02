@@ -68,7 +68,6 @@ const graded = (
   maxScore: 0,
   penalty: 0,
   displayedScore: 0,
-  summary: "",
   ...overrides
 });
 

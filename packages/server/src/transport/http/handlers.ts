@@ -15,6 +15,7 @@ import {
   ProxusApi,
   TooManyMaterials as ApiTooManyMaterials,
   UnsupportedFileType as ApiUnsupportedFileType,
+  MaterialTooManyPages as ApiMaterialTooManyPages,
   type MaterialUploadResult,
   type MaterialValidationResult
 } from "@proxus/shared";
@@ -25,8 +26,10 @@ import {
   type Artifact,
   type ArtifactRepositoryError
 } from "../../domain/artifacts/artifact.ts";
+import { deleteArtifactCascade } from "../../domain/artifacts/artifact-deletion.ts";
 import { NoteService } from "../../domain/artifacts/note-service.ts";
 import { AttemptService, buildAssessmentListEntry } from "../../domain/artifacts/attempt-service.ts";
+import { assessmentShortfall } from "../../domain/artifacts/assessment-shortfall.ts";
 import { StudyProfileService } from "../../domain/profile/study-profile.ts";
 import { rewriteBlock } from "../../domain/artifacts/rewrite-block.ts";
 import { fetchUrlSource } from "../../domain/artifacts/url-source.ts";
@@ -100,8 +103,9 @@ const logAndFailStorage = (materialId: string, reason: unknown) =>
     Effect.andThen(Effect.fail(storageError(materialId)))
   );
 
-// El rechazo por fichero, del domain (`UnsupportedFileType` / `MaterialAlreadyExists`) al del
-// contrato, compartido entre `upload` (que sí escribió) y `validate` (que solo miró).
+// El rechazo por fichero, del domain (`UnsupportedFileType` / `MaterialTooManyPages` /
+// `MaterialAlreadyExists`) al del contrato, compartido entre `upload` (que sí escribió) y `validate`
+// (que solo miró).
 const toApiRejectionReason = (
   reason: Extract<MaterialUploadOutcome, { readonly outcome: "rejected" }>["reason"],
   verb: "subir" | "validar"
@@ -111,11 +115,18 @@ const toApiRejectionReason = (
         fileName: reason.fileName,
         message: `"${reason.fileName}" no se pudo ${verb}: ${reason.reason}`
       })
-    : new ApiMaterialAlreadyExists({
-        fileName: reason.fileName,
-        materialId: reason.materialId,
-        message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
-      });
+    : reason._tag === "MaterialTooManyPages"
+      ? new ApiMaterialTooManyPages({
+          fileName: reason.fileName,
+          pageCount: reason.pageCount,
+          ceiling: LIMITS.maxPagesPerMaterial,
+          message: `"${reason.fileName}" tiene ${reason.pageCount} páginas y el máximo por material son ${LIMITS.maxPagesPerMaterial}. Divídelo en partes más pequeñas y súbelas por separado.`
+        })
+      : new ApiMaterialAlreadyExists({
+          fileName: reason.fileName,
+          materialId: reason.materialId,
+          message: `Ya hay un material con el nombre "${reason.fileName}". Bórralo antes de volver a subirlo.`
+        });
 
 // `maxParts` en el contrato lleva un fichero de holgura sobre `maxFilesPerUpload` (ver el comentario
 // en `packages/shared/src/api/materials.ts`): el parser de multipart de esta beta trunca en silencio
@@ -264,8 +275,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         return yield* deletion.remove(params.id);
       }).pipe(
         Effect.catchTag("MaterialNotFound", () => Effect.fail(notFound(params.id))),
-        Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
-        Effect.catch((error) => logAndFailStorage(params.id, error))
+        Effect.catchTag("MaterialDeletionError", (error) => logAndFailStorage(params.id, error.reason))
       ))
       .handle("index", ({ params }) => materials.getIndex(params.id).pipe(
         Effect.catchTag("MaterialRepositoryError", (error) => logAndFailStorage(params.id, error.reason)),
@@ -291,23 +301,28 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
   })
 );
 
-const artifactSummary = (artifact: Artifact) => ({
-  id: artifact.id,
-  kind: artifact.kind,
-  title: artifact.title,
+const artifactSummary = (artifact: Artifact) => {
   // El apunte lleva su `materialId` desde la fase 2; los Controles y Exámenes lo llevan dentro del
   // alcance, más lo que la pestaña Pruebas necesita para pintar la lista sin descargar cada prueba
   // entera (§5.4).
-  ...(artifact.kind === "note"
-    ? { materialId: artifact.materialId }
-    : {
-        materialId: artifact.scope.materialId,
-        createdAt: artifact.createdAt,
-        scope: artifact.scope,
-        origin: artifact.origin,
-        questionCount: artifact.questions.length
-      })
-});
+  if (artifact.kind === "note") {
+    return { id: artifact.id, kind: artifact.kind, title: artifact.title, materialId: artifact.materialId };
+  }
+  // `requestedQuestionCount` solo cuando la prueba salió parcial (correcciones de cierre de fase 5,
+  // decisión 10): ausente si coincide con `questionCount` o si el artefacto es anterior al corte.
+  const shortfall = assessmentShortfall(artifact);
+  return {
+    id: artifact.id,
+    kind: artifact.kind,
+    title: artifact.title,
+    materialId: artifact.scope.materialId,
+    createdAt: artifact.createdAt,
+    scope: artifact.scope,
+    origin: artifact.origin,
+    questionCount: artifact.questions.length,
+    ...(shortfall ? { requestedQuestionCount: shortfall.requested } : {})
+  };
+};
 
 // 500 con cuerpo, nunca un orDie mudo (invariante 6, F2-08). El mensaje al usuario dice qué falló,
 // no cómo: el motivo crudo (ruta del fichero, SchemaError, `_tag`) es fuga de detalle interno. Los
@@ -435,11 +450,12 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         return yield* notes.rejectProposal(params.id, params.proposalId);
       }))
       // Borrado: la única operación destructiva por HTTP de la fase 2. Cubo `artifacts` (más
-      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte.
+      // estricto): borrar cinco artefactos cada diez minutos sobra para rehacer un apunte. La cascada
+      // de intentos vive en `artifact-deletion.ts`.
       .handle("deleteArtifact", ({ params }) => Effect.gen(function* () {
         const key = yield* clientKey;
         yield* rateLimiter.check(key, "artifacts");
-        return yield* artifacts.deleteArtifact(params.id).pipe(
+        return yield* deleteArtifactCascade(artifacts, params.id).pipe(
           Effect.mapError((error): ApiArtifactNotFound | ApiArtifactStorageError => error._tag === "ArtifactNotFound"
             ? artifactNotFound(params.id)
             : artifactStorageError(`No se pudo borrar el artefacto ${params.id}`)(error))

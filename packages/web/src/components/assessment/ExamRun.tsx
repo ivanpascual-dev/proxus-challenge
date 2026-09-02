@@ -23,7 +23,10 @@ import {
   QuestionCard,
   type LocalAnswers
 } from "./question-view.tsx";
-import { DEFECT_MESSAGE, messageOf } from "../../lib/error-message.ts";
+import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
+import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
+import { ActionButton } from "../ui/ActionButton.tsx";
+import { Icon, type IconName } from "../ui/Icon.tsx";
 
 // El panel de examen a pantalla completa (decisión 18, §6.11). Mientras dura el examen la aplicación
 // ES el examen: sin barra lateral, sin pestañas, sin chat (App lo pinta sobre la rejilla). Aquí solo
@@ -55,12 +58,15 @@ export function ExamRun(props: ExamRunProps) {
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas text-heading">
       {AsyncResult.matchWithError(solvable, {
         onInitial: () => <Centered>Cargando el examen…</Centered>,
-        onError: (error) => (
-          <Centered>
-            <p className="text-danger-ink">No se pudo cargar el examen: {messageOf(error)}</p>
-            <ExitButton onExit={props.onFinished} label="Salir" />
-          </Centered>
-        ),
+        onError: (error) => {
+          const notice = describeFailure(error, { area: "assessments", action: "load" }, "ExamRun");
+          return (
+            <Centered>
+              <p className="text-danger-ink">{notice.title} {notice.description}</p>
+              <ExitButton onExit={props.onFinished} label="Salir" />
+            </Centered>
+          );
+        },
         onDefect: () => (
           <Centered>
             <p className="text-danger-ink">No se pudo cargar el examen: {DEFECT_MESSAGE}</p>
@@ -131,7 +137,8 @@ function ExamBody({
       if (tag === "AttemptAlreadyClosed" || tag === "TimeLimitExceeded") {
         toClosed();
       } else {
-        setError(messageOf(cause));
+        const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "ExamRun");
+        setError(notice.description ?? notice.title);
         submitted.current = false;
         setPhase("running");
       }
@@ -224,7 +231,8 @@ function ExamBody({
         setError("El servidor no devolvió un intento en curso.");
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "start" }, "ExamRun");
+      setError(notice.description ?? notice.title);
     } finally {
       setBusy(false);
     }
@@ -245,7 +253,8 @@ function ExamBody({
       await abandon({ artifactId, attemptId });
       onFinished();
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "cancel" }, "ExamRun");
+      setError(notice.description ?? notice.title);
       setBusy(false);
     }
   };
@@ -260,7 +269,8 @@ function ExamBody({
         setGraded(result);
       }
     } catch (cause) {
-      setError(messageOf(cause));
+      const notice = describeFailure(cause, { area: "attempts", action: "submit" }, "ExamRun");
+      setError(notice.description ?? notice.title);
     }
   };
 
@@ -270,6 +280,7 @@ function ExamBody({
         kind={assessment.kind}
         title={title}
         questionCount={assessment.questions.length}
+        requestedQuestionCount={assessment.requestedQuestionCount}
         timeLimitSeconds={assessment.examTimeLimitSeconds}
         busy={busy}
         error={error}
@@ -309,6 +320,10 @@ function ExamBody({
               {assessment.kind === "quiz" ? "Control" : "Examen"} · modo examen
             </p>
             <h2 className="font-bold text-heading text-lg">{title}</h2>
+            {(() => {
+              const notice = partialAssessmentNotice(assessment.requestedQuestionCount, assessment.questions.length);
+              return notice === null ? null : <p className="text-muted text-xs">{notice}</p>;
+            })()}
           </div>
           <div className="text-right">
             {phase === "graded"
@@ -344,7 +359,7 @@ function ExamBody({
             />
           ))}
           {error !== undefined && (
-            <p className="rounded-2xl border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
+            <p className=" border border-danger/40 bg-danger/15 p-4 text-danger-ink">{error}</p>
           )}
         </div>
       </div>
@@ -360,28 +375,28 @@ function ExamBody({
               )
             : (
                 <>
-                  <button
-                    type="button"
+                  <ActionButton
+                    icon="close"
+                    variant="danger"
                     onClick={() => void onCancel()}
                     disabled={busy || phase === "grading"}
-                    className="rounded-full border border-border-strong px-4 py-2 text-body text-sm hover:border-danger hover:text-danger-ink disabled:opacity-50"
                   >
                     Cancelar el examen
-                  </button>
+                  </ActionButton>
                   <div className="flex items-center gap-3">
                     <p className="text-muted text-sm">
                       {unanswered === 0
                         ? "Todo respondido."
                         : `${unanswered} sin responder (contarán en blanco).`}
                     </p>
-                    <button
-                      type="button"
+                    <ActionButton
+                      icon="check-circle"
+                      variant="primary"
                       onClick={() => void doSubmit()}
                       disabled={busy || phase === "grading"}
-                      className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {phase === "grading" ? "Corrigiendo…" : "Entregar"}
-                    </button>
+                    </ActionButton>
                   </div>
                 </>
               )}
@@ -395,6 +410,7 @@ function ExamBriefing({
   kind,
   title,
   questionCount,
+  requestedQuestionCount,
   timeLimitSeconds,
   busy,
   error,
@@ -404,53 +420,93 @@ function ExamBriefing({
   readonly kind: "quiz" | "test";
   readonly title: string;
   readonly questionCount: number;
+  readonly requestedQuestionCount: number;
   readonly timeLimitSeconds: number;
   readonly busy: boolean;
   readonly error: string | undefined;
   readonly onStart: () => void;
   readonly onExit: () => void;
 }) {
+  const notice = partialAssessmentNotice(requestedQuestionCount, questionCount);
   return (
     <Centered>
-      <div className="max-w-lg">
+      <div className="max-w-xl text-center">
         <p className="font-bold text-brand text-xs uppercase tracking-widest">
-          {kind === "quiz" ? "Control" : "Examen"} · modo examen
+          {kind === "quiz" ? "CONTROL · MODO EXAMEN" : "EXAMEN REAL · A PUERTA CERRADA"}
         </p>
-        <h2 className="mt-1 font-bold text-heading text-2xl">{title}</h2>
-        <p className="mt-3 text-muted">
+        <h2 className="mt-2 font-bold text-heading text-2xl">{title}</h2>
+        <p className="mt-3 font-medium text-body text-lg">
           {questionCount} {questionCount === 1 ? "pregunta" : "preguntas"} · {Math.round(timeLimitSeconds / 60)} minutos
         </p>
-        <ul className="mt-4 grid gap-2 text-body text-sm">
-          <li>· La corrección y la nota salen al entregar, no antes. No hay pistas.</li>
-          <li>· El reloj solo corre mientras tengas el examen abierto: si te vas, se para y se retoma donde lo dejaste.</li>
-          <li>· Cada rato fuera queda registrado como una interrupción y se ve en el historial.</li>
-          <li>· Mientras dure, el resto de la aplicación (material, apuntes, tutor) queda cerrado.</li>
+        {/* Prueba parcial: el mismo aviso que en la lista y en el solver, sin tocarlo (§11.5). */}
+        {notice !== null && <p className="mt-1 text-muted text-sm">{notice}</p>}
+
+        {/* Los avisos que exige F3-39d, en rejilla de dos columnas en vez de una lista de puntos.
+            El texto es el canónico de §11.10 y no se reescribe. */}
+        <ul className="mt-6 grid gap-3 text-left sm:grid-cols-2">
+          {BRIEFING_NOTES.map((item) => (
+            <li key={item.title} className="border border-border bg-surface/60 p-3">
+              <Icon name={item.icon} size={18} className="text-brand" />
+              <p className="mt-2 font-semibold text-heading text-sm">{item.title}</p>
+              <p className="mt-1 text-muted text-sm">{item.body}</p>
+            </li>
+          ))}
         </ul>
+
         {error !== undefined && (
-          <p className="mt-4 rounded-2xl border border-danger/40 bg-danger/15 p-3 text-danger-ink text-sm">{error}</p>
+          <p className="mt-4 border border-danger/40 bg-danger/15 p-3 text-left text-danger-ink text-sm">{error}</p>
         )}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <ActionButton
+            icon="play"
+            variant="primary"
             onClick={onStart}
             disabled={busy}
-            className="rounded-full bg-brand px-5 py-2 font-semibold text-on-brand hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Empezando…" : "Empezar el examen"}
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
+            icon="close"
+            variant="neutral"
             onClick={onExit}
             disabled={busy}
-            className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand disabled:opacity-50"
           >
             Ahora no
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Centered>
   );
 }
+
+// Texto canónico de §11.10, literal. Los tres primeros son los avisos que F3-39d exige antes de
+// arrancar el reloj; el cuarto explica el aislamiento de la pantalla.
+const BRIEFING_NOTES: ReadonlyArray<{
+  readonly icon: IconName;
+  readonly title: string;
+  readonly body: string;
+}> = [
+  {
+    icon: "lightbulb",
+    title: "Sin pistas",
+    body: "La corrección y la nota salen al entregar, no antes."
+  },
+  {
+    icon: "history",
+    title: "El reloj solo corre dentro",
+    body: "Si te vas, se para y se retoma donde lo dejaste."
+  },
+  {
+    icon: "notes",
+    title: "Cada salida queda registrada",
+    body: "Se guarda como una interrupción y se ve en el historial."
+  },
+  {
+    icon: "lock",
+    title: "El resto queda cerrado",
+    body: "Material, apuntes y tutor no están disponibles mientras dure."
+  }
+];
 
 function Centered({ children }: { readonly children: React.ReactNode }) {
   return (
@@ -462,13 +518,13 @@ function Centered({ children }: { readonly children: React.ReactNode }) {
 
 function ExitButton({ onExit, label }: { readonly onExit: () => void; readonly label: string }) {
   return (
-    <button
-      type="button"
+    <ActionButton
+      icon="chevron-left"
+      variant="brand"
       onClick={onExit}
-      className="rounded-full border border-border-strong px-5 py-2 text-body text-sm hover:border-brand"
     >
       {label}
-    </button>
+    </ActionButton>
   );
 }
 

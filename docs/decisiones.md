@@ -251,13 +251,14 @@ Cuatro familias:
 | | Texto pegado por turno (selección, bloque, nota propia, URL extraída) | 12.000 caracteres |
 | | Historial reenviado en cada petición | 400 mensajes y 200.000 caracteres |
 | | Bloque editado por el alumno | 5.000 caracteres |
-| | Fichero subido (fase 4) | 25 MB |
+| | Fichero subido (fase 4) | 10 MB (bajado de 25 al cerrar la fase 5: el material real medido va de 0,39 a 1,22 MB) |
+| | Páginas de un material (fase 5) | 30, comprobadas con `pdfinfo` antes de escribir. Es el techo que de verdad acota el coste: una página bajo el umbral de densidad cuesta una llamada de visión, y los megabytes no lo miden |
 | Coste por turno | Páginas renderizadas | 20 |
 | | Bytes de imagen | 12 MB, contando la cadena base64 (medido en la fase 1) |
 | | Pasos del agente | 12, **acotado en el servidor** (subió de 8 en la fase 2, decisión 22 del plan: holgura para el camino de generación, no más seguridad) |
 | Frecuencia | Mensajes | 20 / 10 min · 200 / día |
 | | Artefactos generados | 5 / 10 min · 40 / día |
-| | Peticiones simultáneas por cliente | 3 |
+| | Peticiones simultáneas por cliente | 3 (con la excepción de ADR-028: la preparación automática de un material recién subido no consume este cupo) |
 | Tamaño de salida | Preguntas por artefacto | 50 |
 | | Bloques por nota | 200 |
 | | Tokens de salida del modelo | 8.192 (`maxOutputTokens` en cada petición a Gemini) |
@@ -880,7 +881,9 @@ tramo 3C (el examen) esa forma se reveló equivocada:
 
 ## ADR-019 · El código pone la forma de la prueba; el modelo redacta las preguntas
 
-- **Estado:** aceptada
+- **Estado:** aceptada; la frase "O la prueba sale con las N pedidas o no sale (decisión 21)" queda
+  sustituida por ADR-026, que autoriza una prueba parcial cuando la insuficiencia de contenido es una
+  declaración válida del modelo, nunca un error de formato.
 - **Fecha:** 2026-08-30
 
 **Contexto.** El adaptador de Gemini de este repo no manda `generationConfig` en el camino vivo, así
@@ -1113,7 +1116,8 @@ fabricar un límite superado donde no hay dato).
 
 ## ADR-024 · Borrar un material se lleva sus artefactos, en cascada y sin preguntar dos veces
 
-- **Estado:** aceptada
+- **Estado:** aceptada; la frase "el índice cacheado... no se toca" queda sustituida por ADR-027, que
+  sí lo borra cuando el material borrado era la última referencia a esa huella.
 - **Fecha:** 2026-08-31
 
 **Contexto.** El plan de la fase 4 no traía borrado de materiales; surgió al hablar con Iván de qué
@@ -1220,3 +1224,335 @@ evals de medida dos veces cada una (antes y después de traducir los prompts al 
   actualizar la fila que cambió.
 - Detalle completo de la medición (las dos pasadas, antes y después de traducir), en
   `notes/bitacora.md` (2026-09-01) y en el comentario de `gemini.ts:451-471`.
+
+---
+
+## ADR-027 · Borrar un material se lleva sus derivados por huella, solo cuando es la última referencia
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** ADR-024 dejó el índice cacheado por huella (ADR-011) fuera del borrado: "sigue siendo una
+optimización compartida entre ficheros, no algo del usuario". Al probar el cierre de la fase 5 aparecen
+dos huecos que esa frase no cubría. Uno, no hablaba de las páginas renderizadas
+(`.data/materials/pages/<sha>-<page>.png`, que no existían cuando se escribió) ni del perfil de estudio
+(`.data/profile/<materialId>.json`): ninguno de los dos se borra hoy, así que un material borrado deja
+huella en dos sitios más además del índice. Dos, Iván pidió explícitamente que borrar limpie estos
+derivados, lo que revierte la parte de ADR-024 que los declaraba intocables.
+
+**Opciones consideradas.**
+
+- **Mantener la frase de ADR-024 sin cambios.** Descartada porque es justo la instrucción que Iván
+  cambió: un material borrado debe dejar de ocupar sus derivados, no solo su PDF y sus artefactos.
+- **Borrar el índice y las páginas cacheadas en cuanto se borra CUALQUIER PDF con esa huella.**
+  Descartada: dos ficheros con nombre distinto y bytes idénticos comparten huella y por tanto índice
+  (ADR-011). Borrar uno de los dos dejaría al otro sin índice ni páginas, forzando un reindexado caro
+  de un material que la persona no tocó.
+- **Añadir un contador de referencias explícito por huella.** Descartada por peso: con
+  `maxMaterials = 5` calcular a mano, en el momento de borrar, cuántos PDF vivos comparten la huella es
+  una operación acotada y barata; mantener un contador aparte es un segundo estado que puede
+  desincronizarse del real.
+
+**Decisión.** El perfil de estudio se borra siempre por `materialId` (no se comparte entre materiales,
+así que no hay caso de última referencia que comprobar). El índice y las páginas cacheadas por huella
+de contenido se borran **solo cuando el PDF que se está borrando era la última referencia viva a esa
+huella**: `FileMaterialRepository.remove` calcula la huella antes de borrar el PDF, recorre los PDF
+restantes (barato con `maxMaterials` acotado) y, si ninguno más la comparte, borra el índice
+(`removeByHash`, nuevo método del puerto) y cada página cacheada cuyo nombre empiece por `<sha>-`. El
+PDF se borra el último de toda la cascada: si un paso anterior falla, el material sigue visible y se
+puede reintentar (no hay transacción entre los repositorios de ficheros implicados).
+
+**Consecuencias.**
+
+- La frase de ADR-024 que declaraba el índice intocable queda corregida: sigue siendo cierto que
+  **compartir** el índice entre dos nombres es gratis y correcto (ADR-011), pero deja de ser cierto que
+  borrar nunca lo toca. Ahora lo toca exactamente cuando ya no queda ningún fichero que lo necesite.
+- Editar un PDF y deshacer la edición (el caso que ADR-011 quería proteger, huérfanos que "vuelven a
+  servir") sigue intacto: esta decisión solo actúa en el borrado explícito de un material desde la
+  interfaz, no en el reemplazo de contenido.
+- Calcular huellas de los PDF restantes en cada borrado tiene un coste que crece con `maxMaterials`. Con
+  el techo actual (5) es insignificante; si el techo subiera mucho, este barrido habría que revisarlo.
+
+---
+
+## ADR-028 · La preparación automática de un material recién subido queda fuera del fusible de concurrencia
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** La fase 4 (decisión 4) ya concedía una gracia de alta a un material recién subido: su
+primera indexación y su primera generación de apuntes no cobran el cubo de frecuencia `artifacts`,
+porque subir ya se cobró contra `uploadsPerWindow`. Al probar una subida de cinco PDF a la vez, la
+gracia resultó incompleta: `NoteGenerationRoute` la aplicaba solo al cubo de frecuencia y seguía
+llamando siempre a `acquire`/`release`, el permiso de concurrencia de `maxConcurrentRequests = 3`. El
+cuarto y quinto material de un lote de cinco reciben 429 aunque tengan gracia, y su preparación queda
+incompleta.
+
+**Opciones consideradas.**
+
+- **Subir `maxConcurrentRequests`.** Descartada: es un fusible global que también protege el chat, la
+  reescritura de bloques y la generación manual de pruebas; subirlo para arreglar un caso de subida
+  relaja la protección en todos los caminos, no solo en el que falla.
+- **Serializar las cinco cadenas de preparación en el cliente.** Descartada por producto: es más lento
+  para quien sube sin que la concurrencia real fuera el problema, solo lo era la contabilidad del cupo.
+
+**Decisión.** La gracia de alta exime también del permiso de concurrencia, no solo del cubo de
+frecuencia: `NoteGenerationRoute` calcula `usesConcurrencyPermit = !hasGrace` y solo entonces llama a
+`check`, `acquire` y `release`, incluido el retorno temprano por apunte ya existente. La gracia se
+concede una sola vez, en el POST de subida, y se revoca explícitamente al cerrar el stream de
+generación de apuntes, en éxito y en fallo, para que no quede viva más allá de su propósito.
+Chat, pruebas manuales y generación de apuntes sin gracia mantienen las dos barreras sin cambios.
+
+**Enmienda (2026-09-02, tras la auditoría de guardarraíles).** La versión inicial renovaba la gracia
+al cerrar el stream de indexado, para que un indexado largo no consumiera la ventana antes de los
+apuntes. La auditoría lo marcó como fallo ALTO: `grantUploadGrace` fija la caducidad en
+`now() + uploadGraceMs` sin tope acumulado, así que un cliente que reindexara en bucle dentro de la
+ventana mantenía la gracia viva para siempre y se saltaba el cubo `messages` sin límite. Es el
+antipatrón "la seguridad la impone el código, no la conducta del cliente". La renovación se retira:
+la ventana se concede una vez en la subida y `uploadGraceMs` sube de 10 a 20 minutos para que cubra,
+sin renovar, subir + indexar los cinco en paralelo + arrancar el último apunte (la comprobación de
+gracia se evalúa una vez al entrar en la ruta de apuntes, así que basta con llegar a tiempo de
+empezar). En el flujo normal la gracia muere antes, cuando la generación de apuntes la revoca.
+
+**Consecuencias.**
+
+- La fila "Peticiones simultáneas por cliente: 3" de la tabla del ADR-007 deja de ser absoluta: queda
+  con la excepción explícita de la preparación automática recién subida.
+- Cinco preparaciones automáticas pueden seguir agotando un límite del proveedor externo (Gemini) que
+  esta exención no toca: cada cadena sigue aislando y mostrando su propio fallo, sin detenerse unas a
+  otras ni presentarlo como éxito.
+- La gracia sigue acotada por `uploadGraceMs` como caducidad de seguridad (20 min, tras la enmienda,
+  y ya sin renovación) y por `uploadsPerWindow` como freno a fabricar gracia a fuerza de subir y
+  borrar: esta decisión amplía lo que la gracia exime, no cuánta gracia se puede tener.
+- Queda como deuda registrada, no urgente: que el reindexado sin gracia tome también permiso de
+  concurrencia (`acquire`), como el resto de operaciones caras. Hoy solo cobra el cubo `messages`.
+
+---
+
+## ADR-026 · Una prueba parcial solo la autoriza una insuficiencia declarada, nunca un error de formato
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-01
+
+**Contexto.** ADR-019 dejó cerrado que "o la prueba sale con las N pedidas o no sale" (decisión 21):
+cualquier déficit, sin distinguir su causa, hacía fallar la generación entera. Al probar el cierre de
+la fase 5, esa regla castiga igual dos casos que no son lo mismo. Uno, el material de verdad no
+sostiene tantas preguntas de un tema concreto (una portada breve, un tema con dos párrafos): el modelo
+lo sabe y lo dice, pero antes no había ningún sitio donde guardar esa verdad. Dos, un fallo técnico
+(JSON roto, tipo de pregunta inesperado, salida cortada por el techo): esto sigue sin decir nada sobre
+si el material da para más, así que tratarlo igual que el caso uno colaría una prueba corta por una
+razón que ni el modelo ni el sistema pueden explicar.
+
+**Opciones consideradas.**
+
+- **Mantener el todo-o-nada de ADR-019.** Descartada: es la instrucción que Iván cambió explícitamente
+  al revisar el cierre de fase 5, y confunde "el material no da para tanto" (verificable, explicable)
+  con "el modelo se cortó" (no dice nada del material).
+- **Aceptar cualquier déficit como parcial, sin distinguir la causa.** Descartada: un JSON roto o un
+  `finishReason: length` no son una declaración de insuficiencia de contenido; guardar una prueba corta
+  por esa razón la presenta como completa hasta que alguien nota que faltan preguntas de un tipo, sin
+  ningún mensaje que lo explique (invariante 3).
+- **Reintentar indefinidamente hasta conseguir la cifra pedida.** Descartada: un material sin más
+  contenido no va a dar más preguntas por reintentar; es gasto de llamadas al modelo sin salida, y
+  retrasa un fallo o un guardado que ya se podría resolver.
+
+**Decisión.** El modelo declara la insuficiencia explícitamente, junto con las preguntas que sí puede
+sostener (`question-parse.ts`, prompt §6.2 del plan de correcciones): `{"questions":[...],
+"insufficientContent":true}`. Solo esa declaración autoriza a cerrar un tema con menos preguntas de las
+que pedía su reparto; `AssessmentGenerationService` sigue entonces con los demás temas y guarda al
+final lo que haya, con `requestedQuestionCount` (lo pedido) y `questions.length` (lo real) por
+separado. Un formato antiguo sin preguntas (`{"insufficientContent":true,"maxPossible":N}`, por si el
+modelo no sigue la instrucción nueva) se acepta como compatibilidad defensiva: se le pide una vez esa
+cantidad exacta y, si tampoco produce nada, el tema aporta cero sin más reintentos. Un error de formato,
+un tipo de pregunta inesperado o una salida cortada (`finishReason: length`) sin esa declaración
+mantienen los reintentos existentes y, al agotarlos, hacen fallar la generación completa sin guardar
+nada: siguen sin decir si el material da para más. Una parcial con cero preguntas en total tampoco se
+guarda: no hay nada que mostrar como prueba.
+
+**Consecuencias.**
+
+- La interfaz muestra `Se pidieron N preguntas; el contenido permitió M.` de forma persistente (al
+  terminar, en la lista y al abrir la prueba), nunca como error ni oculto tras recargar: la diferencia
+  entre lo pedido y lo real deja de ser invisible.
+- Los artefactos guardados antes de este corte no llevan `requestedQuestionCount`: se interpretan como
+  completos, con solicitado igual al real (`assessment-shortfall.ts`). No hace falta migrar ficheros.
+- El reparto por tipo de una prueba parcial puede no conservar los porcentajes de una completa: se
+  guarda solo lo que el material sostiene, sin fabricar preguntas de un tipo para cuadrar el reparto.
+- La corrección y la nota se calculan sobre las preguntas que existen, nunca sobre las que se pidieron.
+
+---
+
+## ADR-029 · Una frase de progreso solo se mueve cuando el servidor manda un evento
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Indexar un PDF, redactar sus apuntes y generar una prueba son las tres esperas largas
+del producto: minutos, no segundos. El servidor ya emite progreso estructurado y honesto en las tres
+(`indexing-service.ts` con `page`/`pageCount`, `note-generation-service.ts` y
+`assessment-generation-service.ts` con `topic`/`topicCount`). Lo que fallaba era la presentación: el
+cliente acumulaba cada mensaje en una lista con aspecto de consola, distinta en cada superficie, y la
+cola de subida enseñaba además el texto crudo del evento.
+
+La tentación evidente al rehacerlo es rellenar la espera: frases que rotan por tiempo ("casi está",
+"ya queda poco"), una barra que avanza sola, un porcentaje estimado antes de conocer el total.
+
+**Opciones consideradas.**
+
+- **Carrusel de frases por tiempo.** Descartada: es exactamente el valor neutro que prohíbe la
+  invariante 3 de `AGENTS.md`. La pantalla parecería avanzar mientras el servidor está parado o
+  muerto, y el alumno no tendría forma de distinguir una espera larga de una caída.
+- **Barra con porcentaje estimado mientras el total es desconocido.** Descartada por lo mismo: un
+  porcentaje inventado es un dato falso presentado con la confianza de un dato medido.
+- **Componer la frase troceando `event.message`.** Descartada: parsear castellano del servidor es un
+  acoplamiento que se rompe en silencio en cuanto alguien cambia una palabra del mensaje.
+
+**Decisión.** La línea de progreso se deriva siempre de un evento real, en lógica pura
+(`packages/web/src/domain/progress/progress-line.ts`): fase y contador salen de los campos
+estructurados del evento, nunca de su texto. Una sola línea que se sustituye, jamás una lista que
+crece, en las cuatro superficies (`GenerationProgress.tsx`). El contador solo existe cuando el total
+es mayor que 1, y mientras el total sea desconocido la barra es una banda tenue, no una fracción. El
+camino de fallo manda sobre el de progreso: al llegar un `failed`, la línea desaparece y queda el
+error con su texto completo; nunca conviven los dos.
+
+**Consecuencias.**
+
+- Se pierde el histórico visible de líneas, que dejaba ver por qué tema pasó una generación. A cambio,
+  el fallo sigue enseñando su texto entero y el servidor conserva el suyo en el log. Si al depurar se
+  echa de menos, vuelve como detalle plegado, nunca como vista por defecto.
+- Se pierde en la interfaz la distinción entre extraer texto y transcribir con el modelo, que viajaba
+  dentro del mensaje del indexado. El alumno no pierde ese dato: la marca `transcrito por el modelo`
+  sigue en cada página del PDF y en cada cita, que es donde decide si se fía.
+- Solo la frase se anuncia a un lector de pantalla; el contador va `aria-hidden`, para que indexar 82
+  páginas no dispare 82 anuncios.
+- No se toca ningún contrato de `packages/shared`: el dato ya estaba, faltaba la presentación.
+
+---
+
+## ADR-030 · La aplicación solo navega sola cuando el destino es inequívoco y no arranca nada
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Al terminar de generarse una prueba, el alumno tenía que pulsar `Ver la prueba en la
+lista`, buscarla y abrirla; al terminar de prepararse un PDF recién subido, tenía que ir al sidebar,
+elegirlo y cambiar de pestaña. Son pasos que no deciden nada: en los dos casos hay un único destino
+razonable y el alumno acaba de pedir ese trabajo.
+
+Navegar solo tiene un coste evidente y opuesto: robarle la pantalla a quien está leyendo otra cosa, o
+peor, meterlo en un estado que consume algo suyo.
+
+**Opciones consideradas.**
+
+- **No navegar nunca.** Descartada: obliga a repetir a mano un camino que la aplicación conoce, y en
+  la generación de pruebas era la fricción que Iván señaló con más claridad.
+- **Navegar siempre que termine un trabajo.** Descartada: con dos o más materiales recién preparados
+  el destino es ambiguo, y con un examen real la pantalla siguiente crearía el intento y arrancaría el
+  reloj sin que nadie lo pidiera.
+- **Abrir el examen real directamente en su intento.** Descartada por contradecir F3-39d: el aviso
+  previo existe precisamente para que empezar sea una decisión, no una consecuencia.
+
+**Decisión.** Se navega sola solo con destino inequívoco y nunca a un estado que arranque un reloj o
+consuma un intento:
+
+- Un Control o un Examen de prueba recién generados se abren en su solver. Un Examen real abre su
+  pantalla previa con `initialAttemptId: null`: el intento nace al pulsar `Empezar el examen`. Si la
+  generación falla, no se navega a ninguna parte.
+- El tipo y el modo que deciden el destino son los que se **pidieron**, no los que responde el
+  servidor: `ArtifactSummary` no lleva `mode` y no se amplía un contrato compartido por un efecto de
+  interfaz.
+- Tras una preparación automática se navega solo si el lote tenía un único PDF y el alumno no ha
+  abierto ningún material a mano mientras tanto. El aterrizaje es la pestaña Mapa.
+- Al terminar un indexado manual del material que ya está abierto, se cambia a Mapa: mismo criterio,
+  destino único y el alumno ya está mirando ese material.
+
+**Consecuencias.**
+
+- El botón `Ver la prueba en la lista` desaparece: ya no hay nada que buscar a mano.
+- El aterrizaje reutiliza el patrón que ya existía para las citas (un objetivo que `MaterialPanel`
+  consume una sola vez), así que no hace falta router ni estado global de navegación.
+- La condición "no hay ningún material abierto" se lee en el momento en que termina la cadena, no
+  cuando empezó la subida: quien abre un material mientras se prepara otro conserva su pantalla.
+- Si al usarlo la navegación automática de la subida molesta, la salida barata es dejarla solo en la
+  generación de pruebas; la de la subida está aislada en un único callback de `App`.
+
+---
+
+## ADR-031 · `Plegar todo` es una orden con marca, no un estado que se recalcula de otras superficies
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** El botón `Plegar todo` / `Desplegar todo` de la cabecera del material (extensión pedida
+por Iván sobre F5-51 y F5-52) recoge de una vez tres superficies que hasta entonces se plegaban cada
+una por su cuenta: la barra lateral, Sym y, si hay un apunte abierto, su índice de bloques. La primera
+implementación calculaba si el índice debía estar plegado mirando si la barra y Sym ya lo estaban
+(`sidebarCollapsed && chatCollapsed`).
+
+**Opciones consideradas.**
+
+- **Estado derivado de las otras dos superficies.** Descartada: al probarlo, desplegar solo el rail de
+  Sym (sin tocar la barra) volvía a evaluar esa condición a `false` y reabría el índice de bloques
+  aunque el alumno no hubiera tocado el apunte. Plegar o desplegar una superficie por separado no puede
+  tener efecto sobre las demás.
+- **Estado propio del índice sin relación con `Plegar todo`.** Descartada: entonces el botón de la
+  cabecera dejaría de plegarlo, que es justo lo que pide la extensión.
+
+**Decisión.** `Plegar todo` emite un mandato (`FoldAllCommand`, en `domain/workspace/layout.ts`):
+`{ collapsed, seq }`. `seq` crece en cada pulsación para distinguir dos órdenes iguales seguidas de
+ninguna orden. `NoteWorkspace` mantiene su propio `outlineCollapsed` y solo lo sobrescribe cuando
+`foldAll.seq` cambia respecto al último que atendió; fuera de eso, el índice de bloques manda sobre su
+propio rail sin que nada se lo vuelva a imponer.
+
+**Consecuencias.**
+
+- Plegar o desplegar Sym por su lado (la agarradera) o la barra lateral (su rail) nunca mueve el índice
+  de bloques, y viceversa: solo pulsar el botón de la cabecera los mueve a los tres a la vez.
+- Con `foldAll` en `null` (apertura inicial, sin ninguna pulsación todavía) el índice arranca
+  desplegado, igual que antes de que existiera el botón.
+- Cualquier otra superficie que en el futuro se sume a `Plegar todo` sigue el mismo patrón: lee
+  `foldAll` y compara `seq`, no deriva su plegado del de sus vecinas.
+
+---
+
+## ADR-032 · El servidor comprueba el contexto de pantalla contra los datos reales antes de describirlo
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Hasta fase 5, el bloque `SCREEN CONTEXT` se armaba copiando lo que mandaba el navegador:
+tipo, id y título. Con la ampliación de F5-17, F5-40 y F5-44 el contexto pasa a decir cosas mucho más
+comprometidas (en qué pestaña está el alumno, qué página lee, si lo que tiene abierto es un Control, un
+Examen de prueba o un Examen real, y si lo está resolviendo o mirando su historial), y F5-44 exige que
+Sym nombre únicamente la ubicación presente en el contexto. Un título es texto que el cliente elige: un
+apunte llamado `Examen final de derivadas` describiría al modelo una prueba que no existe.
+
+**Opciones consideradas.**
+
+- **Confiar en lo que manda el cliente.** Descartada: convierte un campo de texto en la fuente de
+  verdad sobre dónde está el alumno, y la respuesta de Sym a "¿dónde estoy?" pasaría a depender de algo
+  que no se ha comprobado. Choca con la invariante 3.
+- **Ignorar en silencio la referencia que no cuadre.** Descartada por la invariante 11: el alumno vio
+  el chip antes de enviar y creería que Sym sabe dónde está. Si algo no cuadra, se dice.
+
+**Decisión.** El cliente manda referencias mínimas (`type`, ids, superficie y vista) y el servidor las
+resuelve contra sus repositorios antes de renderizar nada
+(`domain/agents/academic-tutor/screen-context-resolver.ts`): el material tiene que existir, la página
+ser entera y estar dentro de `pageCount`, la prueba ser un artefacto de tipo `quiz` o `test` del
+material abierto y el bloque existir dentro del apunte. Los títulos que llegan al modelo son los del
+repositorio, y el rótulo de la prueba (`Control`, `Examen de prueba`, `Examen real`) se deriva del
+artefacto, nunca de su título. Lo que no se puede comprobar se rechaza en voz alta con
+`InvalidScreenContext` (400, declarado en `packages/shared`), y el render (`harness/screen-context.ts`)
+queda como función pura sobre referencias ya resueltas.
+
+**Consecuencias.**
+
+- `renderScreenContext` ya no acepta `ChatContextRef`: recibe `ResolvedScreenRef`. Cualquier camino que
+  quiera armar el bloque (el servicio de chat, el eval del tutor) pasa antes por el resolutor, así que
+  no hay dos formas distintas de describir la pantalla.
+- `surface` es opcional en `MaterialContextRef` aunque la interfaz siempre la manda: el mismo esquema
+  decodifica los turnos ya guardados en disco, y hacerla obligatoria dejaría ilegibles las
+  conversaciones anteriores a esta fase. Sin superficie, el bloque describe el material y no afirma
+  ninguna pestaña, que es exactamente lo que pide la invariante 3.
+- El coste es una lectura por referencia adjunta (como máximo tres) antes de llamar al modelo. Se
+  aceptó a cambio de que Sym no pueda afirmar una ubicación que nadie ha comprobado.

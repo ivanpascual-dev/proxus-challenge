@@ -2,19 +2,26 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { AgentMessage } from "../schemas/agent-message.ts";
 import { ChatContextRef } from "../schemas/chat-context.ts";
-import { Conversation, ConversationSummary, TurnUsage } from "../schemas/conversation.ts";
-import { ConversationNotFound, ConversationStorageError } from "../errors/conversation-errors.ts";
+import { Conversation, ConversationSource, ConversationSummary, TurnUsage } from "../schemas/conversation.ts";
+import { ConversationNotFound, ConversationStorageError, InvalidScreenContext } from "../errors/conversation-errors.ts";
 import { LimitExceeded, RateLimited } from "../errors/limit-exceeded.ts";
 import { ExamLockdownGuard } from "./exam-lockdown.ts";
 
 // La sesión vive en el servidor (fase 4, decisión 6): el cliente ya no manda el historial, solo el
 // turno nuevo. `context` viaja por referencia (decisión 5), nunca como texto pegado.
+//
+// `parseOptions` vive en el esquema y no en cada llamada porque el chat tiene DOS entradas HTTP: la
+// ruta cruda `/api/tutor/chat/stream` y el endpoint `chat` de `HttpApi`. `HttpApiBuilder` decodifica
+// el payload sin opciones (`HttpApiBuilder.ts:562`), así que una opción pasada a mano solo protegía la
+// primera y la otra aceptaba un `messages` fabricado con un 200 mudo. Anotado aquí, el parser mezcla
+// estas opciones sobre las del llamador (`SchemaParser.ts:872-882`) y las dos rutas devuelven 400 ante
+// un campo no declarado, en vez de decodificar en silencio ignorándolo (invariante 3).
 export const TutorChatRequest = Schema.Struct({
   conversationId: Schema.String,
   input: Schema.String,
   context: Schema.Array(ChatContextRef),
   maxSteps: Schema.optional(Schema.Number)
-});
+}).annotate({ parseOptions: { onExcessProperty: "error" } });
 export type TutorChatRequest = typeof TutorChatRequest.Type;
 
 export const TutorChatResponse = Schema.Struct({
@@ -40,6 +47,13 @@ export const TutorChatStreamEvent = Schema.Union([
     type: Schema.Literal("usage"),
     usage: TurnUsage
   }),
+  // Fase 5, §5.3: una fuente confirmada durante el turno. Llega cuando una lectura o vista de material
+  // sirvió páginas de verdad, con lo que el repositorio devolvió; el mismo material vuelve a emitirse
+  // con sus páginas ya fusionadas, así que el cliente sustituye por `materialId` en vez de acumular.
+  Schema.Struct({
+    type: Schema.Literal("source"),
+    source: ConversationSource
+  }),
   Schema.Struct({
     type: Schema.Literal("warning"),
     message: Schema.String
@@ -62,6 +76,9 @@ export class TutorApi extends HttpApiGroup.make("tutor")
       error: [
         ConversationNotFound.pipe(HttpApiSchema.status(404)),
         LimitExceeded.pipe(HttpApiSchema.status(400)),
+        // El contexto de pantalla que ya no describe nada real (fase 5, §5.2): la petición es la que
+        // está mal, así que 400 con su texto, nunca un 500 mudo (invariante 6).
+        InvalidScreenContext.pipe(HttpApiSchema.status(400)),
         RateLimited.pipe(HttpApiSchema.status(429)),
         ConversationStorageError.pipe(HttpApiSchema.status(500))
       ]

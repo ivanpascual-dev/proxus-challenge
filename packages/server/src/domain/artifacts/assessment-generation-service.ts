@@ -31,6 +31,7 @@ import {
   type TopicSignals
 } from "./assessment-shape.ts";
 import { acceptsQuestionType, parseGeneratedQuestions, type ParsedQuestion } from "./question-parse.ts";
+import { holesWithinCapacity, requestedQuestionCount } from "./assessment-shortfall.ts";
 import { shuffleBySeed } from "./question-order.ts";
 import { timeLimitSeconds } from "./exam-scoring.ts";
 import {
@@ -262,7 +263,12 @@ export const make = (
     {
       readonly questions: readonly ParsedQuestion[];
       readonly retries: number;
-      readonly insufficient: number | null;
+      // "complete": se llenó todo el hueco. "declared-insufficient": el modelo declaró (formato
+      // nuevo o antiguo) que el tema no da para más; `forMaterial` sigue con los demás temas
+      // (decisión 9 del plan de correcciones, C5-05). "exhausted": se agotaron los reintentos sin
+      // esa declaración (formato roto, tipo inesperado o truncado); `forMaterial` falla entero
+      // (C5-06), igual que antes de este corte.
+      readonly outcome: "complete" | "declared-insufficient" | "exhausted";
       // Riesgo 10 / F4-37: si el último intento se cortó por el techo de salida, quien llama no puede
       // reportarlo como "el tema no daba" ni como reintentos agotados sin más.
       readonly truncated: boolean;
@@ -276,22 +282,15 @@ export const make = (
       .filter((text) => text.trim().length > 0)
       .join("\n\n");
 
-    const deficit = countByType(holes);
     const collected: ParsedQuestion[] = [];
     // Solo evita que el modelo repita una pregunta DENTRO de esta misma generación (entre reintentos).
     const seenPrompts = new Set<string>();
-    let retries = 0;
     let lastCallTruncated = false;
 
-    for (let attempt = 0; attempt <= LIMITS.maxGenerationRetriesPerTopic; attempt += 1) {
-      const stillNeeded = [...deficit.entries()].filter(([, count]) => count > 0);
-      if (stillNeeded.length === 0) {
-        break;
-      }
-      if (attempt > 0) {
-        retries += 1;
-      }
-
+    // Una llamada al modelo pidiendo exactamente `requestDeficit`. Aislado para poder reutilizarlo en
+    // la petición extra de materialización del formato antiguo (`legacy-insufficient`, más abajo).
+    const askModel = (requestDeficit: ReadonlyMap<AssessableQuestionType, number>) => Effect.gen(function* () {
+      const stillNeeded = [...requestDeficit.entries()].filter(([, count]) => count > 0);
       const request = stillNeeded
         .map(([type, count]) => `- ${count} preguntas ${QUESTION_TYPE_LABEL[type]}`)
         .join("\n");
@@ -350,17 +349,73 @@ export const make = (
         );
       }
 
-      const parsed = parseGeneratedQuestions(response.text);
-      if (parsed.kind === "insufficient") {
-        return { questions: collected, retries, insufficient: parsed.maxPossible, truncated: lastCallTruncated };
+      return parseGeneratedQuestions(response.text);
+    });
+
+    // Añade a `collected` las preguntas de `parsed` que casan con un tipo todavía pendiente en
+    // `requestDeficit`, descontándolo. Comparte `seenPrompts` con el resto de la función.
+    const collectMatching = (
+      questions: readonly ParsedQuestion[],
+      requestDeficit: Map<AssessableQuestionType, number>
+    ) => {
+      for (const question of questions) {
+        if (!acceptsQuestionType(kind, question.type)) {
+          continue;
+        }
+        const remaining = requestDeficit.get(question.type) ?? 0;
+        const normalizedPrompt = question.prompt.trim().toLocaleLowerCase();
+        if (remaining <= 0 || seenPrompts.has(normalizedPrompt)) {
+          continue;
+        }
+        collected.push(question);
+        seenPrompts.add(normalizedPrompt);
+        requestDeficit.set(question.type, remaining - 1);
       }
+    };
+
+    const deficit = countByType(holes);
+    let retries = 0;
+
+    for (let attempt = 0; attempt <= LIMITS.maxGenerationRetriesPerTopic; attempt += 1) {
+      const stillNeeded = [...deficit.entries()].filter(([, count]) => count > 0);
+      if (stillNeeded.length === 0) {
+        return { questions: collected, retries, outcome: "complete" as const, truncated: lastCallTruncated };
+      }
+      if (attempt > 0) {
+        retries += 1;
+      }
+
+      const parsed = yield* askModel(deficit);
+
       if (parsed.kind === "unparseable") {
         continue;
       }
 
-      // No cara al alumno (F3-08 solo pide no adivinar el campo y no colar la pregunta): diagnóstico
-      // de por qué el modelo dio menos preguntas útiles de las que devolvió, para quien lea el log.
+      if (parsed.kind === "legacy-insufficient") {
+        // Compatibilidad defensiva (§4.1.2): el modelo no siguió el formato nuevo y no escribió
+        // ninguna pregunta. Si declara que puede dar algo, se le pide esa cantidad exacta en UNA
+        // petición de materialización, dentro del mismo presupuesto de reintentos; el resultado
+        // (con preguntas o sin ellas) cierra el tema.
+        if (parsed.maxPossible > 0) {
+          retries += 1;
+          const reducedDeficit = countByType(holesWithinCapacity(holes, parsed.maxPossible));
+          const materialized = yield* askModel(reducedDeficit);
+          if (materialized.kind === "questions") {
+            if (materialized.dropped.length > 0) {
+              yield* Effect.logWarning(
+                `generación de prueba: la materialización del tema "${topic.label}" descartó ${materialized.dropped.length} pregunta(s) indecodificable(s)`
+              );
+            }
+            collectMatching(materialized.questions, reducedDeficit);
+          }
+        }
+        return { questions: collected, retries, outcome: "declared-insufficient" as const, truncated: lastCallTruncated };
+      }
+
+      // parsed.kind === "questions"
       if (parsed.dropped.length > 0) {
+        // No cara al alumno (F3-08 solo pide no adivinar el campo y no colar la pregunta):
+        // diagnóstico de por qué el modelo dio menos preguntas útiles de las que devolvió.
         yield* Effect.logWarning(
           `generación de prueba: el tema "${topic.label}" descartó ${parsed.dropped.length} pregunta(s) indecodificable(s): ${
             parsed.dropped.map((item) => `#${item.index} (${item.reason})`).join("; ")
@@ -368,22 +423,14 @@ export const make = (
         );
       }
 
-      for (const question of parsed.questions) {
-        if (!acceptsQuestionType(kind, question.type)) {
-          continue;
-        }
-        const remaining = deficit.get(question.type) ?? 0;
-        const normalizedPrompt = question.prompt.trim().toLocaleLowerCase();
-        if (remaining <= 0 || seenPrompts.has(normalizedPrompt)) {
-          continue;
-        }
-        collected.push(question);
-        seenPrompts.add(normalizedPrompt);
-        deficit.set(question.type, remaining - 1);
+      collectMatching(parsed.questions, deficit);
+
+      if (parsed.insufficientContent) {
+        return { questions: collected, retries, outcome: "declared-insufficient" as const, truncated: lastCallTruncated };
       }
     }
 
-    return { questions: collected, retries, insufficient: null, truncated: lastCallTruncated };
+    return { questions: collected, retries, outcome: "exhausted" as const, truncated: lastCallTruncated };
   });
 
   const forMaterial = (
@@ -513,15 +560,12 @@ export const make = (
         );
         totalRetries += outcome.retries;
 
-        if (outcome.insufficient !== null) {
-          return yield* new AssessmentGenerationError({
-            reason: outcome.truncated
-              ? `el tema "${topic.label}" se cortó por el techo de salida del modelo (finishReason: length) al generar las ${holes.length} preguntas del reparto. Vuelve a intentarlo.`
-              : `el tema "${topic.label}" solo da para ${outcome.insufficient} preguntas de las ${holes.length} que pedía el reparto. Genera una prueba más corta.`
-          });
-        }
-
-        if (outcome.questions.length < holes.length) {
+        // Solo una insuficiencia DECLARADA por el modelo autoriza a seguir con menos de lo que pedía
+        // el reparto de este tema (decisión 9 del plan de correcciones, C5-05): `forMaterial` sigue
+        // con los demás temas y guarda al final lo que haya. Agotar los reintentos sin esa
+        // declaración (formato roto, tipo inesperado o truncado) sigue siendo un fallo completo,
+        // sin guardar nada (C5-06).
+        if (outcome.outcome === "exhausted") {
           return yield* new AssessmentGenerationError({
             reason: outcome.truncated
               ? `no se pudieron generar las ${holes.length} preguntas del tema "${topic.label}" (salieron ${outcome.questions.length}): el modelo se cortó por el techo de salida (finishReason: length) tras ${LIMITS.maxGenerationRetriesPerTopic} reintentos.`
@@ -543,6 +587,14 @@ export const make = (
         for (const parsedQuestion of outcome.questions) {
           pending.push({ parsed: parsedQuestion, source });
         }
+      }
+
+      // Una o más insuficiencias declaradas pueden haber dejado la prueba sin ninguna pregunta: una
+      // parcial con cero preguntas nunca se guarda (decisión 9, C5-05).
+      if (pending.length === 0) {
+        return yield* new AssessmentGenerationError({
+          reason: "el material no da para ninguna pregunta de esta prueba"
+        });
       }
 
       // El reparto agrupa las preguntas por tema y por tipo. Se barajan con una permutación sembrada
@@ -585,7 +637,8 @@ export const make = (
             scope,
             origin: input.origin,
             createdAt: new Date().toISOString(),
-            examTimeLimitSeconds: timeLimitSeconds(questions)
+            examTimeLimitSeconds: timeLimitSeconds(questions),
+            requestedQuestionCount: input.questionCount
           }
         : {
             kind: "test",
@@ -596,7 +649,8 @@ export const make = (
             origin: input.origin,
             createdAt: new Date().toISOString(),
             examTimeLimitSeconds: timeLimitSeconds(questions),
-            mode: input.mode
+            mode: input.mode,
+            requestedQuestionCount: input.questionCount
           };
 
       yield* repository.saveArtifact(artifact as Artifact).pipe(
@@ -674,7 +728,8 @@ export const summarizeAssessment = (artifact: QuizArtifact | TestArtifact): Arti
   createdAt: artifact.createdAt,
   scope: artifact.scope,
   origin: artifact.origin,
-  questionCount: artifact.questions.length
+  questionCount: artifact.questions.length,
+  requestedQuestionCount: requestedQuestionCount(artifact)
 });
 
 export const AssessmentGenerationServiceLive = Layer.effect(AssessmentGenerationService)(

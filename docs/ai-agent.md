@@ -127,16 +127,38 @@ hay que borrar una para crear otra).
 
 ## Contexto de pantalla (decisión 5) y preguntas de seguimiento (decisión 8)
 
-`context` es un array de `ChatContextRef` (material, artefacto o bloque activo: solo id y título,
-nunca texto libre) que la interfaz adjunta sola según lo que el alumno ya tiene abierto; se ve antes
-de enviar y se puede quitar. El servidor lo añade al final del mensaje del usuario, nunca al system
-prompt (`renderScreenContext`, `harness/screen-context.ts`), para no romper la caché del prefijo
-estable. Toda respuesta del tutor cierra con un bloque `<<<FOLLOW-UP>>>` de exactamente tres preguntas
+`context` es un array de `ChatContextRef` (hasta `LIMITS.maxContextRefs`, 3) que la interfaz adjunta
+sola según lo que el alumno ya tiene abierto; se ve antes de enviar y se puede quitar. Son referencias
+mínimas, nunca texto libre: el material con la pestaña que se está viendo (`surface`: PDF, mapa,
+apuntes o pruebas), el apunte y su bloque seleccionado, la prueba abierta con su vista (`solve` o
+`history`) y la página que el alumno adjunta a mano desde el PDF con `Preguntar a Sym`. Qué convive con
+qué lo decide `domain/tutor/screen-refs.ts` en el navegador, y por eso el conjunto nunca pasa del techo
+sin recortar nada en silencio.
+
+Antes de describir nada, el servidor resuelve esas referencias contra sus repositorios
+(`academic-tutor/screen-context-resolver.ts`, ADR-032): comprueba que el material existe, que la página
+está dentro de su rango, que la prueba es una prueba de ese material y que el bloque sigue en el
+apunte. Los títulos y el rótulo del tipo de prueba (`Control`, `Examen de prueba`, `Examen real`) se
+derivan del artefacto real, no de lo que mande el cliente; lo que no cuadra se rechaza con
+`InvalidScreenContext` (400) en vez de describirse a ciegas. El bloque resultante se añade al final del
+mensaje del usuario, nunca al system prompt (`renderScreenContext`, `harness/screen-context.ts`), para
+no romper la caché del prefijo estable. Toda respuesta del tutor cierra con un bloque `<<<FOLLOW-UP>>>` de exactamente tres preguntas
 en español, que el servidor recorta del texto (`extractFollowUp`); si el bloque falta o viene mal
 formado, no se completa ni se inventa ninguna pregunta (invariante 3). La única tolerancia es un
 cierre omitido: si después de la apertura hay exactamente tres líneas válidas hasta el final de la
 respuesta, se recuperan esas mismas preguntas. En todos los casos, los delimitadores se retiran del
 texto visible.
+
+## Fuentes consultadas (fase 5, §5.3)
+
+Cada turno guarda en `ConversationTurn.sources` qué materiales y qué páginas leyó el agente de verdad.
+La fuente no sale del texto de la respuesta ni de una cita que escriba el modelo: la apuntan los
+propios comandos (`academic-tutor/material-commands.ts`) con lo que el repositorio sirvió, sobre un
+registro por turno (`academic-tutor/turn-sources.ts`, el mismo patrón que el presupuesto de turno).
+Una llamada que falla o que no sirve ninguna página no crea fuente, y las páginas se deduplican por
+material, así que leer dos veces la misma no la duplica. `transcribedPages` marca las páginas cuyo
+texto indexado es transcripción del modelo (invariante 8), y la interfaz las presenta bajo la respuesta
+como `Fuentes consultadas`, con la misma cita navegable que apuntes y pruebas.
 
 ## Idioma (decisión 9)
 
@@ -154,6 +176,8 @@ vocabulario propio del material nunca se traduce: si dice "set", el tutor dice "
    - `{ type: "message", message }`
    - `{ type: "follow-up", questions }`
    - `{ type: "usage", usage }`
+   - `{ type: "source", source }`: una fuente confirmada del turno (fase 5, §5.3), emitida en cuanto
+     `materials read` o `materials view` sirve páginas de verdad
    - `{ type: "warning", message }`: al 75% del techo de historial de la conversación
      (`maxConversationHistoryTokens`), informativo, no corta el turno
    - `{ type: "error", message }`: el fallo del modelo tal cual, sin disfrazarlo de respuesta

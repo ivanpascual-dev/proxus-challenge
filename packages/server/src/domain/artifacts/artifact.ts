@@ -223,7 +223,11 @@ export const QuizArtifact = Schema.Struct({
   origin: AssessmentOrigin,
   createdAt: Schema.String,
   // El Control es siempre de práctica: no lleva `mode`.
-  examTimeLimitSeconds: Schema.Number
+  examTimeLimitSeconds: Schema.Number,
+  // Cuántas preguntas se pidieron al generar (correcciones de cierre de fase 5, decisión 10).
+  // Ausente en artefactos anteriores a este corte: se interpretan como completos
+  // (`assessment-shortfall.ts`).
+  requestedQuestionCount: Schema.optional(Schema.Number)
 });
 export type QuizArtifact = typeof QuizArtifact.Type;
 
@@ -237,7 +241,8 @@ export const TestArtifact = Schema.Struct({
   createdAt: Schema.String,
   examTimeLimitSeconds: Schema.Number,
   // "practice" = de prueba (a libro abierto); "exam" = real (puerta cerrada, sin pistas).
-  mode: AssessmentMode
+  mode: AssessmentMode,
+  requestedQuestionCount: Schema.optional(Schema.Number)
 });
 export type TestArtifact = typeof TestArtifact.Type;
 
@@ -432,8 +437,7 @@ export const GradedAttempt = Schema.Struct({
   rawScore: Schema.Number,
   maxScore: Schema.Number,
   penalty: Schema.Number,
-  displayedScore: Schema.Number,
-  summary: Schema.String
+  displayedScore: Schema.Number
 });
 export type GradedAttempt = typeof GradedAttempt.Type;
 
