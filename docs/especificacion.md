@@ -684,11 +684,18 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
 
 #### Contexto adjunto
 
-- **F5-17 · P3.** CUANDO la persona adjunte contexto desde una acción de la interfaz (tema, página,
-  bloque, prueba), EL sistema DEBERÁ mostrarlo como chip visible y retirable antes de enviar, y NO
-  DEBERÁ enviarlo al servidor hasta que la persona envíe el mensaje.
+- **F5-17 · P3.** CUANDO la persona adjunte contexto desde una acción de la interfaz (material, página,
+  apunte, bloque, prueba), EL sistema DEBERÁ mostrarlo como chip visible y retirable antes de enviar, y
+  NO DEBERÁ enviarlo al servidor hasta que la persona envíe el mensaje.
 - **F5-18 · P3.** SI la persona retira un chip de contexto antes de enviar, ENTONCES EL sistema NO
   DEBERÁ incluir esa referencia en la petición.
+
+> F5-17 nombraba también el **tema** como origen. `Preguntar a Sym` desde un tema del mapa nunca se
+> construyó (era acabado de §4.10 del plan de fase 5, no entró en P1 ni en P2) y §5.2 no define ninguna
+> referencia que describa un tema, así que el origen sale del criterio en vez de quedarse como una
+> promesa que ninguna prueba puede recorrer. El hueco se conserva escrito en `NOTES.md`; reabrirlo pide
+> decidir antes qué referencia describe un tema. El criterio queda verificado a mano por Iván el
+> 2026-09-02 adjuntando la página desde el PDF.
 
 #### PDF y citas
 

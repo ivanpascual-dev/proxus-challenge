@@ -1374,3 +1374,31 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   (el mismo defecto que P3b ya había evitado para el plegado de Sym, pero no cubría el propio material).
   Arreglo: material, separador, chat y rail pasan a ser hermanos fijos en el árbol; lo que cambia con
   material/plegado es cómo se pintan (`flex`, `hidden`), nunca si existen.
+
+## 2026-09-02 · Fase 5 · auditoría de P3 (`@fiel-al-plan` y `@guardarrailes`)
+
+- **Veredicto de `@fiel-al-plan`:** fiel. Ningún paso de P3a a P3e sin evidencia, ninguna decisión
+  cerrada de §11.1 reabierta y el texto canónico de §11.10 literal en `ExamRun.tsx`. Las tres
+  desviaciones reales (`surface` opcional, `BlockContextRef`, `Plegar todo`) ya estaban documentadas en
+  ADR-031, ADR-032 y en esta bitácora, así que ninguna era silenciosa.
+- **Causa raíz (hallazgo de `@guardarrailes`):** el chat tiene dos entradas HTTP y solo una rechazaba
+  campos no declarados. `HttpApiBuilder` decodifica el payload sin opciones de parseo
+  (`HttpApiBuilder.ts:562`), así que `POST /api/tutor/chat` aceptaba con un 200 mudo un `messages`
+  fabricado y lo descartaba en silencio, mientras `/chat/stream` sí devolvía 400 porque pasaba
+  `onExcessProperty: "error"` a mano. No era una brecha (`runTurn` nunca lee el historial del payload,
+  y D3 lo comprueba), pero incumplía la invariante 3 en una ruta pública. Arreglo: la opción se anota
+  en el propio `TutorChatRequest`, porque el parser mezcla las opciones del esquema sobre las del
+  llamador (`SchemaParser.ts:872-882`) y así vale para las dos rutas. Comprobado en vivo: las dos
+  devuelven 400 ante el campo fabricado, y un turno real con contexto de material sigue en 200.
+- **Batería completa en verde por primera vez con el fixture:** D1 a D4 y B1 a B9 pasan con `STRICT=1`.
+  Las pasadas anteriores dejaban B7, B8 y B9 sin conclusión, y la causa no era el tutor: la batería
+  compartía cuota (`messagesPerWindow`) con el servidor que ya estaba abierto y B9 se saltaba por no
+  definir `FIXTURE_MATERIAL_ID`. Se corre contra un servidor propio en otro puerto (contador de
+  frecuencia limpio, que vive en memoria del proceso) y con `inyeccion.pdf` indexado, que ejerce la
+  inyección por texto extraído en la página 1 y por visión en la 2. El tutor no emite el canario.
+- **F5-17 cerrado quitándole el origen que no existía.** El criterio nombraba el tema, pero
+  `Preguntar a Sym` desde un tema del mapa nunca se construyó y §5.2 no define ninguna referencia que
+  describa un tema. Verificado a mano por Iván adjuntando la página desde el PDF, así que el criterio
+  pasa a enumerar los orígenes reales (material, página, apunte, bloque, prueba) y el hueco se queda
+  escrito en `NOTES.md`, no borrado. Reabrirlo sigue pidiendo decidir antes qué referencia describe un
+  tema.
