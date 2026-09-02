@@ -628,10 +628,16 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
 - **F5-04 · P0.** CUANDO la persona cambie la proporción del split, EL sistema DEBERÁ recordar solo esa
   proporción en almacenamiento local y aplicarla la próxima vez que haya material seleccionado, sin
   persistir contexto, perfil ni contenido educativo.
-- **F5-05 · P3.** CUANDO el viewport esté entre 768px y 1179px, EL sistema DEBERÁ mostrar una sola
-  superficie (Material o Sym) a la vez, con un control en cabecera para alternar entre ellas.
-- **F5-06 · P3.** CUANDO el viewport sea menor de 768px, EL sistema DEBERÁ presentar el sidebar como un
-  drawer modal con foco atrapado, que se cierra con Escape o al seleccionar un material.
+- **F5-05 · `descartado` (2026-09-02).** CUANDO el viewport esté entre 768px y 1179px, EL sistema DEBERÁ
+  mostrar una sola superficie (Material o Sym) a la vez, con un control en cabecera para alternar entre
+  ellas.
+- **F5-06 · `descartado` (2026-09-02).** CUANDO el viewport sea menor de 768px, EL sistema DEBERÁ
+  presentar el sidebar como un drawer modal con foco atrapado, que se cierra con Escape o al seleccionar
+  un material.
+
+> F5-05 y F5-06 quedan **descartados**, no diferidos: decisión de Iván del 2026-09-02, el reto se
+> entrega para escritorio. No se implementan, no se prueban y no se afirman en el CHANGELOG. Se
+> conservan escritos para que el hueco sea visible.
 
 #### Sidebar, subida y avisos globales
 
@@ -788,6 +794,51 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
   contexto adjunto (material, página, bloque, pestaña Pruebas, o el Control/Examen de prueba abierto con
   su vista); NO DEBERÁ inventar un intento o una pregunta concreta, y NO DEBERÁ afirmar ubicación alguna
   si la persona retira el chip correspondiente; durante un Examen real NO DEBERÁ existir chat.
+
+#### Progreso de una generación
+
+- **F5-45 · P3.** MIENTRAS se esté indexando un material, redactando sus apuntes o generando una prueba,
+  EL sistema DEBERÁ mostrar una sola línea de progreso que se sustituye, con la frase de la fase en
+  curso y, SOLO cuando el total sea mayor que uno, su contador de avance; NO DEBERÁ acumular una lista
+  de líneas, NO DEBERÁ mostrar una frase que no proceda de un evento recibido del servidor y NO DEBERÁ
+  mostrar porcentaje mientras el total sea desconocido.
+- **F5-46 · P3.** SI una generación falla o se corta, ENTONCES EL sistema DEBERÁ retirar la línea de
+  progreso y mostrar en su lugar el fallo con su texto completo, y NO DEBERÁ dejar visible una frase de
+  progreso junto al error.
+
+#### Navegación automática al terminar
+
+- **F5-47 · P3.** CUANDO termine de generarse un Control o un Examen de prueba, EL sistema DEBERÁ
+  abrirlo directamente en su solver; CUANDO termine de generarse un Examen real, DEBERÁ abrir su
+  pantalla previa SIN crear el intento ni arrancar el reloj; SI la generación falla, ENTONCES NO DEBERÁ
+  navegar a ninguna parte.
+- **F5-48 · P3.** CUANDO termine la preparación automática de un lote de un único PDF y no haya ningún
+  material abierto, EL sistema DEBERÁ seleccionar ese material y mostrarlo en la pestaña Mapa; SI el
+  lote tenía dos o más ficheros, SI la persona ya ha abierto un material a mano, o SI la cadena terminó
+  en error, ENTONCES NO DEBERÁ cambiar lo que la persona está mirando. CUANDO termine un indexado manual
+  del material que ya está abierto, EL sistema DEBERÁ cambiar a su pestaña Mapa.
+
+#### Pantalla previa del examen y editor
+
+- **F5-49 · P3.** LA pantalla previa de un examen DEBERÁ presentar centrados su título, su conteo de
+  preguntas y minutos y sus dos acciones, DEBERÁ seguir advirtiendo de las tres cosas que exige F3-39d
+  (que se puede retomar, que el reloj solo corre dentro y que las interrupciones quedan registradas), y
+  DEBERÁ mostrar el aviso de prueba parcial cuando lo haya.
+- **F5-50 · P3.** EL editor de un bloque de apuntes DEBERÁ ofrecer el encabezado H1 en el menú `/` y en
+  la barra flotante, DEBERÁ mostrarlo con más cuerpo que el H2, y DEBERÁ conservarlo intacto al guardar
+  y volver a abrir el apunte.
+
+#### Separador, plegado de Sym y persistencia de layout
+
+- **F5-51 · P3.** EL separador entre Material y Sym DEBERÁ mostrar una agarradera visible; arrastrarla
+  DEBERÁ redimensionar respetando los 420px mínimos de F5-03, y pulsarla sin arrastrar DEBERÁ plegar a
+  Sym a un rail de 56px con un control de restaurar y nombre accesible. MIENTRAS Sym esté plegado, EL
+  sistema DEBERÁ conservar su borrador, su contexto adjunto y cualquier respuesta en curso, y NO DEBERÁ
+  desmontar el chat. CUANDO no haya material seleccionado, NO DEBERÁ ofrecerse el plegado.
+- **F5-52 · P3.** EL sistema DEBERÁ persistir en almacenamiento local exactamente la proporción del
+  split y los dos estados de plegado (sidebar y Sym), y NO DEBERÁ persistir contexto, perfil,
+  conversación ni contenido educativo; SI el almacenamiento local falla o está bloqueado, ENTONCES la
+  interfaz DEBERÁ seguir funcionando con los valores por defecto.
 
 ### Correcciones de cierre de fase 5
 

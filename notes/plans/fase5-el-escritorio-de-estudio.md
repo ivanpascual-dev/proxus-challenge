@@ -1190,26 +1190,65 @@ ni una migración incompleta. Si el calendario termina aquí, actualizar documen
 20. Cerrar P2 con recorrido completo, checks, documentación y capturas de ambos temas en los tres
     anchos de escritorio. Si termina el tiempo, entregar aquí.
 
-### P3 · Backend, responsive y mejoras opcionales
+### P3 · Acabado, plegado de Sym y contratos nuevos
 
-21. Implementar `MaterialSurface`, `AssessmentContextRef` y `PageContextRef` con validación en servidor,
-    chips retirables y las pruebas de ubicación de §6.4. Hasta entonces se conserva el contexto de fase
-    4 sin afirmar pestaña, página o vista que Sym no conoce.
-22. Implementar `ConversationSource`, persistencia, deduplicación y `Fuentes consultadas`; no inferir
-    citas desde Markdown.
-23. Revisar la cola acumulada del uploader. Si se decide corregirla, revalidar toda la cola al añadir
-    otro lote, ignorar respuestas asíncronas antiguas y probar duplicado y `maxFilesPerUpload` repartidos
-    entre dos selecciones. No tocar el endpoint si la medición no justifica el coste.
-24. Ejecutar las pruebas completas de identidad y ubicación, fuentes durante stream y recarga, y
-    contexto de prueba exacta. Actualizar contratos y documentación solo de lo realmente construido.
-25. Completar responsive al final: selector Material/Sym en tablet y sidebar como drawer accesible en
-    móvil. Probar 1024x768 y 390x844 sin rebajar la calidad ya cerrada para escritorio.
-26. Contraer también el panel de Sym a un rail, para dejar Apuntes a pantalla completa (petición de
-    Iván tras las correcciones de cierre; hoy `AppShell` solo contrae sidebar e índice de bloques, y el
-    plan de correcciones §9 excluye "ocultar a cero" un panel). Es un cuarto estado de layout: rail con
-    control de restaurar, persistencia, teclado y comportamiento del separador. Encaja aquí junto a la
-    superficie de estudio ampliada, no en el corte de correcciones.
-27. Cierre final opcional: recorrido completo, tests, typecheck, build, logs, capturas y changelog.
+Los contratos de cada pieza del acabado viven en **§11**; los de los contratos nuevos, en §5.2 y §5.3.
+Dos cambios sobre el orden que este apartado tenía antes:
+
+- **El antiguo paso 23 (cola acumulada del uploader) ya está hecho.** Lo cerró el corte de correcciones
+  en `notes/plans/correciones.md` §4.1.4 (`packages/web/src/domain/materials/upload-queue.ts`). No se
+  repite.
+- **El antiguo paso 25 (responsive de tablet y móvil) queda descartado**, no diferido, por decisión de
+  Iván del 2026-09-02: este reto se entrega para escritorio. F5-05 y F5-06 quedan marcados
+  `descartado` en `docs/especificacion.md` y aparecen en §9.
+
+#### P3a · Progreso, navegación al terminar y pantalla previa
+
+21. Implementar `packages/web/src/domain/progress/progress-line.ts` con sus tests (§11.2). Es lógica
+    pura: convierte un evento real del stream en frase, contador y fase.
+22. Crear `GenerationProgress.tsx` y sustituir con él las tres presentaciones de progreso que hoy
+    conviven, más la línea por fichero de la cola de subida (§11.3).
+23. Autonavegación al terminar una prueba: Control y Examen de prueba abren el solver; un Examen real
+    lleva a la pantalla previa sin crear intento (§11.4).
+24. Autonavegación al terminar una preparación: lote de un único PDF y ningún material abierto a mano,
+    se selecciona ese material y se aterriza en Mapa; con dos o más, no se navega. Indexado manual del
+    material ya abierto, se cambia a Mapa (§11.4).
+25. Rediseñar `ExamBriefing` con el texto canónico de §11.10 y los botones centrados, conservando los
+    tres avisos que exige F3-39d y el aviso de prueba parcial (§11.5).
+26. Añadir el encabezado H1 al editor de bloques y su estilo, y ampliar el test de ida y vuelta de
+    Markdown (§11.6).
+27. Registrar ADR-029 y ADR-030 (§11.1), escribir F5-45 a F5-50 en `docs/especificacion.md`, pasar los
+    checks de §8.1, recorrer §11.11 y cerrar con bitácora y commit.
+
+#### P3b · Separador con agarradera y plegado de Sym
+
+28. Implementar `packages/web/src/domain/workspace/separator-gesture.ts` con sus tests: distinguir
+    arrastre de pulsación por un umbral de píxeles (§11.7).
+29. Rehacer el separador de `AppShell`: banda más estrecha, línea de 1px y agarradera visible siempre,
+    con el gesto del paso 28 (§11.7).
+30. Añadir `chatCollapsed` a `AppShell` y el rail de Sym de 56px, sin desmontar el chat ni perder el
+    borrador ni cortar un stream en curso (§11.8).
+31. Escribir F5-51 y F5-52, pasar los checks, recorrer §11.11 y cerrar con bitácora y commit.
+
+#### P3c · Contexto estructurado ampliado
+
+32. Implementar `MaterialSurface`, `AssessmentContextRef` y `PageContextRef` con validación en servidor,
+    chips retirables y las pruebas de ubicación de §6.4 (contrato en §5.2). Hasta entonces se conserva
+    el contexto de fase 4 sin afirmar pestaña, página o vista que Sym no conoce.
+33. Ejecutar `@guardarrailes` y las pruebas de identidad y ubicación. Cerrar F5-17, F5-18, F5-40 y
+    F5-44 con checks, bitácora y commit.
+
+#### P3d · Fuentes consultadas por el chat
+
+34. Implementar `ConversationSource`, persistencia, deduplicación y `Fuentes consultadas` (contrato en
+    §5.3); no inferir citas desde Markdown.
+35. Ejecutar `@guardarrailes`, probar fuentes durante el stream y tras recargar, y cerrar F5-41 con
+    checks, bitácora y commit.
+
+#### P3e · Cierre
+
+36. Recorrido completo de §8.3 más §11.11, tests, typecheck, build, logs, capturas de ambos temas y
+    actualización de `CHANGELOG.md` y `NOTES.md` solo con lo realmente terminado.
 
 ## 8. Cómo se sabe que funciona
 
@@ -1222,7 +1261,8 @@ verificable:
 | P0 | F5-01 a F5-04, F5-07 a F5-16, F5-34, F5-37 a F5-39, F5-42 y F5-43 | Escritorio, sidebar, chat, actividad segura, comunicación humana, identidad y todas las superficies actuales con el nuevo lenguaje visual. |
 | P1 | F5-19 a F5-21 y F5-25 a F5-30 | PDF con miniaturas, Apuntes por bloque y Pruebas agrupadas. |
 | P2 | F5-22 a F5-24, F5-31 a F5-33, F5-35 y F5-36 | Mapa manipulable, siguiente paso, accesibilidad exhaustiva y rendimiento medido. |
-| P3 | F5-05 a F5-06, F5-17 a F5-18, F5-40, F5-41 y F5-44 | Responsive completo, contexto estructurado ampliado, página, fuentes del chat y ubicación exacta de Sym. |
+| P3 | F5-17 a F5-18, F5-40, F5-41, F5-44 y F5-45 a F5-52 | Acabado de generación y navegación, pantalla previa del examen, H1, separador y plegado de Sym, contexto estructurado ampliado y fuentes del chat. |
+| Descartado | F5-05 y F5-06 | Responsive de tablet y móvil. Decisión de Iván del 2026-09-02: el reto se entrega para escritorio. No se implementa ni se afirma. |
 
 No se borra un criterio si no entra: queda marcado `deferred` con su prioridad y no se incluye en las
 afirmaciones del CHANGELOG ni del recorrido entregado. Este plan guarda el procedimiento y no repite
@@ -1252,7 +1292,7 @@ pnpm run test:guardarrailes
 | Criterios | Prueba |
 | --- | --- |
 | F5-01 a F5-04, shell | Abrir a 1440x900 sin material: 224 px de sidebar y Sym ocupa el resto. Abrir `densidad.pdf`: aparece split 58/42. Arrastrar a ambos extremos: ninguno baja de 420 px. Recargar: conserva ratio. Cerrar material: vuelve a Sym completo. |
-| F5-05 a F5-06, responsive | Probar 1024x768: una sola superficie y selector Material/Sym. Probar 390x844: sidebar en drawer, foco atrapado, Escape lo cierra y seleccionar material también. |
+| F5-05 a F5-06, responsive | **Descartados el 2026-09-02.** No se prueban ni se afirman: la entrega es de escritorio. |
 | F5-07 a F5-09, sidebar, subida y tema | Confirmar lista plana, solo materiales, botón de subida y tres iconos de tema al pie. Elegir juntos un PDF válido y otro inválido: no se escribe ninguno durante `validate`, ambos se ven con estado, el botón permanece bloqueado y la X permite retirar el rechazado. Subir el válido, cerrar y reabrir: la cola y el progreso continúan. Cambiar sistema/claro/oscuro y recargar. Forzar artefacto ilegible: aviso global, no sección nueva en sidebar. |
 | F5-10 a F5-13, chat | Escribir dos líneas con Shift+Enter; Enter envía; probar IME sin envío prematuro; pegar siete líneas y comprobar tope visual a seis. Respuesta Markdown con lista, tabla y bloque de código: solo tabla/código tienen scroll horizontal. |
 | F5-14 a F5-16, actividad | Pedir `lista mis materiales`. Cerrado: un resumen humano. Abierto: pasos emparejados en orden. Provocar comando fallido: estado failure persistente después de recargar. Nunca enseñar JSON en el nivel principal. |
@@ -1272,6 +1312,14 @@ pnpm run test:guardarrailes
 | F5-42, detalle técnico seguro | Desplegar actividad con llamada correcta, resultado grande y fallo. El nivel principal sigue siendo humano; el detalle abreviado conserva información útil, no enseña claves, base64, system prompt ni consumo de tokens. |
 | F5-43, identidad visible | Sidebar muestra `Symma`; el chat muestra `Sym` y `Tutor académico`; acciones dicen `Preguntar a Sym`. El barrido no encuentra nombres retirados en copy visible. |
 | F5-44, identidad y ubicación del agente | Preguntar quién es y dónde está con contexto vacío, material, página, bloque, lista de Pruebas, Control abierto y Examen de prueba abierto. Sym mantiene identidad Symma/Sym, solo nombra ubicación adjunta, distingue solver de historial y no inventa intento ni pregunta. Retirar cada chip elimina esa afirmación. Durante Examen real no existe chat. Las generaciones impersonales no incluyen la marca. |
+
+| F5-45 a F5-46, progreso vivo | Indexar un PDF de más de 10 páginas, generar apuntes y generar un Examen de 20 preguntas. En las tres, la zona de progreso muestra **una sola línea** que se sustituye, nunca una lista que crece, con contador solo cuando el total es mayor que 1. Cortar el servidor a mitad: la línea desaparece y queda el aviso de fallo; no se queda una frase de progreso colgada. Con un lector de pantalla, el cambio de página no se anuncia 82 veces: solo el cambio de fase. |
+| F5-47, navegación al terminar una prueba | Generar un Control: al acabar se abre su solver sin pulsar nada. Generar un Examen de prueba: igual. Generar un Examen en modo `Real`: aparece la pantalla previa, `GET /api/assessments/:id/active` sigue diciendo que no hay intento y el reloj no ha empezado. Pulsar `Ahora no`: vuelve el escritorio con la prueba ya en su grupo. |
+| F5-48, navegación al terminar una preparación | Subir un único PDF sin ningún material abierto: al acabar la cadena queda seleccionado y en la pestaña Mapa. Repetir con dos PDF en el mismo lote: no se navega y ambos quedan en el sidebar. Repetir con un único PDF habiendo abierto otro material a mano durante la subida: no se navega. Con la cadena en error: no se navega. |
+| F5-49, pantalla previa del examen | Abrir un Examen real desde la lista a 1280x720 y a 1920x1080: el bloque queda centrado, los dos botones centrados, y siguen visibles los tres avisos de F3-39d. Abrir una prueba parcial: aparece además `Se pidieron N preguntas; el contenido permitió M.`. |
+| F5-50, H1 en apuntes | En un bloque, escribir `/` y elegir `Título grande`: el texto pasa a H1 y se ve más grande que un H2 en ambos temas. Guardar, recargar y comprobar que sigue siendo H1. El test de ida y vuelta de `noteBlockSchema` incluye H1. |
+| F5-51, separador y plegado de Sym | Con material abierto, arrastrar la agarradera: ninguno de los dos paneles baja de 420px. Pulsarla sin arrastrar: Sym se pliega a un rail de 56px. Comprobar antes de plegar que hay texto sin enviar en el composer y una respuesta a medias: al plegar y desplegar, siguen ahí. Recargar: sigue plegado. Cerrar el material: Sym vuelve a ancho completo. Recorrer separador y rail solo con teclado. |
+| F5-52, persistencia de layout | Tras tocar ratio, sidebar y Sym, `localStorage` contiene exactamente `symma.workspace.materialRatio`, `symma.workspace.sidebarCollapsed` y `symma.workspace.chatCollapsed`, y nada más. Bloquear `localStorage` en el navegador: la interfaz sigue funcionando con los valores por defecto. |
 
 ### 8.3 Recorrido final del evaluador
 
@@ -1314,7 +1362,17 @@ Con `pnpm run seed:demo` y `pnpm dev`:
   probar emparejamiento, persistencia y recarga. Nunca se estimará una duración desde la animación.
 - Reabrir las reglas de prompt injection, herramientas, citas o capacidades del agente. Fase 5 cambia
   la identidad canónica y su conocimiento del producto, no las barreras cerradas en fase 4.
-- Rehacer ExamRun visualmente más allá de adoptar tokens y accesibilidad sin cambiar su aislamiento.
+- Rehacer ExamRun visualmente más allá de adoptar tokens y accesibilidad sin cambiar su aislamiento. El
+  rediseño de §11.5 afecta solo a la pantalla previa: ni el reloj, ni el aislamiento, ni la entrega.
+- **Responsive de tablet y móvil (F5-05 y F5-06).** Descartado el 2026-09-02 por decisión de Iván: la
+  entrega es de escritorio. No se implementa, no se prueba y no se afirma en el CHANGELOG. Los dos
+  criterios quedan en la especificación marcados `descartado`, no borrados.
+- Un carrusel de frases de progreso que rote por tiempo. La línea viva de §11.2 se mueve solo cuando
+  llega un evento real del servidor (invariante 3).
+- Barra de progreso con porcentaje inventado cuando el total todavía no se conoce.
+- Navegación automática a un destino ambiguo: dos o más materiales recién preparados, o un estado que
+  arranque un reloj o consuma un intento.
+- Redimensionar el rail de Sym, cerrarlo del todo o convertirlo en un drawer flotante.
 
 ## 10. Riesgos conocidos
 
@@ -1358,10 +1416,328 @@ Con `pnpm run seed:demo` y `pnpm dev`:
     accidente y cortar la actualización visual aunque las peticiones continúen. `UploadManager`
     permanece montado, y F5-07 a F5-09 obligan a cerrar y reabrir durante validación y preparación.
 
+## 11. P3 ampliado: acabado de generación, navegación y plegado de Sym
+
+Este apartado se añade el 2026-09-02, después de cerrar el corte de correcciones, con cuatro peticiones
+de Iván sobre la aplicación ya construida. No es una fase nueva: es el contenido del P3 de §7, y sus
+criterios se escriben en `docs/especificacion.md` dentro de fase 5, como F5-45 a F5-52.
+
+**El dato que gobierna el diseño:** el servidor ya emite progreso estructurado y honesto en las tres
+generaciones, con los campos que hacen falta para contar el avance
+(`indexing-service.ts:72,84,135` con `page`/`pageCount`; `note-generation-service.ts:144,163` y
+`assessment-generation-service.ts:551,621` con `topic`/`topicCount`). Lo que falla no es el dato, es la
+presentación: el cliente acumula esos mensajes en una lista con aspecto de consola. Por eso todo el
+acabado del progreso es cliente y no toca ni un contrato.
+
+### 11.1 Decisiones cerradas, no volver a preguntar
+
+Continúan la numeración de §2 y solo añaden; no sustituyen ninguna decisión anterior.
+
+29. **La línea de progreso se deriva de un evento real, siempre.** Ni frases rotando por tiempo, ni
+    porcentaje inventado, ni "ya queda poco" sin dato que lo sostenga. Un carrusel decorativo es
+    exactamente el valor neutro que prohíbe la invariante 3 de `AGENTS.md`: parecería que la aplicación
+    avanza mientras el servidor está parado. Queda como ADR-029.
+30. **La aplicación navega sola solo cuando el destino es inequívoco, y nunca a un estado que arranque
+    un reloj o consuma un intento.** De ahí salen las tres reglas de §11.4. Queda como ADR-030.
+31. **Un Control y un Examen de prueba se abren solos en el solver al terminar de generarse; un Examen
+    real abre la pantalla previa, sin crear intento.** Decisión de Iván. Entrar en `ExamRun` con
+    `initialAttemptId: null` es exactamente el aviso previo de F3-39d: el intento nace al pulsar
+    `Empezar el examen`, no antes.
+32. **El tipo de prueba que decide la navegación es el que se pidió, no el que responde el servidor.**
+    `ArtifactSummary` no lleva `mode` (comprobado en `packages/shared/src/schemas/artifact.ts:193-213`),
+    y `GenerateCard` ya conoce `target.kind` y `mode`. Se usa eso y no se amplía el contrato para un
+    efecto de interfaz.
+33. **Tras una preparación automática se navega solo si el lote tenía un único PDF y el alumno no ha
+    abierto ningún material a mano mientras tanto.** Decisión de Iván para el primer caso; el segundo lo
+    añade el plan porque robarle la pantalla a alguien que está leyendo otra cosa es peor que no navegar.
+34. **Al terminar un indexado manual del material que ya está abierto, se cambia a Mapa.** Es el mismo
+    criterio: destino único y el alumno ya está mirando ese material. Asunción explícita del plan, no
+    petición de Iván.
+35. **La agarradera del separador pliega Sym.** Decisión de Iván. Pulsar sin arrastrar pliega; arrastrar
+    sigue redimensionando. El umbral que separa los dos gestos es lógica pura y probada.
+36. **Plegar Sym no lo desmonta.** El chat se oculta con CSS y conserva borrador, contexto, drawer y un
+    stream en curso. Es la misma regla que ya cumplen el editor de Apuntes y `UploadManager`.
+37. **Plegar no es cerrar y no contradice F5-03.** F5-03 prohíbe colapsar arrastrando y exige que cerrar
+    sea una acción explícita. La agarradera es una acción explícita, con nombre accesible, y el rail de
+    56px sigue siendo una superficie visible con su control de restaurar.
+38. **El estado de layout persistido son exactamente tres booleanos y un número**, todos de presentación:
+    `symma.workspace.materialRatio`, `symma.workspace.sidebarCollapsed` y `symma.workspace.chatCollapsed`.
+    Nunca contexto, perfil ni contenido educativo (F5-04, ampliado por F5-52).
+39. **La pantalla previa del examen se reescribe de forma y de texto, no de comportamiento.** Los tres
+    avisos de F3-39d siguen ahí, el aviso de prueba parcial también, y no cambian el reloj, la
+    penalización ni el aislamiento.
+40. **No se añade ninguna dependencia.** Ni librería de animación, ni de split panes, ni de progreso.
+41. **El responsive de tablet y móvil queda descartado**, no diferido (§7 y §9).
+
+### 11.2 Lógica pura: la línea de progreso
+
+Crear `packages/web/src/domain/progress/progress-line.ts`:
+
+```ts
+export interface ProgressLine {
+  // La frase, sin contador. Es lo único que se anuncia a un lector de pantalla.
+  readonly phrase: string;
+  // `null` cuando no hay avance contable (fase de guardado, o total desconocido).
+  readonly step: number | null;
+  readonly total: number | null;
+}
+
+export const indexProgressLine: (event: { readonly page: number | null; readonly pageCount: number }) => ProgressLine;
+export const noteProgressLine: (event: { readonly topic: number | null; readonly topicCount: number }) => ProgressLine;
+export const assessmentProgressLine: (event: { readonly topic: number | null; readonly topicCount: number }) => ProgressLine;
+```
+
+Reglas, todas deterministas:
+
+- El contador solo existe cuando el total es mayor que 1. Un Control de un solo tema no dice
+  `tema 1 de 1`.
+- `page === null` o `topic === null` significa fase de cierre: frase sin contador.
+- La frase no se compone parseando `event.message`. El texto del servidor sigue viajando y se conserva
+  para el log y para el camino de fallo, pero la interfaz no lo trocea. Parsear castellano del servidor
+  sería la clase de acoplamiento que se rompe en silencio al cambiar una palabra.
+- Se pierde a propósito la distinción entre extraer texto y transcribir con el modelo, que hoy viaja en
+  el mensaje del indexado. No se pierde información para el alumno: la marca `transcrito por el modelo`
+  sigue en cada página del PDF (`PdfPage.tsx:50-52`) y en cada cita (`MaterialCitation.tsx:45-46`).
+
+Tests en `progress-line.test.ts`: primera página, página intermedia, última página, fase de temas,
+total 1, total 0 y fase de guardado en las tres generaciones.
+
+### 11.3 La línea viva en pantalla
+
+Crear `packages/web/src/components/ui/GenerationProgress.tsx`, que recibe una `ProgressLine | null` y
+pinta: la frase, el contador cuando existe, y una barra fina determinada por `step/total` (indeterminada
+mientras el total sea desconocido). Accesibilidad:
+
+- La frase vive en un `role="status"` con `aria-live="polite"`; **el contador va aparte y
+  `aria-hidden`**, para que un material de 82 páginas no dispare 82 anuncios.
+- Con `prefers-reduced-motion: reduce` la barra no se anima, solo salta a su valor.
+
+Sustituye a las tres presentaciones actuales, que dejan de acumular listas:
+
+| Dónde | Hoy | Después |
+| --- | --- | --- |
+| `MaterialPanel.tsx:472-478` (`ReindexBanner`) | `<ul>` de líneas acumuladas | Una `GenerationProgress` con `indexProgressLine` |
+| `MaterialPanel.tsx:594-598` (`GenerateNoteCard`) | Una línea de texto plano | La misma `GenerationProgress` con `noteProgressLine` |
+| `AssessmentsTab.tsx:353-357` (`GenerateCard`) | `<ul>` de líneas acumuladas con `max-h-40` | Una `GenerationProgress` con `assessmentProgressLine` |
+| `UploadQueue.tsx:104-128` | `STAGE_LABEL` más `event.message` crudo | `STAGE_LABEL` se queda como título de la fila; debajo, la línea derivada |
+
+`UploadManager.runChain` deja de guardar `event.message` en la entrada y guarda la `ProgressLine`
+derivada. El campo `message` de `FileUploadState` se reserva para fallos y rechazos, que siguen
+mostrándose con su texto entero.
+
+El camino de fallo no cambia y manda sobre el de progreso: al llegar un `failed` o una excepción, la
+línea viva desaparece y queda el aviso de error que ya construye `describeFailure`. Nunca conviven una
+frase de progreso y un error.
+
+### 11.4 Navegación al terminar
+
+**Pruebas.** `GenerateCard.onGenerated` pasa a entregar `{ id, title, mode, kind }` tomados del evento
+`done` y de lo que se pidió (decisión 32). `AssessmentsTab` decide:
+
+- `kind === "quiz"`, o `kind === "test"` con `mode === "practice"`: `refresh()` y
+  `setView({ kind: "solve", id, title })`.
+- `kind === "test"` con `mode === "exam"`: `refresh()`, `setActiveGroup("realExams")` y
+  `onStartExam(id, title)`, que en `App.tsx:132-133` entra con `attemptId: null`, es decir, la pantalla
+  previa. El reloj no arranca y `Ahora no` devuelve el escritorio.
+- Desaparece el botón `Ver la prueba en la lista` (`AssessmentsTab.tsx:360-369`): ya no hay nada que
+  buscar a mano.
+- Si la generación falla, no se navega: se queda la tarjeta con su error y su `Cancelar`.
+
+**Subida.** `UploadManager` recuerda cuántos ficheros tenía el lote confirmado. Cuando la cadena de un
+material termina en `done` y ese lote era de uno, llama a un `onMaterialPrepared(materialId)` nuevo, que
+`Sidebar` sube tal cual a `App`. `App` navega solo si `selectedMaterialId === null` en ese momento
+(decisión 33), y lo hace fijando dos cosas: el material seleccionado y un objetivo de aterrizaje.
+
+**Aterrizaje en una pestaña.** Se copia el patrón que ya existe para las citas
+(`App.tsx:50-54`, `citationTarget` más `onCitationConsumed`): `MaterialPanel` recibe
+`landingTarget: { materialId, tab } | null` y `onLandingConsumed`, y cuando el `materialId` coincide con
+el suyo hace `setTab(tab)` y lo consume una sola vez. Con eso, aterrizar en Mapa no necesita router ni
+estado global.
+
+**Indexado manual.** `ReindexBanner` gana un `onIndexed` que `MaterialPanel` usa para `setTab("mindmap")`
+(decisión 34). No pasa por `App`: el material ya está abierto.
+
+### 11.5 Pantalla previa del examen
+
+Se reescribe `ExamBriefing` (`ExamRun.tsx:408-471`) conservando su firma. Qué cambia:
+
+- El bloque se centra de verdad: el contenedor sigue siendo `Centered`, pero el contenido pasa a
+  `text-center` con `max-w-xl`, y los dos botones a `justify-center`. Hoy el texto va alineado a la
+  izquierda dentro de un bloque centrado, que es lo que se ve descuadrado en la captura de Iván.
+- Los cuatro avisos dejan de ser una lista de puntos y pasan a cuatro tarjetas en rejilla de dos
+  columnas, cada una con un icono ya existente en `Icon.tsx`, un título corto y una frase. El texto
+  literal está en §11.10.
+- El conteo (`N preguntas · M minutos`) sube a un lugar más visible y el aviso de prueba parcial se
+  mantiene justo debajo, con `partialAssessmentNotice` sin tocar.
+- El error de arranque conserva su caja de peligro actual.
+
+No se toca `phase`, ni el reloj, ni `startAttemptAction`, ni el aislamiento de F5-30.
+
+### 11.6 H1 en el editor de bloques
+
+- `blockFormats.ts`: se añade `{ title: "Título grande", short: "H1", description: "Encabezado principal del bloque (H1)" }`
+  como primer encabezado de la lista, antes de `Título` (H2), con `toggleHeading({ level: 1 })`. Aparece
+  a la vez en el menú `/` y en la barra flotante, porque las dos leen `BLOCK_FORMATS`.
+- `styles.input.css`: se añade `.tiptap-block h1` antes de la regla de `h2` (`:134`), con cuerpo mayor
+  que H2 y el mismo color de encabezado. Hoy no existe, así que un H1 se vería como texto normal.
+- No hace falta tocar el esquema: `StarterKit` ya trae los seis niveles y `noteBlockSchema.ts:10-17` no
+  los restringe (comprobado).
+- `noteBlockSchema.test.ts` amplía el caso de ida y vuelta con un H1, que es donde se comprobaría un
+  fallo de serialización de `tiptap-markdown`.
+- El índice de bloques no cambia: `blockHeading` ya limpia `#{1,6}` (`NoteOutline.tsx:18`).
+
+### 11.7 Separador con agarradera
+
+Crear `packages/web/src/domain/workspace/separator-gesture.ts`:
+
+```ts
+export type SeparatorGesture = "drag" | "toggle";
+export const resolveSeparatorGesture: (
+  startX: number,
+  endX: number,
+  threshold?: number // 4 px
+) => SeparatorGesture;
+```
+
+Un desplazamiento por debajo del umbral es una pulsación (pliega Sym); por encima, un arrastre (deja el
+ratio donde esté). Tests: cero, justo por debajo, justo por encima, y desplazamiento negativo.
+
+En `AppShell.tsx:167-184`:
+
+- La banda pasa de 12px a 9px y conserva la línea de 1px y el `cursor-col-resize`.
+- La agarradera es una píldora siempre visible, de unos 6x32px, centrada verticalmente, con más
+  contraste en hover y foco. Se pinta como un elemento hermano posicionado sobre la banda, **no dentro
+  del elemento con `role="separator"`**, para no meter un control dentro de un widget de separador.
+- El separador conserva `role="separator"`, su `aria-valuenow` y su teclado de flechas, Inicio y Fin.
+  La agarradera es un `<button>` con nombre accesible `Plegar a Sym`, que responde a Enter y Espacio.
+- El gesto de puntero sigue en la banda, con la captura que ya existe; al soltar se consulta
+  `resolveSeparatorGesture` y, si fue pulsación, se pliega en vez de persistir ratio.
+
+### 11.8 Plegado de Sym
+
+`AppShell` gana `chatCollapsed`, con la misma mecánica exacta que `sidebarCollapsed` ya tiene
+(`AppShell.tsx:24-38`), incluida la tolerancia a que `localStorage` falle:
+
+- Solo tiene efecto cuando hay material y el split cabe. Sin material, Sym es la única superficie y el
+  plegado no se ofrece ni se aplica.
+- Plegado, el chat conserva su nodo montado y oculto (`hidden`), y a su lado se pinta un rail de 56px
+  con: avatar de Sym, y un botón `Mostrar a Sym` que despliega. El rail no ofrece historial, ni
+  papelera, ni composer: son acciones que necesitan la superficie entera.
+- El material ocupa todo el ancho menos ese rail. No se toca `MIN_PANEL_WIDTH_PX` para el material.
+- Al desplegar vuelve el ratio guardado, no un valor nuevo.
+- **Prohibido desmontar el chat.** Un stream en curso, el borrador del composer, los chips de contexto y
+  el drawer sobreviven al plegado. Es lo que se prueba en F5-51.
+
+### 11.9 Qué toca en `packages/shared`
+
+**Nada.** Todo el acabado es cliente y usa contratos que ya existen. Lo escribo explícito porque es la
+tentación evidente: no se añade `mode` a `ArtifactSummary` (decisión 32) ni una fase estructurada a los
+eventos de progreso. Los contratos nuevos de P3c y P3d sí tocan `shared`, y sus formas ya están escritas
+en §5.2 y §5.3.
+
+### 11.10 Texto canónico literal
+
+Se copia tal cual. No se resume ni se "mejora de estilo".
+
+**Frases de progreso** (`progress-line.ts`), con el contador aparte:
+
+```text
+Leyendo el documento            · página N de M
+Ordenando los temas del material
+Redactando los apuntes          · tema N de M
+Guardando los apuntes
+Escribiendo las preguntas       · tema N de M
+Guardando la prueba
+```
+
+**Frase mientras la petición está en vuelo y todavía no ha llegado ningún evento**, por superficie:
+
+```text
+Abriendo el documento…
+Leyendo el índice del material…
+Preparando el reparto de preguntas…
+```
+
+**Cierre de una generación de prueba**, antes de navegar:
+
+```text
+Prueba lista: N preguntas.
+```
+
+**Pantalla previa del examen.** Antetítulo, título y conteo:
+
+```text
+EXAMEN REAL · A PUERTA CERRADA
+<título del examen>
+N preguntas · M minutos
+```
+
+Las cuatro tarjetas, en este orden, con título y frase:
+
+```text
+Sin pistas · La corrección y la nota salen al entregar, no antes.
+El reloj solo corre dentro · Si te vas, se para y se retoma donde lo dejaste.
+Cada salida queda registrada · Se guarda como una interrupción y se ve en el historial.
+El resto queda cerrado · Material, apuntes y tutor no están disponibles mientras dure.
+```
+
+Los dos botones conservan su texto actual: `Empezar el examen` y `Ahora no`. Para un Control en modo
+examen, el antetítulo es `CONTROL · MODO EXAMEN` y el resto no cambia.
+
+**Rail de Sym** y agarradera:
+
+```text
+Plegar a Sym
+Mostrar a Sym
+```
+
+En código, `N`, `M` y el título se interpolan desde los datos; no se duplican cifras literales.
+
+### 11.11 Recorrido de comprobación del acabado
+
+Con `pnpm dev` y datos temporales vacíos:
+
+1. Subir un único PDF sin ningún material abierto. Ver una sola línea que avanza por páginas, luego
+   temas, luego apuntes. Al terminar, el material queda seleccionado y abierto en Mapa.
+2. Repetir con dos PDF en un lote: las dos filas avanzan con su propia línea y **no se navega**.
+3. Borrar los materiales, subir uno y, mientras se prepara, abrir a mano otro material: al terminar no
+   se navega.
+4. Generar un Control desde un tema: al acabar se abre su solver solo.
+5. Generar un Examen en modo `Real`: aparece la pantalla previa, centrada, con las cuatro tarjetas. Sin
+   pulsar nada, comprobar que no hay intento activo. Pulsar `Ahora no` y volver.
+6. En Apuntes, aplicar `Título grande` a la primera línea de un bloque, guardar y recargar.
+7. Con material abierto, arrastrar la agarradera a los dos extremos (nada baja de 420px), escribir en el
+   composer sin enviar, plegar Sym, comprobar el rail de 56px, desplegar y ver el texto intacto.
+8. Recargar y comprobar que sigue plegado. Cerrar el material y ver que Sym vuelve entero.
+9. Repetir 1, 4 y 7 con teclado, tema claro, tema oscuro, zoom al 200 por ciento y movimiento reducido.
+
+### 11.12 Riesgos de este apartado
+
+15. **Quitar el histórico de líneas quita información de diagnóstico.** Hoy la lista deja ver por qué
+    tema pasó la generación. Se acepta a cambio de que el fallo siga mostrando su texto completo y de que
+    el servidor conserve el suyo en el log. Si al depurar se echa de menos, el histórico vuelve como
+    detalle plegado, nunca como la vista por defecto.
+16. **Autonavegar puede robarle la pantalla al alumno.** Por eso las tres condiciones de la decisión 33 y
+    por eso un Examen real nunca arranca solo. Si aun así molesta al probarlo, la salida barata es dejar
+    la navegación solo en la generación de pruebas, que es donde Iván la pidió con más claridad.
+17. **La agarradera que hace dos cosas se puede sentir ambigua.** El umbral de 4px es una cifra elegida,
+    no medida. Si en uso real una pulsación se cuela como arrastre, se sube el umbral en la única
+    constante que existe; el gesto es lógica pura y probada, así que cambiarlo cuesta un test.
+18. **Plegar Sym con un stream vivo es el caso frágil.** Todo depende de no desmontar. Un futuro
+    refactor que mueva el chat dentro del rail rompería esto sin que ningún typecheck se queje; por eso
+    F5-51 lo prueba con una respuesta a medias.
+19. **El rail de Sym añade un cuarto estado de layout.** Sidebar plegado, índice de bloques plegado, Sym
+    plegado y sin material se combinan. La combinación que hay que mirar con cuidado es sin material y
+    Sym plegado: no debe existir, porque dejaría la pantalla vacía.
+20. **`role="status"` con contenido que cambia mucho puede parlotear.** Por eso el contador va
+    `aria-hidden` y solo la frase se anuncia. Si un lector concreto sigue leyendo de más, se pasa el
+    anuncio a un texto oculto que solo cambia al cambiar de fase.
+
 ## Orden de arranque cuando corresponda
 
 Con el commit final de fase 4 como base, invocar
 `ejecutar-fase notes/plans/fase5-el-escritorio-de-estudio.md`. El ejecutor completa P0 antes de abrir
-P1 y repite la regla para P2 y P3. Cuando se agote el calendario, termina el nivel actual o revierte su
+P1 y repite la regla para P2 y P3. Dentro de P3, la unidad de corte es el tramo (P3a a P3e): cada uno
+termina en verde y con su commit, y se puede entregar ahí. Cuando se agote el calendario, termina el nivel actual o revierte su
 parte incompleta, ejecuta su cierre de checks y documentación y entrega el último corte verde. El
 documento ya está en su ubicación definitiva; no hay que moverlo ni crear otra copia.
