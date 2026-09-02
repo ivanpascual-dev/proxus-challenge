@@ -1363,3 +1363,14 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   `Preguntar a Sym` (era acabado de §4.10, no se construyó en P1 ni en P2) y §5.2 no define ninguna
   referencia de tema. Queda cubierto para material, página, apunte, bloque y prueba. Desbloquearlo pide
   decidir antes qué referencia describe un tema.
+
+## 2026-09-02 · Fase 5 · tramo P3d (fuentes consultadas por el chat)
+
+- **Causa raíz (aparte de P3d, arreglo independiente):** abrir una fuente consultada sin material
+  abierto devolvía la conversación a un borrador en blanco. Síntoma: la burbuja del chat desaparecía de
+  pantalla justo al abrir el material. Causa: `AppShell` decidía con un ternario entre tres ramas del
+  árbol ("split", "solo material", "solo chat") cuál montaba el chat, así que abrir o cerrar un material
+  lo cambiaba de rama y React lo desmontaba entero, perdiendo el estado en memoria de la conversación
+  (el mismo defecto que P3b ya había evitado para el plegado de Sym, pero no cubría el propio material).
+  Arreglo: material, separador, chat y rail pasan a ser hermanos fijos en el árbol; lo que cambia con
+  material/plegado es cómo se pintan (`flex`, `hidden`), nunca si existen.

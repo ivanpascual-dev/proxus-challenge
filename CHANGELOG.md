@@ -314,6 +314,10 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Las sugerencias del chat vacío ya no se salen al estrechar el panel de Sym.** Se apilaban según el
   ancho de la ventana, no el del panel, así que al reducir Sym el texto largo de cada tarjeta
   desbordaba. Ahora se apilan según el ancho real del panel.
+- **Abrir o cerrar un material ya no vacía la conversación con Sym de la pantalla.** El chat cambiaba
+  de rama del árbol de la interfaz al abrir o cerrar el material, así que se desmontaba y volvía a
+  mostrarse como un borrador en blanco; se notaba, por ejemplo, al pulsar una fuente consultada sin
+  material abierto. Ahora el chat vive siempre en el mismo hueco y solo cambia cómo se pinta.
 
 ### Eliminado
 
