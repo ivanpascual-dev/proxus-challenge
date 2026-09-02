@@ -289,7 +289,7 @@ para y se devuelve lo que hay **diciéndolo**: "me detuve en la página 14 de 20
   puede identificar al cliente por IP o por un identificador del navegador, y las dos cosas se cambian
   en diez segundos. Protege de un bucle accidental, de un reintento automático y de una demo abierta el
   fin de semana; no protege de nadie que quiera saltárselo. Es un fusible, no una cerradura, y así se
-  escribe en `NOTES.md` en vez de presentarlo como seguridad.
+  escribe en `docs/notas-tecnicas.md` en vez de presentarlo como seguridad.
 - El tope de preguntas y bloques por artefacto es el que decide si la interfaz de la nota por bloques
   va fluida, así que es un límite de producto además de uno de coste.
 - **La petición a Gemini fija `temperature` baja (`LIMITS.modelTemperature`, 0.2) y `maxOutputTokens`
@@ -378,7 +378,7 @@ aplica es parte del análisis.
 **Consecuencias.**
 
 - **La inyección de prompt no queda resuelta, y decirlo es parte de la entrega.** `CHALLENGE.md:72` pide
-  fallos conocidos y cómo se evaluarían: es la limitación principal y va en `NOTES.md` con el número de
+  fallos conocidos y cómo se evaluarían: es la limitación principal y va en `docs/notas-tecnicas.md` con el número de
   ataques que pasa y que no.
 - La barrera 5 depende de que siga sin haber autenticación ni datos de terceros. **Si algún día los hay,
   esta ADR queda obsoleta** y el análisis se rehace desde arriba.
@@ -416,7 +416,7 @@ ellos.
 
 **Consecuencias.** Los off-by-one de los límites, que son el fallo típico de esta clase de código,
 quedan cubiertos. A cambio no hay red bajo la interfaz: un cambio de React que rompa la nota por bloques
-no lo detecta nada automático, y eso queda escrito como limitación en `NOTES.md`.
+no lo detecta nada automático, y eso queda escrito como limitación en `docs/notas-tecnicas.md`.
 
 ---
 
@@ -717,7 +717,7 @@ solo `text/html` y `text/plain`; y extracción de texto con una función pura y 
   `fetch` por su cuenta, un DNS hostil puede cambiar la respuesta. Cerrarlo bien exige fijar la IP
   resuelta en la conexión (un dispatcher de undici o un cliente HTTP nuevo) y pasar la cabecera `Host` a
   mano; sobre una beta y para un riesgo que, sin autenticación, es el propio usuario contra su máquina,
-  no compensa. Se documenta en `NOTES.md`.
+  no compensa. Se documenta en `docs/notas-tecnicas.md`.
 - La extracción de texto no es un parser de HTML y con markup roto puede colar texto que no es
   contenido. El fragmento se enseña antes de aceptarlo, así que el fallo es visible y reversible.
 - Muchas páginas reales redirigen (de `example.com` a `www.example.com`, de HTTP a HTTPS). El alumno
@@ -965,7 +965,7 @@ techo `maxJudgeCallsPerAttempt` es el fusible (F3-26).
   discrepancia, se retira su aportación al perfil y la nota mostrada del intento no cambia (F3-43,
   ADR-022).
 - Riesgo residual (falso negativo del juez, sobre todo la paráfrasis válida): medido por la eval de
-  §6.7.2, con la paráfrasis como caso central. Va a `NOTES.md` con su cifra y con la palabra "no
+  §6.7.2, con la paráfrasis como caso central. Va a `docs/notas-tecnicas.md` con su cifra y con la palabra "no
   resuelto".
 
 ---

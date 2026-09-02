@@ -734,7 +734,7 @@ Cada tramo deja el repo funcionando y los tres checks en verde.
 
 Molde: `open-answer-judge.eval.ts`. Fixture versionado, llamadas reales, informe impreso por consola,
 **herramienta de medida y no check de CI** (imprime y sale 0). Se corren a mano y su resultado va a la
-bitácora y a `NOTES.md`.
+bitácora y a `docs/notas-tecnicas.md`.
 
 18. **`assessment-generation.eval.ts`: responder con material y sin material.** Por cada pregunta de
     opción única generada, dos llamadas: una con solo el enunciado y las opciones, otra añadiendo el
@@ -795,7 +795,7 @@ bitácora y a `NOTES.md`.
     (`:201-217`).
 24. Actualizar `docs/ai-agent.md`, `docs/api.md`, `docs/data.md`, `docs/testing.md` (las evals nuevas),
     `docs/decisiones.md` (ADR-006 enmendado, ADR-011 primera mitad revisada, ADR nuevo del coste),
-    `CHANGELOG.md` y `NOTES.md`.
+    `CHANGELOG.md` y `docs/notas-tecnicas.md`.
 25. **Corregir el apartado "Tutor agent" de [`docs/architecture.md:218-225`](../../docs/architecture.md).**
     Hoy dice "el modelo debe cargarlas mediante `load_skill`" sin decir que el modelo **ya ve** el
     nombre y la descripción de cada skill en el system prompt (`harness.ts:57` y `81-82`, y el propio
@@ -870,7 +870,7 @@ por eso miden en vez de aprobar.
 | F4-37               | Generar el Examen más grande que permita el reparto (un material de un tema, `questionsPerTest.max`)                | Ninguna llamada acaba con `finishReason: "length"`; si acabara, se ve como tal y **no** como "el tema no daba" |
 | F4-38               | `pnpm eval:assessments` con thinking off y on                                                                       | Informe con acierto con material, sin material y **la diferencia**. Nunca una nota absoluta                    |
 | F4-39               | `pnpm eval:notes` con thinking off y on                                                                             | Cifras inventadas, términos traducidos y reglas incumplidas, por bloque. Cero llamadas a un juez               |
-| F4-40               | Leer la bitácora y `NOTES.md` al cerrar                                                                             | Cada camino con thinking dice con qué eval se decidió; y si fue a mano, lo dice y con cuántas muestras         |
+| F4-40               | Leer la bitácora y `docs/notas-tecnicas.md` al cerrar                                                                             | Cada camino con thinking dice con qué eval se decidió; y si fue a mano, lo dice y con cuántas muestras         |
 
 ---
 
@@ -881,7 +881,7 @@ Cada cosa con su motivo, para que nadie la reabra ni la dé por olvidada:
 - **Imágenes adjuntas por chat** (la foto de apuntes a mano). Es la que más ilusión hacía y la que más
   cuesta: adjunto en el contrato, presupuesto de bytes por turno, y la interfaz de propuesta. **La vía
   ya está diseñada** para cuando entre: la imagen la lee el tutor y propone un bloque con
-  `artifacts note propose`, que el alumno acepta (ADR-014). Va a `NOTES.md` como próximo paso.
+  `artifacts note propose`, que el alumno acepta (ADR-014). Va a `docs/notas-tecnicas.md` como próximo paso.
 - **El `@` manual de contexto.** El contexto de pantalla cubre el caso común.
 - **`materials topics <materialId>`, el décimo comando.** Es la mejor candidata a comando nuevo que
   sale del repaso de los 9 actuales: hoy, para saber de qué trata un material, hay que llamar a
@@ -889,24 +889,24 @@ Cada cosa con su motivo, para que nadie la reabra ni la dé por olvidada:
   existe en `.data/materials/index` con sus `topics` y sus rangos de página, así que el comando sería
   barato de escribir y ahorraría lecturas. **No entra por tiempo** (decisión 1), y porque el contexto
   de pantalla de esta fase tapa parcialmente el hueco: si el alumno tiene el material abierto, el
-  agente ya recibe su referencia. Queda en `NOTES.md` como el primer candidato de la fase siguiente.
+  agente ya recibe su referencia. Queda en `docs/notas-tecnicas.md` como el primer candidato de la fase siguiente.
 - **La clave de respuestas en `artifacts show`.** Un `quiz` o un `test` vuelven como JSON entero, con
   `correctOptionId` y compañía (`shared/src/schemas/artifact.ts:50,65,76`), y la skill lo nombra como
   algo normal (`use-study-assessments.ts:30-31`). Durante un Examen real **no hay fuga**: la
   aplicación entra en modo examen sin chat y el servidor responde 409 (`App.tsx:39-42`). Pero nada
   impide que el alumno pida las respuestas **antes** de empezar. No se cierra aquí porque exige
   decidir producto (¿el tutor debe poder ver la clave?), y eso es una pregunta para Iván, no una
-  decisión de ejecución. **Va a `@guardarrailes` como hallazgo** y a `NOTES.md`.
+  decisión de ejecución. **Va a `@guardarrailes` como hallazgo** y a `docs/notas-tecnicas.md`.
 - **`artifacts create` anclado.** [`docs/ai-agent.md:16`](../../docs/ai-agent.md) promete que vuelve en
   esta fase; **no vuelve, y el documento se corrige**, en vez de dejar la promesa colgando.
-- **Reorganizar `.data`.** Fontanería que no se ve en la demo. Propuesta anotada en `NOTES.md`:
+- **Reorganizar `.data`.** Fontanería que no se ve en la demo. Propuesta anotada en `docs/notas-tecnicas.md`:
   `pages/<sha256>/<n>.png` y `artifacts/<kind>/<id>.json`, sin tocar el archivado por contenido del
   ADR-011.
 - **Caché explícita de Gemini** (`cachedContent` con TTL). La implícita ya da el 69% medido y no
   cuesta ni una línea de gestión de ciclo de vida.
 - **Batch API** para la indexación. Da un descuento fuerte en trabajo no interactivo y la indexación
   de 261 páginas es el caso perfecto, pero es asíncrono y se llevaría por delante el progreso página a
-  página. A `NOTES.md`.
+  página. A `docs/notas-tecnicas.md`.
 - **Model routing con clasificador.** Decisión 15.
 - **Búsqueda semántica, compartir conversaciones y skills con `/`.** Ya estaban fuera.
 
@@ -938,7 +938,7 @@ Cada cosa con su motivo, para que nadie la reabra ni la dé por olvidada:
 6. **La gracia de alta es un hueco deliberado en el limitador.** Un cliente que suba y borre en bucle
    podría usarla para saltarse el cubo `artifacts`. Lo acota `uploadsPerWindow`, que es el techo real.
    Como todo el limitador sin autenticación, **es un fusible y no una cerradura** (ADR-007), y así se
-   escribe en `NOTES.md`.
+   escribe en `docs/notas-tecnicas.md`.
 7. **Degradar las imágenes en disco es irreversible.** Si alguna vez hiciera falta reconstruir un
    turno exactamente como lo vio el modelo, ya no se puede. Se acepta: la página se puede volver a
    renderizar desde el PDF, y el caché de `.data/materials/pages` sigue ahí.

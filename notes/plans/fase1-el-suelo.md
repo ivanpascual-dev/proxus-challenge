@@ -680,7 +680,7 @@ al final de la fase.
 ### Tramo 1B
 
 14. `PdfService.extractText` en el puerto y en el adaptador, con `assertExecutable("pdftotext")`.
-    Actualizar `AGENTS.md`, `docs/getting-started.md`, `docs/data.md` y **[`NOTES.md:65`](../../NOTES.md#L65),
+    Actualizar `AGENTS.md`, `docs/getting-started.md`, `docs/data.md` y **[`docs/notas-tecnicas.md:65`](../../docs/notas-tecnicas.md#L65),
     que hoy nombra dos binarios de Poppler y pasan a ser tres**.
 15. `render-scale.ts` y `page-classifier.ts`, con sus tests. Puros, cero entrada/salida.
 16. `poppler-pdf-service.ts` pasa de `-r 144` a lado corto 1152.
@@ -688,7 +688,7 @@ al final de la fase.
 18. Puerto `MaterialIndexRepository` y adaptador `FileMaterialIndexRepository`.
 19. Fixture sintético y su generador. Tests del umbral contra el fixture. **Y el script `pnpm seed:demo`
     que copia `packages/server/fixtures/materials/*.pdf` a `.data/materials/pdfs/`**: hoy
-    [`NOTES.md:68`](../../NOTES.md#L68) y [`docs/data.md:100`](../../docs/data.md) lo prometen los dos y
+    [`docs/notas-tecnicas.md:68`](../../docs/notas-tecnicas.md#L68) y [`docs/data.md:100`](../../docs/data.md) lo prometen los dos y
     no existe, así que el documento de entrega manda ejecutar un comando que falla.
 20. `indexing-service.ts` con los dos prompts literales de la sección 6 y el parseo defensivo del JSON.
 21. Script `pnpm index:materials` con progreso en consola, y su bandera `--prune` (explícita, nunca por
@@ -697,7 +697,7 @@ al final de la fase.
 23. Los dos endpoints nuevos, con errores declarados y mapeados (nada de `orDie`).
 24. Visor de página en la web, con sus cuatro estados y la procedencia visible.
 25. `docs/especificacion.md`, `docs/decisiones.md` (la cifra de 12 MB del ADR-007), `CHANGELOG.md` y
-    `NOTES.md` al día. **`NOTES.md` no es trabajo del último día.**
+    `docs/notas-tecnicas.md` al día. **`docs/notas-tecnicas.md` no es trabajo del último día.**
 
 ---
 
@@ -744,7 +744,7 @@ pnpm test
 
 ### Lo que se anota aunque pase
 
-- **D3 de la batería falla y tiene que fallar** (decisión 9). Se anota en `NOTES.md` como agujero
+- **D3 de la batería falla y tiene que fallar** (decisión 9). Se anota en `docs/notas-tecnicas.md` como agujero
   conocido con su fecha de cierre en la fase 4. Un check que se desactiva porque molesta deja de
   proteger.
 - Lo que tardó y costó `pnpm index:materials` sobre los 9 PDFs reales, medido, en `notes/bitacora.md`.
@@ -775,7 +775,7 @@ Nadie amplía esta fase por su cuenta. Fuera:
    suerte.** Un PDF con páginas de 700 caracteres de texto basura (marcas de agua, cabeceras repetidas,
    OCR malo de origen) se indexaría como `extracted` con contenido inútil, y ese fallo es silencioso:
    el índice queda mal sin que nadie lo note. Mitigación parcial: la procedencia se ve en la interfaz y
-   el visor abre la página real. **Va a `NOTES.md` como limitación y como caso de la batería.**
+   el visor abre la página real. **Va a `docs/notas-tecnicas.md` como limitación y como caso de la batería.**
 2. **La transcripción es del modelo, no del PDF.** Es la invariante 8 y no se resuelve, se contiene:
    cita a la página, visor con la imagen real y procedencia visible. Verificar salida del modelo con
    salida del modelo no es verificar.
@@ -792,7 +792,7 @@ Nadie amplía esta fase por su cuenta. Fuera:
    la más barata). Está aislada en `renderDpi`, una función de una línea.
 6. **El limitador de frecuencia por IP es un fusible, no una cerradura** (ADR-007). Sin autenticación
    no hay identidad de cliente que valga. Protege de un bucle accidental y de una demo abierta el fin
-   de semana, y de nada más. Va literal a `NOTES.md`.
+   de semana, y de nada más. Va literal a `docs/notas-tecnicas.md`.
 7. **La ventana deslizante vive en memoria**, así que reiniciar el servidor la borra. Es aceptable para
    una entrega local y hay que decirlo, no disimularlo.
 8. **Construir el harness por petición** (sección 4.5) es un cambio a un sitio que hoy se construye una

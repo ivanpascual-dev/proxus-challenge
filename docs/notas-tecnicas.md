@@ -1,7 +1,9 @@
-# NOTES
+# Notas técnicas
 
-> Entrega del reto. Se escribe **sobre la marcha**, al cerrar cada fase, no la noche de antes.
-> Un `NOTES.md` escrito al final se escribe mal: se olvidan las razones y quedan los resultados.
+> El registro técnico del reto, fase a fase. Se escribe **sobre la marcha**, al cerrar cada una, no la
+> noche de antes: un documento así escrito al final se escribe mal, porque se olvidan las razones y
+> quedan solo los resultados. La entrega en sí, contada de forma continua, está en
+> [`INFORME_FINAL.md`](../INFORME_FINAL.md); esto es el detalle que hay debajo.
 
 ---
 
@@ -436,8 +438,9 @@ en `.env`. El servidor falla al arrancar si falta alguno, a propósito.
 3. **Ver un material sin indexar.** Abre uno de la lista. Se ven todas sus páginas en scroll continuo,
    como un PDF. Arriba, un aviso de que no está indexado y un botón para hacerlo.
 4. **Indexar.** Pulsa el botón. El progreso avanza página a página. Necesita
-   `GOOGLE_GENERATIVE_AI_API_KEY` en `.env` y topa con la cuota gratis de Gemini (15 peticiones/min),
-   así que un material grande tarda.
+   `GOOGLE_GENERATIVE_AI_API_KEY` en `.env`, y esa clave no debería estar en el plan gratuito de
+   Gemini: sus 15 peticiones por minuto convierten un material grande en varios minutos de espera con
+   reintentos. Con una clave de pago el ritmo lo marca el material, no la cuota.
 5. **Material indexado.** En "PDF", las páginas que transcribió el modelo llevan una marca ámbar y las
    que fallaron una banda roja. En "Mapa mental", los temas salen en dos niveles: arrastra el fondo,
    amplía, reduce y centra. Pulsa un nodo para abrir sus apuntes o crear un Control de ese tema.
@@ -776,13 +779,26 @@ de datos; nunca se convierte en un perfil vacío ni en una recomendación plausi
   el servidor (decisión 6, ADR-008 barrera 3) y el contrato de `POST /api/tutor/chat` ya no lleva
   `messages`. D3 pasa como barrera dura real (`STRICT=1 pnpm test:guardarrailes`, 2026-09-01); el
   script ya no lo marca como hueco conocido.
+- **Las preguntas de seguimiento salen en la voz de Sym, no en la del alumno (fase 4).** El bloque
+  `<<<FOLLOW-UP>>>` produce con frecuencia ofrecimientos del tutor (`¿Quieres que te explique…?`,
+  `¿Te gustaría que profundizara en…?`) en vez de preguntas que el alumno haría. Como el chip se envía
+  tal cual como mensaje del alumno, el alumno acaba preguntándole a Sym lo que Sym le acababa de
+  ofrecer. Medido en `agent-sessions/00c22d35…` (2026-09-02): 4 de 8 turnos, y dos de esos mensajes
+  enviados son literalmente el ofrecimiento devuelto. El prompt ya pide "something the student could
+  ask you next" (`academic-tutor.ts:116`), pero la validación de `harness/follow-up.ts` solo comprueba
+  cantidad y longitud, no la voz. No corrompe datos ni rompe el turno: el mensaje enviado sigue siendo
+  una pregunta válida. Arreglarlo bien es decidir si la voz se impone por código (rechazar el patrón
+  de ofrecimiento y quedarse sin bloque antes que emitir uno malo) y medirlo con una eval, no retocar
+  una frase del prompt a última hora.
 - **El tutor revela nombres internos ante pregunta directa.** La fase 4 cerró las barreras de código:
   historial en servidor, `tool-result` del cliente sin canal y material delimitado como dato. La
   batería dura D1–D4 pasa, pero B4 sigue consiguiendo que el modelo nombre `cli` o sus skills. Es
   hardening de comportamiento, no acceso a datos ni ejecución de una capacidad indebida; con
   `STRICT=1` se mantiene visible como fallo.
-- **La cuota gratis de Gemini (15 peticiones/min)** convierte el barrido de un material de muchas
-  diapositivas en varios minutos con reintentos. Es un límite del proveedor, no del código.
+- **Requisito de arranque, no fallo: la clave de Gemini no debe estar en el plan gratuito.** Sus 15
+  peticiones por minuto convierten el barrido de un material de muchas diapositivas en varios minutos
+  con reintentos. Es una cuota del proveedor y se quita cambiando de plan, así que se documenta como
+  comprobación previa y no como limitación del código.
 - **El esquema del índice no lleva número de versión.** Cuando el esquema cambia (el `parentId` de los
   temas, en esta fase), los índices archivados quedan inservibles y hay que borrarlos y reindexar a
   mano; además un índice con esquema viejo hace fallar el listado entero. Pendiente para una fase

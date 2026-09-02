@@ -39,7 +39,7 @@ Smoke test manual de una sola pregunta al CLI, ver `docs/ai-agent.md`.
 ### Evals de generación (fase 4, tramo 4F)
 
 Herramientas de **medida**, no checks: llaman al modelo de verdad, imprimen un informe y salen 0. Su
-resultado se anota a mano en `notes/bitacora.md` y en `NOTES.md`. Fixture versionado junto a cada una
+resultado se anota a mano en `notes/bitacora.md` y en `docs/notas-tecnicas.md`. Fixture versionado junto a cada una
 (`*.fixture.json`), autónomo: no depende de ningún PDF de `.data`.
 
 ```bash

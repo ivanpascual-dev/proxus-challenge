@@ -97,8 +97,8 @@ OK de Iván antes de lanzarlo**.
    y qué ha quedado distinto del plan y por qué.
 2. **Iván prueba y decide.** Si pide cambios, se hacen y se vuelve al paso 1. Este bucle puede darse
    las veces que haga falta: no cuesta nada, y verificar código que está a punto de cambiar sí.
-3. **Con su OK explícito**, actualizar `NOTES.md` con lo que esta fase aporta a la entrega: qué
-   problema resuelve, qué decisión se tomó y cómo se prueba a mano.
+3. **Con su OK explícito**, actualizar `docs/notas-tecnicas.md` con lo que esta fase aporta a la
+   entrega: qué problema resuelve, qué decisión se tomó y cómo se prueba a mano.
 4. **La fase no la cierras tú.** Reportas; el visto bueno lo da Iván.
 
 ## Salida

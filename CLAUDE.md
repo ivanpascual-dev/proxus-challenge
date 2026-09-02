@@ -28,7 +28,9 @@ Este fichero existe solo porque Claude Code lee `CLAUDE.md` y otros agentes leen
 | Plan de cada fase                                      | `notes/plans/faseN-<nombre>.md`                  |
 | Lo que no se deduce del diff                           | [`notes/bitacora.md`](notes/bitacora.md)         |
 | Lo que cambia y se nota usando la aplicación           | [`CHANGELOG.md`](CHANGELOG.md)                   |
-| La entrega: problema, decisiones, cómo probarlo        | [`NOTES.md`](NOTES.md)                           |
+| La entrega: problema, decisiones, cómo probarlo        | [`INFORME_FINAL.md`](INFORME_FINAL.md)           |
+| El detalle técnico por fases, debajo del informe       | [`docs/notas-tecnicas.md`](docs/notas-tecnicas.md) |
+| Lo que se seguiría construyendo después                | [`FUTURE.md`](FUTURE.md)                         |
 
 ## Skills
 

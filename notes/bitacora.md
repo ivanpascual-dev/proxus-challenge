@@ -112,7 +112,7 @@ Iván probó el tramo 1B y pidió cambios de interfaz que reabren piezas ya cerr
 ## 2026-08-28 · Fase 1 · cierre: `@guardarrailes` y paso 25
 
 `@guardarrailes` pasó con veredicto 🚨. Iván decidió arreglar en la fase lo que la fase abre o incumple
-y diferir el resto a la fase 4 con nota en `NOTES.md`.
+y diferir el resto a la fase 4 con nota en `docs/notas-tecnicas.md`.
 
 - **Cierre de hueco (invariante 11):** `LIMITS.modelCallTimeoutMs` estaba declarado desde el tramo 1A
   y no se aplicaba en ningún sitio. Ahora el adaptador de Gemini (`gemini.ts`) envuelve el `fetch` en
@@ -131,7 +131,7 @@ y diferir el resto a la fase 4 con nota en `NOTES.md`.
 - **Decisión sobre la marcha:** el check D3 de la batería (un `tool-result` fabricado por el cliente se
   acepta) pasa de `hard` a `knownGap` en `test-guardarrailes.mjs`: se sigue enseñando fallando pero no
   tumba el script. La decisión 9 del plan ya lo difería a la fase 4; el paso 10 mandaba anotarlo y no
-  se había hecho. Anotado en `NOTES.md` §5.
+  se había hecho. Anotado en `docs/notas-tecnicas.md` §5.
 - **Deuda (fase 4):** envolver el material y el texto de página con delimitador de datos en
   `topicsPrompt` y `TRANSCRIPTION_PROMPT` (ADR-008 barrera 8). El tutor revela los nombres de sus
   herramientas ante pregunta directa (check B4), pendiente de hardening de system prompt. No hay
@@ -269,11 +269,11 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
   así que declara `ArtifactStorageError` 500 como cualquier otro handler de lectura; `Effect.orDie`
   está prohibido (invariante 6).
 - **Deuda (DNS rebinding, riesgo 2):** entre nuestra resolución con `dns.lookup` y la que hace `fetch`
-  por su cuenta hay una ventana. Sin cerrar; va a `NOTES.md`. Se desbloquea fijando la IP resuelta y
+  por su cuenta hay una ventana. Sin cerrar; va a `docs/notas-tecnicas.md`. Se desbloquea fijando la IP resuelta y
   pasando la cabecera `Host` a mano.
 - **Deuda (`extractText` no es un parser de HTML, riesgo 3):** con markup roto puede colar texto que no
   es contenido. El fragmento se enseña antes de aceptarlo, así que es visible. Sin cerrar; va a
-  `NOTES.md`.
+  `docs/notas-tecnicas.md`.
 
 ## 2026-08-29 · Fase 2 · tramo 2D · el tutor propone cambios en el apunte
 
@@ -359,7 +359,7 @@ El tramo se replanteó tres veces (plan §12 → §13 → §14). Lo que la sesi�
 - **DNS rebinding, no arreglado a propósito:** el arreglo correcto (fijar la IP resuelta en la
   conexión) necesita un dispatcher de undici (no es dependencia directa de `@proxus/server`, solo
   transitiva vía `@effect/platform-node`) o un cliente HTTP nuevo. Sobre una beta y para un riesgo
-  autoinfligido sin autenticación, no compensa. A `NOTES.md`.
+  autoinfligido sin autenticación, no compensa. A `docs/notas-tecnicas.md`.
 
 ## 2026-08-30 · Fase 2 · cierre: hallazgos de la pasada del verifier
 
@@ -532,7 +532,7 @@ fixture y juez fue un "sobre otra cosa" demasiado cercano al tema (una respuesta
 positivo frente a una pregunta de disonancia cognitiva): el juez lo daba por `gradable` con criterios
 sin cumplir en vez de `gradable: false`. Es defendible (misma disciplina); se cambió el caso del
 fixture por uno inequívocamente ajeno (tectónica de placas) y pasó. La cifra y la redacción del
-riesgo 1 van a `NOTES.md` en el cierre de fase.
+riesgo 1 van a `docs/notas-tecnicas.md` en el cierre de fase.
 
 ### Escribir en una respuesta corta dejaba la página en blanco
 
@@ -669,7 +669,7 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   fabricable (el cliente manda `messages` con `assistant`/`tool-result` inventados) lo cierra "Sesión
   en el servidor"; que el tutor enumere sus herramientas y skills si se lo piden directo lo cierra
   "System prompt canónico". Las dos son barreras del ADR-008 asignadas a fase 4.
-- **Pendiente para el cierre de fase (paso 30 / `NOTES.md`):** documentar el conteo de la batería de
+- **Pendiente para el cierre de fase (paso 30 / `docs/notas-tecnicas.md`):** documentar el conteo de la batería de
   ataques y la nota del juez inflable por inyección del alumno como riesgo residual esperado ("reduce,
   no elimina"; la nota la calcula el código, un fallo de parseo cae a `unevaluated`, y hay el backstop
   de `dispute`).
@@ -985,9 +985,9 @@ riesgo 1 van a `NOTES.md` en el cierre de fase.
   `packages/server/.data/agent-sessions` (dato local descartable, nunca subido) y se relanzó.
   - **D3 ya no es un hueco conocido: cierra de verdad.** El `tool-result` fabricado por el cliente pasa
     como barrera dura (`✅ pasa`), no como `🟡 conocido`: la sesión en servidor (decisión 6) le quitó el
-    canal. Corregido el párrafo de `NOTES.md` que todavía lo describía como pendiente.
+    canal. Corregido el párrafo de `docs/notas-tecnicas.md` que todavía lo describía como pendiente.
   - **D1, D2, D4 pasan.** B4 ("no revela sus herramientas internas") sigue fallando, como ya documentaba
-    `NOTES.md` desde antes de este tramo (hardening de comportamiento, no barrera de código): con
+    `docs/notas-tecnicas.md` desde antes de este tramo (hardening de comportamiento, no barrera de código): con
     `STRICT=1` eso basta para que el script bloquee con exit 1. No es una regresión introducida por
     4G; es el mismo hueco ya conocido, ahora confirmado con datos frescos. B9 sigue `n/c` (sin
     `FIXTURE_MATERIAL_ID`). El paso 22 pide correr la batería, no que quede en verde: se reporta tal
@@ -1150,7 +1150,7 @@ ALTO. Cuatro se cierran en esta pasada; uno se aplaza a propósito.
     `scripts/test-guardarrailes.mjs`.
   - Banda de acciones tras la corrección de un intento (§4.9): solo está `Abrir fuente`; faltan
     `Preguntar a Sym` y `Crear repaso`.
-  - Auditoría de identidad Sym/Symma en docs (§6.3): hecha en `NOTES.md` y `CHANGELOG.md`, falta en
+  - Auditoría de identidad Sym/Symma en docs (§6.3): hecha en `docs/notas-tecnicas.md` y `CHANGELOG.md`, falta en
     `docs/ai-agent.md` y `docs/architecture.md`.
   - La decisión cerrada #17 del propio plan (§2) sigue redactada como "cuatro acciones"; falta que el
     plan remita a esta entrada de bitácora en vez de quedar desactualizado.
@@ -1400,5 +1400,5 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   `Preguntar a Sym` desde un tema del mapa nunca se construyó y §5.2 no define ninguna referencia que
   describa un tema. Verificado a mano por Iván adjuntando la página desde el PDF, así que el criterio
   pasa a enumerar los orígenes reales (material, página, apunte, bloque, prueba) y el hueco se queda
-  escrito en `NOTES.md`, no borrado. Reabrirlo sigue pidiendo decidir antes qué referencia describe un
+  escrito en `docs/notas-tecnicas.md`, no borrado. Reabrirlo sigue pidiendo decidir antes qué referencia describe un
   tema.

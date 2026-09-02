@@ -11,7 +11,7 @@ import type { ShortAnswerCorrection } from "./artifact.ts";
 //
 // 1. Medir la TASA DE CAÍDAS AL PARSEAR con la capa JSON (`GeminiJudgeLanguageModelLive`, la que corre
 //    en producción, `responseMimeType: application/json`) y sin ella (`GeminiLanguageModelLive`). Las
-//    dos cifras van a `notes/bitacora.md` (riesgo 2) y a `NOTES.md`.
+//    dos cifras van a `notes/bitacora.md` (riesgo 2) y a `docs/notas-tecnicas.md`.
 // 2. Ver si el juez acierta el veredicto en los seis casos por pregunta del fixture, con la paráfrasis
 //    como caso central (la defensa 2 contra el falso negativo).
 //

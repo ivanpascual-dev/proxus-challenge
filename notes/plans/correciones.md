@@ -608,7 +608,7 @@ un commit propio. No se empieza la sesión siguiente con la anterior en rojo.
    cambiar la selección ni descartar el borrador.
 5. Ejecutar los procedimientos C5-10, C5-12, C5-13 y C5-14 a 1280x720, 1440x900 y 1920x1080, con
    teclado, zoom 200 por ciento, ambos temas y movimiento reducido.
-6. Cerrar con checks completos y actualizar `notes/bitacora.md`, `CHANGELOG.md` y `NOTES.md` solo con lo
+6. Cerrar con checks completos y actualizar `notes/bitacora.md`, `CHANGELOG.md` y `docs/notas-tecnicas.md` solo con lo
    realmente terminado. No declarar P3 terminado.
 
 ## 8. Cómo se sabe que funciona

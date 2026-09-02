@@ -13,7 +13,7 @@ Los criterios de evaluación del reto se citan por número: **1** producto, **2*
 - **Los tests de la fase se escriben en la fase** (ADR-009). `proxus-verifier` no cierra sin ellos.
 - **El límite que la fase introduce se declara en la fase**, en `packages/shared/src/limits.ts`
   (ADR-007). Capacidad nueva sin techo rompe la invariante 11.
-- **`NOTES.md` se actualiza al cerrar cada fase.** El documento de entrega no es trabajo del último día.
+- **`docs/notas-tecnicas.md` se actualiza al cerrar cada fase.** El documento de entrega no es trabajo del último día.
 - **Los criterios EARS van a `docs/especificacion.md`**; el plan de la fase guarda cómo se prueban.
 
 ---
@@ -203,7 +203,7 @@ esperado, fallos conocidos y cómo se evaluarían.
 - **Adjuntar una imagen por chat** (una foto de apuntes a mano que se incorpora al bloque que le
   corresponde). Sale de la fase 4 por tiempo, con la vía ya decidida: el tutor la lee y **propone** el
   bloque con `artifacts note propose`, que el alumno acepta (ADR-014).
-- **`NOTES.md` final**: problema elegido, decisiones, cómo probarlo a mano, limitaciones conocidas. Ahí
+- **`docs/notas-tecnicas.md` final**: problema elegido, decisiones, cómo probarlo a mano, limitaciones conocidas. Ahí
   van el fusible que no es cerradura (ADR-007) y la inyección que se contiene pero no se resuelve
   (ADR-008), con el número de ataques que pasa y que no.
 - **Pomodoro** si sobra tiempo.
@@ -229,5 +229,5 @@ Si falta tiempo se cae en este orden, y **se anota que se cayó** en vez de deja
 
 - Las tres barreras deterministas de la fase 1. Son una línea cada una y cierran el agujero más caro.
 - La evaluación documentada con su batería (`CHALLENGE.md:72`, criterio 3).
-- `NOTES.md` con las limitaciones conocidas (criterio 6).
+- `docs/notas-tecnicas.md` con las limitaciones conocidas (criterio 6).
 - Los tests de lo que sí se construyó (ADR-009).

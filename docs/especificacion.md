@@ -693,7 +693,7 @@ criterio marcado `deferred` en el cierre no se borra: queda pendiente de la sesi
 > F5-17 nombraba también el **tema** como origen. `Preguntar a Sym` desde un tema del mapa nunca se
 > construyó (era acabado de §4.10 del plan de fase 5, no entró en P1 ni en P2) y §5.2 no define ninguna
 > referencia que describa un tema, así que el origen sale del criterio en vez de quedarse como una
-> promesa que ninguna prueba puede recorrer. El hueco se conserva escrito en `NOTES.md`; reabrirlo pide
+> promesa que ninguna prueba puede recorrer. El hueco se conserva escrito en `docs/notas-tecnicas.md`; reabrirlo pide
 > decidir antes qué referencia describe un tema. El criterio queda verificado a mano por Iván el
 > 2026-09-02 adjuntando la página desde el PDF.
 

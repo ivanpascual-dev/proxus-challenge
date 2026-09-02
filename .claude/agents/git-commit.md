@@ -111,7 +111,7 @@ para el tramo entero**, no por cada commit que salga de él. Antes del commit, c
 | Cambia un comportamiento observable | `docs/especificacion.md` (criterio EARS) |
 | Cierra una decisión que ata al proyecto | `docs/decisiones.md` (ADR nuevo) |
 | Añade o cambia una skill o un agente | La tabla de [`CLAUDE.md`](../../CLAUDE.md) |
-| Aporta algo a la entrega | `NOTES.md`, en su apartado |
+| Aporta algo a la entrega | `docs/notas-tecnicas.md`, en su apartado |
 | Deja algo a medias a propósito | `notes/bitacora.md` (deuda) |
 
 **`CHANGELOG.md` y `notes/bitacora.md` no se solapan nunca.** El primero guarda el **resultado** para

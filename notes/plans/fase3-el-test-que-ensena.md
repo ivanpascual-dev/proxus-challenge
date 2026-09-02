@@ -845,7 +845,7 @@ tests. Los tres checks del repo se pasan al cerrar cada tramo.
 29. Los tres checks, `pnpm test`, y **pasada de `@guardarrailes`** (se ha tocado el prompt del tutor, sus
     comandos y hay dos prompts nuevos con entrada del alumno dentro).
 30. `docs/especificacion.md`, `docs/decisiones.md` (ADR nuevos, §11), `docs/api.md`, `docs/ai-agent.md`,
-    `notes/bitacora.md`, `CHANGELOG.md` y `NOTES.md`.
+    `notes/bitacora.md`, `CHANGELOG.md` y `docs/notas-tecnicas.md`.
 
 ---
 
@@ -886,7 +886,7 @@ menos un bloque marcado como importante.
 | Completitud            | F3-44 a F3-47  | Generar un Control de 6 diez veces y comprobar que **siempre trae 6**. Test de `question-parse` con las diez entradas rotas. Test del servicio con un modelo falso que devuelve 4 buenas y 2 rotas: reintenta y completa; con uno que siempre devuelve rotas: falla y no guarda nada. Con `insufficientContent`: falla nombrando cuántas sí daba el tema. Comprobar en la interfaz que toda pregunta de opciones tiene cuatro                                                                                                                                                  |
 | Tamaño y techos        | F3-40 a F3-42  | Generar un Control de 4 y otro de 8; pedir 3 y pedir 40 → 400 con el rango. Test de `assessment-shape`: con el mínimo salen todos los tipos, y los porcentajes se mantienen en 10, 20 y 30 preguntas (5/2/1/2 y 14/7/3/6). Generar un cuarto Control **del mismo tema** → 400 diciendo cómo bajar del techo, y comprobar que borrando uno se puede otra vez; que un tema distinto sí deja generar; y el cuarto intento de práctica sobre la misma prueba → 400                                                                                                                 |
 | Discrepar              | F3-43          | Responder un desarrollo corto con una paráfrasis válida que el juez suspenda; pulsar "esto sí lo dije" en el criterio; comprobar que la pregunta queda sin evaluar, que el perfil pierde ese fallo y que la nota mostrada del intento **no** cambia                                                                                                                                                                                                                                                                                                                            |
-| Eval del juez          | riesgo 1       | `pnpm --filter @proxus/server run eval:judge` con el fixture de §6.7.2. La cifra de aciertos va a la bitácora y a `NOTES.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Eval del juez          | riesgo 1       | `pnpm --filter @proxus/server run eval:judge` con el fixture de §6.7.2. La cifra de aciertos va a la bitácora y a `docs/notas-tecnicas.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Límites                | invariante 11  | `curl` con 51 preguntas → 400 nombrando el techo. Intento 6 en modo examen sobre la misma prueba → 400. Respuesta abierta de 2.000 caracteres → 400                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Invariante 1           | permanente     | Generar sobre un material en inglés y comprobar que los enunciados usan sus términos, sin traducir                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -941,7 +941,7 @@ Ordenados por lo que costaría descubrirlos tarde.
    fragmento del material a la vista del juez, y JSON forzado con temperatura 0), y **medido** por la
    eval de §6.7.2, cuyo caso central es exactamente la paráfrasis. La aritmética la hace el código y
    `unevaluated` es explícito, así que un juez roto se ve en vez de disfrazarse de nota mediocre.
-   **No está resuelto**, y va a `NOTES.md` con esas palabras y con la cifra que dé la eval. Es el mismo
+   **No está resuelto**, y va a `docs/notas-tecnicas.md` con esas palabras y con la cifra que dé la eval. Es el mismo
    riesgo que el ADR-003 ya asumía, ahora con un juez y un botón de discrepar en vez de una comparación
    de cadenas.
 2. **La prueba incompleta deja de ser un riesgo del producto y pasa a ser uno de coste y de latencia.**
@@ -981,7 +981,7 @@ Ordenados por lo que costaría descubrirlos tarde.
    además que la fase 4 abra una rendija al añadir la subida de ficheros.
    9b. **El reloj de tiempo conectado se puede parar desconectándose.** Es la contrapartida de que el
    examen se pueda retomar, y se eligió a sabiendas (decisión 19c). Mitigación honesta, no técnica: las
-   interrupciones se guardan y **el historial las enseña**. Va a `NOTES.md` como limitación conocida:
+   interrupciones se guardan y **el historial las enseña**. Va a `docs/notas-tecnicas.md` como limitación conocida:
    esto no es un examen vigilado, es una herramienta de estudio local, y quien se engaña se engaña
    solo. La única vía de trampa que sí se cierra en código es la de consultar apuntes y tutor desde
    dentro de la aplicación (decisión 18).

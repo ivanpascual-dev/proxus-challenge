@@ -331,7 +331,7 @@ rechazar si **alguna** dirección es privada; `fetch` con `redirect: "manual"` y
 
 > `extractText` **no es un parser de HTML** y no pretende serlo. Con markup roto puede colar texto de
 > un atributo. El fragmento se enseña al alumno antes de que lo acepte, así que el fallo es visible y
-> reversible. Se escribe en `NOTES.md`.
+> reversible. Se escribe en `docs/notas-tecnicas.md`.
 
 ### 4.8 `materials read`, comando nuevo del tutor
 
@@ -609,7 +609,7 @@ guardas, recargas y el markdown está intacto.
 29. La barra lateral separa Quizzes y Tests con `artifactsByKindQuery`. Los apuntes no van en la
     barra: viven en la pestaña Apuntes de su material (F2-35, decisión 26).
 30. `docs/especificacion.md` con los criterios F2, `docs/ai-agent.md` con los comandos nuevos,
-    `docs/api.md` con los endpoints, `CHANGELOG.md`, `NOTES.md`, `notes/bitacora.md`.
+    `docs/api.md` con los endpoints, `CHANGELOG.md`, `docs/notas-tecnicas.md`, `notes/bitacora.md`.
 31. `pnpm test` y los tres checks del repo.
 32. **`@guardarrailes`** antes de cerrar: la fase toca dos prompts (skills 6.2 y 6.3), añade el prompt
     de reescritura y abre dos puertas nuevas al mundo (modelo y red).
@@ -689,10 +689,10 @@ pnpm test
    "espejar", y hay un test que decodifica un apunte guardado con el esquema de `shared`.
 2. **DNS rebinding.** Resolvemos el host y después `fetch` lo vuelve a resolver por su cuenta: entre
    las dos resoluciones, un DNS hostil puede cambiar la respuesta. Arreglarlo bien exige fijar la IP y
-   pasar la cabecera `Host` a mano. **No se arregla en esta fase**, se escribe en `NOTES.md`. Sin
+   pasar la cabecera `Host` a mano. **No se arregla en esta fase**, se escribe en `docs/notas-tecnicas.md`. Sin
    autenticación, quien lo explotaría es el propio usuario contra su propia máquina.
 3. **`extractText` no es un parser de HTML.** Con markup roto puede colar texto que no es contenido. Se
-   enseña antes de aceptar, así que el fallo es visible, y se escribe en `NOTES.md`.
+   enseña antes de aceptar, así que el fallo es visible, y se escribe en `docs/notas-tecnicas.md`.
 4. **La reescritura es heurística.** El modelo puede añadir algo que no está en la fuente pese al
    prompt. Por eso no se guarda sola (decisión 8). Es el mismo trato que la fase 1 le da a la
    transcripción: barata, no verdadera.
@@ -1047,7 +1047,7 @@ real y lo dio por bueno en resultado. Se reabrió si el disparador debía ser un
 
 **Decisión (Iván):** approach A se queda **sin cambios de código**. Se añade el **ADR-016** que fija el
 límite ("el tutor autora lo abierto; transformar un material es un servicio con ruta") y se sincronizan
-[`docs/ai-agent.md`](../../docs/ai-agent.md) y, al cierre de fase, `NOTES.md`. La decisión 24 de §13.1
+[`docs/ai-agent.md`](../../docs/ai-agent.md) y, al cierre de fase, `docs/notas-tecnicas.md`. La decisión 24 de §13.1
 queda confirmada con este razonamiento; deja de estar en duda.
 
 ---
@@ -1123,8 +1123,8 @@ patrones existentes; el clic real lo prueba Iván.
 
 ### 16.4 Pendiente de 2C
 
-- **DNS rebinding** (riesgo 2): sin arreglar, va a `NOTES.md`.
-- **`extractText` no es un parser** (riesgo 3): sin arreglar, va a `NOTES.md`.
+- **DNS rebinding** (riesgo 2): sin arreglar, va a `docs/notas-tecnicas.md`.
+- **`extractText` no es un parser** (riesgo 3): sin arreglar, va a `docs/notas-tecnicas.md`.
 - El prompt `URL_SUMMARY_PROMPT` es superficie nueva del modelo: entra en la pasada de
   `@guardarrailes` del cierre de fase (paso 32).
 
@@ -1186,7 +1186,7 @@ dato, con envoltura `<<<BEGIN/END STUDENT MATERIAL>>>`) ✅. Capa 3 sigue con el
 
 Diferido: **DNS rebinding** (riesgo 2, ADR-015). El arreglo correcto (fijar la IP resuelta en la
 conexión, `Host` a mano) exige un dispatcher de undici o un cliente HTTP nuevo sobre una beta, para un
-riesgo que sin autenticación es el usuario contra su propia máquina. Va a `NOTES.md`. La batería en
+riesgo que sin autenticación es el usuario contra su propia máquina. Va a `docs/notas-tecnicas.md`. La batería en
 vivo la corre Iván.
 
 Sugerido a Iván para `docs/especificacion.md` (no lo toca esta sesión): dos EARS análogos a F2-14,

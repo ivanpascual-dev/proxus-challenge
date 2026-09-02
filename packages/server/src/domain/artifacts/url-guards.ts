@@ -209,7 +209,7 @@ export interface ExtractedPage {
   readonly text: string;
 }
 
-// No es un parser de HTML y no lo pretende (riesgo 3, va a NOTES.md). Quita `<script>` y `<style>`
+// No es un parser de HTML y no lo pretende (riesgo 3, va a docs/notas-tecnicas.md). Quita `<script>` y `<style>`
 // con su contenido, quita el resto de etiquetas, decodifica las entidades básicas y colapsa los
 // espacios. Saca el `<title>` si lo hay.
 export const extractText = (html: string): ExtractedPage => {

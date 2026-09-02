@@ -317,7 +317,7 @@ split panes, virtualización ni pan/zoom. Esta fase no añade ninguna.
 - `notes/plans/fase3-el-test-que-ensena.md:895-912` manda Controles, Exámenes y dos paneles de apuntes a
   fase 5. Solo se recupera la vista de apuntes; las pruebas no vuelven al sidebar.
 - `docs/especificacion.md:447-449` todavía no tiene criterios de fase 5.
-- `docs/ai-agent.md:119` y `NOTES.md:254` todavía describen artefactos en el sidebar y se corrigen al
+- `docs/ai-agent.md:119` y `docs/notas-tecnicas.md:254` todavía describen artefactos en el sidebar y se corrigen al
   cerrar, no durante la extracción inicial de componentes.
 - `docs/especificacion.md:462` enlaza un `docs/extensibilidad.md` inexistente. Se elimina el enlace o se
   crea el documento solo si la entrega realmente necesita ese triaje.
@@ -1062,7 +1062,7 @@ una sola autoridad, se preserva la caché del prefijo y no se pagan tokens dupli
 | Prompts de indexación, apuntes, preguntas, juez, reescritura y URL | Buscar referencias a Proxus, tutor o agente y eliminarlas si existen. No añadir Sym/Symma: son servicios impersonales. |
 | `packages/web/src` | Sustituir `Proxus Tutor`, `Asistente académico`, `Tutor académico` como título, `Nexo` y `Compañero de estudio` por la jerarquía exacta Symma > Sym > Tutor académico. |
 | Eval del tutor y guardarraíles | Añadir identidad, producto y límite de percepción de pantalla; conservar selección de skill, idioma, citas e invariantes existentes. |
-| `docs/ai-agent.md`, `docs/architecture.md`, `NOTES.md`, `CHANGELOG.md` | Documentar la identidad de producto sin renombrar tipos internos que siguen describiendo correctamente el dominio. |
+| `docs/ai-agent.md`, `docs/architecture.md`, `docs/notas-tecnicas.md`, `CHANGELOG.md` | Documentar la identidad de producto sin renombrar tipos internos que siguen describiendo correctamente el dominio. |
 
 Los nombres internos `AcademicTutor`, `TutorChatService`, `TutorApi`, rutas `/tutor` y fichero
 `academic-tutor.ts` permanecen. Son nombres técnicos correctos y cambiarlos no mejora la experiencia;
@@ -1248,7 +1248,7 @@ Dos cambios sobre el orden que este apartado tenía antes:
 #### P3e · Cierre
 
 36. Recorrido completo de §8.3 más §11.11, tests, typecheck, build, logs, capturas de ambos temas y
-    actualización de `CHANGELOG.md` y `NOTES.md` solo con lo realmente terminado.
+    actualización de `CHANGELOG.md` y `docs/notas-tecnicas.md` solo con lo realmente terminado.
 
 ## 8. Cómo se sabe que funciona
 
