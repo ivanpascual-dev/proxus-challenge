@@ -214,6 +214,11 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
   };
 
   const materialPercent = Math.round(clampedRatio * 100);
+  // El ancho del material se reparte en píxeles sobre `availableWidth`, que ya descuenta la banda del
+  // separador. Repartirlo en porcentaje del contenedor entero se comía esos 9px y, al redondear a un
+  // entero, hasta medio punto más: en el extremo derecho Sym bajaba a 417px y rompía el mínimo de
+  // 420px que prometen F5-03 y F5-51. `materialPercent` sigue siendo solo el valor accesible.
+  const materialWidthPx = clampedRatio * bounds.availableWidth;
   // La preferencia persistida solo se aplica donde hay algo de lo que plegarse. Sin material, o si el
   // viewport no admite los dos mínimos, Sym es la única superficie: plegarlo dejaría la pantalla vacía
   // (riesgo 19 del plan), así que ni se ofrece ni se aplica.
@@ -235,7 +240,7 @@ export function AppShell({ sidebar, material, chat }: AppShellProps) {
           <div
             className="h-screen min-w-0 overflow-hidden bg-canvas"
             style={canSplit && !symCollapsed
-              ? { flex: `0 0 ${materialPercent}%`, minWidth: MIN_PANEL_WIDTH_PX }
+              ? { flex: `0 0 ${materialWidthPx}px`, minWidth: MIN_PANEL_WIDTH_PX }
               : { flex: "1 1 auto", minWidth: 0 }}
           >
             {material({
