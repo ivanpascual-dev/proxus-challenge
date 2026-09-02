@@ -23,6 +23,13 @@ import {
   type NextStudyAction as StudyAction,
 } from "../domain/profile/next-study-action.ts";
 import { studyProfileQuery } from "../domain/profile/atoms.ts";
+import {
+  INDEX_STARTING_LINE,
+  NOTES_STARTING_LINE,
+  indexProgressLine,
+  noteProgressLine,
+  type ProgressLine,
+} from "../domain/progress/progress-line.ts";
 import { DEFECT_MESSAGE, describeFailure } from "../lib/user-feedback.ts";
 import { NextStudyAction } from "./assessment/NextStudyAction.tsx";
 import { StudyProfilePanel } from "./assessment/StudyProfilePanel.tsx";
@@ -32,6 +39,7 @@ import { MindMapWorkspace } from "./material/mindmap/MindMapWorkspace.tsx";
 import { PdfWorkspace } from "./material/pdf/PdfWorkspace.tsx";
 import type { PageMarker } from "./material/pdf/PdfPage.tsx";
 import { ActionButton } from "./ui/ActionButton.tsx";
+import { GenerationProgress } from "./ui/GenerationProgress.tsx";
 
 interface MaterialPanelProps {
   readonly materialId: string;
@@ -54,6 +62,13 @@ interface MaterialPanelProps {
     readonly page: number;
   } | null;
   readonly onCitationConsumed: () => void;
+  // Aterrizaje tras una preparación automática (§11.4, F5-48): mismo patrón que la cita, con la
+  // pestaña como destino en vez de la página. Se consume una sola vez y solo si es este material.
+  readonly landingTarget: {
+    readonly materialId: string;
+    readonly tab: Tab;
+  } | null;
+  readonly onLandingConsumed: () => void;
 }
 
 type NoteAvailability =
@@ -72,6 +87,8 @@ export function MaterialPanel({
   onOpenCitation,
   citationTarget,
   onCitationConsumed,
+  landingTarget,
+  onLandingConsumed,
 }: MaterialPanelProps) {
   const indexed = indexState === "indexed";
   const [tab, setTab] = useState<Tab>("pdf");
@@ -147,6 +164,18 @@ export function MaterialPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citationTarget, materialId]);
+
+  // El aterrizaje solo se aplica si el material ya está indexado: sin índice no hay pestañas que
+  // enseñar, así que cambiar de pestaña dejaría al alumno en una superficie que no existe.
+  useEffect(() => {
+    if (landingTarget !== null && landingTarget.materialId === materialId) {
+      if (indexed) {
+        setTab(landingTarget.tab);
+      }
+      onLandingConsumed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [landingTarget, materialId, indexed]);
 
   const generateControlForTopic = (topicId: string, topicLabel: string) => {
     setPendingControl({ topicId, topicLabel, origin: "material" });
@@ -232,7 +261,7 @@ export function MaterialPanel({
 
       {!indexed && (
         <div className="p-4">
-          <ReindexBanner materialId={materialId} />
+          <ReindexBanner materialId={materialId} onIndexed={() => setTab("mindmap")} />
         </div>
       )}
 
@@ -411,9 +440,17 @@ function IndexedPdfWorkspace({
 
 // --- Banner de indexación --------------------------------------------------
 
-function ReindexBanner({ materialId }: { readonly materialId: string }) {
+function ReindexBanner({
+  materialId,
+  onIndexed,
+}: {
+  readonly materialId: string;
+  // Indexado manual del material que ya está abierto: el destino es único y el alumno ya está
+  // mirando ese material, así que se aterriza en Mapa (§11.4, decisión 34).
+  readonly onIndexed: () => void;
+}) {
   const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<readonly string[]>([]);
+  const [progress, setProgress] = useState<ProgressLine | null>(null);
   const [error, setError] = useState<string | undefined>();
   // Al terminar, refrescar la lista basta: el material pasa a "indexed" y el panel muestra las pestañas.
   const refreshMaterials = useAtomRefresh(materialsQuery);
@@ -421,22 +458,27 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
   const run = async () => {
     setRunning(true);
     setError(undefined);
-    setLines([]);
+    setProgress(INDEX_STARTING_LINE);
     try {
+      let indexed = false;
       for await (const event of streamReindexMaterial(materialId)) {
         if (event.type === "progress") {
-          setLines((current) => [...current, event.message]);
+          setProgress(indexProgressLine(event));
         } else if (event.type === "failed") {
+          // El fallo manda sobre el progreso (F5-46): nunca conviven una frase que avanza y un error.
+          setProgress(null);
           setError(event.message);
+          return;
         } else {
-          setLines((current) => [
-            ...current,
-            `Índice listo: ${event.index.pages.length} páginas, ${event.index.topics.length} temas.`,
-          ]);
+          indexed = true;
         }
       }
       refreshMaterials();
+      if (indexed) {
+        onIndexed();
+      }
     } catch (cause) {
+      setProgress(null);
       const notice = describeFailure(
         cause,
         { area: "materials", action: "index" },
@@ -469,13 +511,7 @@ function ReindexBanner({ materialId }: { readonly materialId: string }) {
         </ActionButton>
       </div>
 
-      {lines.length > 0 && (
-        <ul className="mt-3 max-h-40 overflow-y-auto border border-border bg-canvas p-3 text-muted text-sm">
-          {lines.map((line, index) => (
-            <li key={index}>{line}</li>
-          ))}
-        </ul>
-      )}
+      {progress !== null && <GenerationProgress line={progress} className="mt-3" />}
       {error !== undefined && (
         <p className="mt-3 text-danger-ink">La indexación falló: {error}</p>
       )}
@@ -543,20 +579,22 @@ function NotesTab({
 
 function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<string | undefined>();
+  const [progress, setProgress] = useState<ProgressLine | null>(null);
   const [error, setError] = useState<string | undefined>();
   const refreshArtifacts = useAtomRefresh(artifactsQuery);
 
   const run = async () => {
     setRunning(true);
     setError(undefined);
-    setProgress(undefined);
+    setProgress(NOTES_STARTING_LINE);
     try {
       for await (const event of streamGenerateNotes(materialId)) {
         if (event.type === "progress") {
-          setProgress(event.message);
+          setProgress(noteProgressLine(event));
         } else if (event.type === "failed") {
+          setProgress(null);
           setError(event.message);
+          return;
         }
       }
       refreshArtifacts();
@@ -566,6 +604,7 @@ function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
         { area: "notes", action: "generate" },
         "MaterialPanel",
       );
+      setProgress(null);
       setError(notice.description ?? notice.title);
     } finally {
       setRunning(false);
@@ -591,10 +630,8 @@ function GenerateNoteCard({ materialId }: { readonly materialId: string }) {
         >
           {running ? "Creando apuntes…" : "Crear apuntes"}
         </ActionButton>
-        {running && (
-          <p className="mt-3 text-muted text-sm">
-            {progress ?? "Leyendo el índice del material…"}
-          </p>
+        {progress !== null && (
+          <GenerationProgress line={progress} className="mt-4 text-left" />
         )}
         {error !== undefined && (
           <p className="mt-3 text-danger-ink">

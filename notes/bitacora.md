@@ -1315,3 +1315,14 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   - Inconsistencia interna del plan: §7 sesión 4 paso 4 decía "48px"; corregido a 56px.
 - **Los cuatro checks (typecheck raíz, typecheck server, build web, `pnpm test` con 446) en verde.**
   No se tocó ningún prompt, así que `test:guardarrailes` y `eval:assessments` no aplican a este corte.
+
+## 2026-09-02 · Fase 5 · tramo P3a (acabado de generación y navegación)
+
+- **Decisión sobre la marcha:** el aviso de prueba parcial deja de pintarse en la tarjeta de
+  generación de `AssessmentsTab` (el botón "Ver la prueba en la lista" que lo enseñaba también
+  desaparece). Al terminar, la navegación es inmediata (F5-47) y la tarjeta se cierra con ella. No se
+  pierde: el solver, la lista y `ExamBriefing` ya lo muestran cada uno por su lado.
+- **Decisión sobre la marcha:** el aterrizaje tras preparar o indexar un material (`landingTarget` en
+  `MaterialPanel`) solo cambia de pestaña si el material ya está indexado; sin índice no hay pestañas
+  que enseñar y cambiar dejaría al alumno en una superficie inexistente. En cualquier caso se consume
+  una sola vez, indexado o no, para no dejarlo pendiente de un indexado futuro.

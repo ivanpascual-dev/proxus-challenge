@@ -1,5 +1,7 @@
+import type { ProgressLine } from "../../domain/progress/progress-line.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { ActionButton } from "../ui/ActionButton.tsx";
+import { GenerationProgress } from "../ui/GenerationProgress.tsx";
 
 // Presentación de la cola de subida (fase 5, §4.2): `UploadManager` posee el estado, este componente
 // solo lo pinta. Dos listas separadas porque son dos fases distintas: la de prevalidación (antes de
@@ -11,7 +13,10 @@ export interface FileUploadState {
   readonly key: string;
   readonly fileName: string;
   readonly stage: UploadStage;
+  // `message` queda reservado para fallos y rechazos, que siguen enseñando su texto entero (§11.3).
+  // El avance de la fase en curso viaja en `progress`, ya derivado del evento.
   readonly message?: string | undefined;
+  readonly progress?: ProgressLine | null | undefined;
 }
 
 // El mapa mental no es un paso propio de la cadena: sale del mismo índice que arma esta fase, así
@@ -124,6 +129,11 @@ export function UploadQueue({ staged, uploads, canUpload, anyValidating, onRemov
                 >
                   {item.message}
                 </p>
+              )}
+              {/* El fallo manda sobre el progreso (F5-46): con un error, la línea viva ya viene a
+                  `null` desde `UploadManager` y solo queda el texto del fallo. */}
+              {item.progress !== undefined && item.progress !== null && (
+                <GenerationProgress line={item.progress} className="mt-2" />
               )}
             </li>
           ))}

@@ -7,6 +7,12 @@ import { streamGenerateNotes } from "../../domain/artifacts/note-generation-stre
 import { materialsQuery, uploadMaterialsAction, validateMaterialsAction } from "../../domain/materials/atoms.ts";
 import { streamReindexMaterial } from "../../domain/materials/stream.ts";
 import { validateQueueAddition, type QueueRejectionReason } from "../../domain/materials/upload-queue.ts";
+import {
+  INDEX_STARTING_LINE,
+  NOTES_STARTING_LINE,
+  indexProgressLine,
+  noteProgressLine
+} from "../../domain/progress/progress-line.ts";
 import { describeFailure } from "../../lib/user-feedback.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { Icon } from "../ui/Icon.tsx";
@@ -48,7 +54,16 @@ const describeQueueRejection = (reasons: readonly QueueRejectionReason[]): { rea
 // perdió. No se persiste al recargar y la orquestación sigue en cliente (deuda conocida del plan).
 // `compact` lo usa el rail contraído del sidebar (§4.2.8): mismo diálogo y misma cola, pero el
 // disparador es un icono con nombre accesible en vez del botón a lo ancho.
-export function UploadManager({ compact = false }: { readonly compact?: boolean }) {
+export function UploadManager({
+  compact = false,
+  onMaterialPrepared
+}: {
+  readonly compact?: boolean;
+  // Un material recién preparado del todo (subido, indexado y con apuntes) cuando su lote era de un
+  // solo fichero (§11.4, F5-48). Quien navega es `App`, que es el único que sabe si el alumno ya
+  // tiene otro material abierto a mano.
+  readonly onMaterialPrepared?: (materialId: string) => void;
+}) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -80,32 +95,38 @@ export function UploadManager({ compact = false }: { readonly compact?: boolean 
     setStaged((current) => current.map((item) => item.key === key ? { ...item, ...patch } : item));
   };
 
-  const runChain = async (key: string, materialId: string) => {
+  // `batchSize` es el tamaño del lote confirmado al que pertenece este material: la navegación
+  // automática solo se ofrece cuando era de uno (§11.4, decisión 33). Con dos o más el destino sería
+  // ambiguo y no se le roba la pantalla a nadie.
+  const runChain = async (key: string, materialId: string, batchSize: number) => {
     try {
       for await (const event of streamReindexMaterial(materialId)) {
         if (event.type === "progress") {
-          updateEntry(key, { stage: "indexing", message: event.message });
+          updateEntry(key, { stage: "indexing", progress: indexProgressLine(event) });
         } else if (event.type === "failed") {
-          updateEntry(key, { stage: "error", message: event.message });
+          updateEntry(key, { stage: "error", message: event.message, progress: null });
           return;
         }
       }
       refreshMaterials();
 
-      updateEntry(key, { stage: "generating-notes", message: undefined });
+      updateEntry(key, { stage: "generating-notes", progress: NOTES_STARTING_LINE });
       for await (const event of streamGenerateNotes(materialId)) {
         if (event.type === "progress") {
-          updateEntry(key, { stage: "generating-notes", message: event.message });
+          updateEntry(key, { stage: "generating-notes", progress: noteProgressLine(event) });
         } else if (event.type === "failed") {
-          updateEntry(key, { stage: "error", message: event.message });
+          updateEntry(key, { stage: "error", message: event.message, progress: null });
           return;
         }
       }
       refreshArtifacts();
-      updateEntry(key, { stage: "done", message: undefined });
+      updateEntry(key, { stage: "done", message: undefined, progress: null });
+      if (batchSize === 1) {
+        onMaterialPrepared?.(materialId);
+      }
     } catch (cause) {
       const notice = describeFailure(cause, { area: "materials", action: "index" }, "UploadManager");
-      updateEntry(key, { stage: "error", message: notice.description ?? notice.title });
+      updateEntry(key, { stage: "error", message: notice.description ?? notice.title, progress: null });
     }
   };
 
@@ -193,8 +214,8 @@ export function UploadManager({ compact = false }: { readonly compact?: boolean 
         if (result.outcome === "rejected") {
           updateEntry(entry.key, { stage: "rejected", message: result.reason.message });
         } else {
-          updateEntry(entry.key, { stage: "indexing", message: undefined });
-          void runChain(entry.key, result.material.id);
+          updateEntry(entry.key, { stage: "indexing", message: undefined, progress: INDEX_STARTING_LINE });
+          void runChain(entry.key, result.material.id, ready.length);
         }
       });
       refreshMaterials();

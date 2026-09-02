@@ -7,13 +7,18 @@ import { deleteArtifactAction } from "../../domain/artifacts/atoms.ts";
 import { studyProfileQuery } from "../../domain/profile/atoms.ts";
 import { streamGenerateAssessment } from "../../domain/assessments/generation-stream.ts";
 import { groupAssessments } from "../../domain/assessments/group-assessments.ts";
-import { partialAssessmentNotice } from "../../domain/assessments/shortfall.ts";
+import {
+  ASSESSMENT_STARTING_LINE,
+  assessmentProgressLine,
+  type ProgressLine
+} from "../../domain/progress/progress-line.ts";
 import { AssessmentGroupTabs, type AssessmentGroup } from "./AssessmentGroupTabs.tsx";
 import { AssessmentList } from "./AssessmentList.tsx";
 import { AssessmentSolver } from "./AssessmentSolver.tsx";
 import { AttemptHistory } from "./AttemptHistory.tsx";
 import { DEFECT_MESSAGE, describeFailure } from "../../lib/user-feedback.ts";
 import { ActionButton } from "../ui/ActionButton.tsx";
+import { GenerationProgress } from "../ui/GenerationProgress.tsx";
 import type { IconName } from "../ui/Icon.tsx";
 
 // Petición de "Control de este tema" que llega desde el mapa mental (§6.11). MaterialPanel la sube
@@ -129,9 +134,18 @@ export function AssessmentsTab({
           materialId={materialId}
           target={genTarget}
           onClose={() => setGenTarget(null)}
-          onGenerated={() => {
+          onGenerated={(generated) => {
+            // Navegación al terminar (§11.4, F5-47): un Control o un Examen de prueba se abren en su
+            // solver; un Examen real abre su pantalla previa con `attemptId: null`, que es el aviso
+            // de F3-39d: el intento nace al pulsar "Empezar el examen", no al generarlo.
             refresh();
             setGenTarget(null);
+            if (generated.kind === "test" && generated.mode === "exam") {
+              setActiveGroup("realExams");
+              onStartExam(generated.id, generated.title);
+              return;
+            }
+            setView({ kind: "solve", id: generated.id, title: generated.title });
           }}
         />
       )}
@@ -189,6 +203,15 @@ export function AssessmentsTab({
 
 // --- Tarjeta de generación ---------------------------------------------------------------------
 
+// Lo que hace falta para decidir a dónde se navega al terminar (§11.4): el id y el título salen del
+// evento `done`; el tipo y el modo, de lo que se pidió.
+export interface GeneratedAssessment {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: "quiz" | "test";
+  readonly mode: "practice" | "exam";
+}
+
 function GenerateCard({
   materialId,
   target,
@@ -198,7 +221,7 @@ function GenerateCard({
   readonly materialId: string;
   readonly target: GenTarget;
   readonly onClose: () => void;
-  readonly onGenerated: () => void;
+  readonly onGenerated: (generated: GeneratedAssessment) => void;
 }) {
   const range = target.kind === "test" ? LIMITS.questionsPerTest : LIMITS.questionsPerQuiz;
   const [count, setCount] = useState<number>(range.default);
@@ -218,37 +241,46 @@ function GenerateCard({
   );
   const effectiveOrigin: "material" | "review" = canReview ? origin : "material";
   const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<readonly string[]>([]);
+  const [progress, setProgress] = useState<ProgressLine | null>(null);
   const [error, setError] = useState<string | undefined>();
-  const [done, setDone] = useState(false);
 
   const run = async () => {
     setRunning(true);
     setError(undefined);
-    setLines([]);
-    setDone(false);
+    setProgress(ASSESSMENT_STARTING_LINE);
+    const requestedMode = target.kind === "test" ? mode : "practice";
     const input: GenerateAssessmentInput = target.kind === "test"
       ? { kind: "test", topicId: null, origin: effectiveOrigin, questionCount: count, mode }
       : { kind: "quiz", topicId: target.topicId, origin: effectiveOrigin, questionCount: count, mode: "practice" };
     try {
       for await (const event of streamGenerateAssessment(materialId, input)) {
         if (event.type === "progress") {
-          setLines((current) => [...current, event.message]);
+          setProgress(assessmentProgressLine(event));
         } else if (event.type === "failed") {
+          // Una generación fallida no navega a ninguna parte (F5-47): se queda la tarjeta con su
+          // error y su "Cancelar", y la línea viva desaparece (F5-46).
+          setProgress(null);
           setError(event.message);
+          return;
         } else {
-          const notice = partialAssessmentNotice(event.requestedQuestionCount, event.questionCount);
-          setLines((current) => [
-            ...current,
-            `Prueba lista: ${event.questionCount} ${event.questionCount === 1 ? "pregunta" : "preguntas"}` +
-              (event.retries > 0 ? ` (${event.retries} ${event.retries === 1 ? "reintento" : "reintentos"})` : ""),
-            ...(notice === null ? [] : [notice])
-          ]);
-          setDone(true);
+          setProgress({
+            phrase: `Prueba lista: ${event.questionCount} ${event.questionCount === 1 ? "pregunta" : "preguntas"}.`,
+            step: null,
+            total: null
+          });
+          // El tipo y el modo que deciden a dónde se navega son los que se PIDIERON: `ArtifactSummary`
+          // no lleva `mode` y no se amplía el contrato por un efecto de interfaz (decisión 32).
+          onGenerated({
+            id: event.assessment.id,
+            title: event.assessment.title,
+            kind: target.kind,
+            mode: requestedMode
+          });
         }
       }
     } catch (cause) {
       const notice = describeFailure(cause, { area: "assessments", action: "generate" }, "AssessmentsTab");
+      setProgress(null);
       setError(notice.description ?? notice.title);
     } finally {
       setRunning(false);
@@ -268,7 +300,7 @@ function GenerateCard({
               : "Cubre solo este tema."}
           </p>
         </div>
-        {!running && !done && (
+        {!running && (
           <ActionButton
             icon="close"
             variant="neutral"
@@ -280,7 +312,7 @@ function GenerateCard({
         )}
       </div>
 
-      {!running && !done && (
+      {!running && (
         <div className="mt-3 grid gap-3">
           <div className="text-sm">
             <span className="block text-muted">Preguntas</span>
@@ -350,23 +382,8 @@ function GenerateCard({
         </div>
       )}
 
-      {lines.length > 0 && (
-        <ul className="mt-3 max-h-40 overflow-y-auto border border-border bg-canvas p-3 text-muted text-sm">
-          {lines.map((line, index) => <li key={index}>{line}</li>)}
-        </ul>
-      )}
+      {progress !== null && <GenerationProgress line={progress} className="mt-3" />}
       {error !== undefined && <p className="mt-3 text-danger-ink">La generación falló: {error}</p>}
-      {running && <p className="mt-3 text-muted text-sm">Generando…</p>}
-      {done && (
-        <ActionButton
-          icon="arrow-right"
-          variant="brand"
-          className="mt-3"
-          onClick={onGenerated}
-        >
-          Ver la prueba en la lista
-        </ActionButton>
-      )}
     </div>
   );
 }

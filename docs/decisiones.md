@@ -1378,3 +1378,99 @@ guarda: no hay nada que mostrar como prueba.
 - El reparto por tipo de una prueba parcial puede no conservar los porcentajes de una completa: se
   guarda solo lo que el material sostiene, sin fabricar preguntas de un tipo para cuadrar el reparto.
 - La corrección y la nota se calculan sobre las preguntas que existen, nunca sobre las que se pidieron.
+
+---
+
+## ADR-029 · Una frase de progreso solo se mueve cuando el servidor manda un evento
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Indexar un PDF, redactar sus apuntes y generar una prueba son las tres esperas largas
+del producto: minutos, no segundos. El servidor ya emite progreso estructurado y honesto en las tres
+(`indexing-service.ts` con `page`/`pageCount`, `note-generation-service.ts` y
+`assessment-generation-service.ts` con `topic`/`topicCount`). Lo que fallaba era la presentación: el
+cliente acumulaba cada mensaje en una lista con aspecto de consola, distinta en cada superficie, y la
+cola de subida enseñaba además el texto crudo del evento.
+
+La tentación evidente al rehacerlo es rellenar la espera: frases que rotan por tiempo ("casi está",
+"ya queda poco"), una barra que avanza sola, un porcentaje estimado antes de conocer el total.
+
+**Opciones consideradas.**
+
+- **Carrusel de frases por tiempo.** Descartada: es exactamente el valor neutro que prohíbe la
+  invariante 3 de `AGENTS.md`. La pantalla parecería avanzar mientras el servidor está parado o
+  muerto, y el alumno no tendría forma de distinguir una espera larga de una caída.
+- **Barra con porcentaje estimado mientras el total es desconocido.** Descartada por lo mismo: un
+  porcentaje inventado es un dato falso presentado con la confianza de un dato medido.
+- **Componer la frase troceando `event.message`.** Descartada: parsear castellano del servidor es un
+  acoplamiento que se rompe en silencio en cuanto alguien cambia una palabra del mensaje.
+
+**Decisión.** La línea de progreso se deriva siempre de un evento real, en lógica pura
+(`packages/web/src/domain/progress/progress-line.ts`): fase y contador salen de los campos
+estructurados del evento, nunca de su texto. Una sola línea que se sustituye, jamás una lista que
+crece, en las cuatro superficies (`GenerationProgress.tsx`). El contador solo existe cuando el total
+es mayor que 1, y mientras el total sea desconocido la barra es una banda tenue, no una fracción. El
+camino de fallo manda sobre el de progreso: al llegar un `failed`, la línea desaparece y queda el
+error con su texto completo; nunca conviven los dos.
+
+**Consecuencias.**
+
+- Se pierde el histórico visible de líneas, que dejaba ver por qué tema pasó una generación. A cambio,
+  el fallo sigue enseñando su texto entero y el servidor conserva el suyo en el log. Si al depurar se
+  echa de menos, vuelve como detalle plegado, nunca como vista por defecto.
+- Se pierde en la interfaz la distinción entre extraer texto y transcribir con el modelo, que viajaba
+  dentro del mensaje del indexado. El alumno no pierde ese dato: la marca `transcrito por el modelo`
+  sigue en cada página del PDF y en cada cita, que es donde decide si se fía.
+- Solo la frase se anuncia a un lector de pantalla; el contador va `aria-hidden`, para que indexar 82
+  páginas no dispare 82 anuncios.
+- No se toca ningún contrato de `packages/shared`: el dato ya estaba, faltaba la presentación.
+
+---
+
+## ADR-030 · La aplicación solo navega sola cuando el destino es inequívoco y no arranca nada
+
+- **Estado:** aceptada
+- **Fecha:** 2026-09-02
+
+**Contexto.** Al terminar de generarse una prueba, el alumno tenía que pulsar `Ver la prueba en la
+lista`, buscarla y abrirla; al terminar de prepararse un PDF recién subido, tenía que ir al sidebar,
+elegirlo y cambiar de pestaña. Son pasos que no deciden nada: en los dos casos hay un único destino
+razonable y el alumno acaba de pedir ese trabajo.
+
+Navegar solo tiene un coste evidente y opuesto: robarle la pantalla a quien está leyendo otra cosa, o
+peor, meterlo en un estado que consume algo suyo.
+
+**Opciones consideradas.**
+
+- **No navegar nunca.** Descartada: obliga a repetir a mano un camino que la aplicación conoce, y en
+  la generación de pruebas era la fricción que Iván señaló con más claridad.
+- **Navegar siempre que termine un trabajo.** Descartada: con dos o más materiales recién preparados
+  el destino es ambiguo, y con un examen real la pantalla siguiente crearía el intento y arrancaría el
+  reloj sin que nadie lo pidiera.
+- **Abrir el examen real directamente en su intento.** Descartada por contradecir F3-39d: el aviso
+  previo existe precisamente para que empezar sea una decisión, no una consecuencia.
+
+**Decisión.** Se navega sola solo con destino inequívoco y nunca a un estado que arranque un reloj o
+consuma un intento:
+
+- Un Control o un Examen de prueba recién generados se abren en su solver. Un Examen real abre su
+  pantalla previa con `initialAttemptId: null`: el intento nace al pulsar `Empezar el examen`. Si la
+  generación falla, no se navega a ninguna parte.
+- El tipo y el modo que deciden el destino son los que se **pidieron**, no los que responde el
+  servidor: `ArtifactSummary` no lleva `mode` y no se amplía un contrato compartido por un efecto de
+  interfaz.
+- Tras una preparación automática se navega solo si el lote tenía un único PDF y el alumno no ha
+  abierto ningún material a mano mientras tanto. El aterrizaje es la pestaña Mapa.
+- Al terminar un indexado manual del material que ya está abierto, se cambia a Mapa: mismo criterio,
+  destino único y el alumno ya está mirando ese material.
+
+**Consecuencias.**
+
+- El botón `Ver la prueba en la lista` desaparece: ya no hay nada que buscar a mano.
+- El aterrizaje reutiliza el patrón que ya existía para las citas (un objetivo que `MaterialPanel`
+  consume una sola vez), así que no hace falta router ni estado global de navegación.
+- La condición "no hay ningún material abierto" se lee en el momento en que termina la cadena, no
+  cuando empezó la subida: quien abre un material mientras se prepara otro conserva su pantalla.
+- Si al usarlo la navegación automática de la subida molesta, la salida barata es dejarla solo en la
+  generación de pruebas; la de la subida está aislada en un único callback de `App`.

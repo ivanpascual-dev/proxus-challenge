@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import type { ActiveAttemptResponse, ChatContextRef } from "@proxus/shared";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { Chat } from "./components/Chat.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { MaterialPanel } from "./components/MaterialPanel.tsx";
+import type { Tab } from "./components/material/MaterialTabs.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { AppShell } from "./components/shell/AppShell.tsx";
 import { SystemNoticeRegion } from "./components/shell/SystemNoticeRegion.tsx";
@@ -37,6 +38,13 @@ interface CitationTarget {
   readonly page: number;
 }
 
+// Dónde aterriza un material recién preparado (§11.4, F5-48): mismo patrón que la cita, con la
+// pestaña como destino. `MaterialPanel` lo consume una sola vez cuando el material coincide.
+interface LandingTarget {
+  readonly materialId: string;
+  readonly tab: Tab;
+}
+
 export function App() {
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [enteredExam, setEnteredExam] = useState<EnteredExam | null>(null);
@@ -51,6 +59,26 @@ export function App() {
   const openCitation = (materialId: string, page: number) => {
     setSelectedMaterialId(materialId);
     setCitationTarget({ materialId, page });
+  };
+
+  const [landingTarget, setLandingTarget] = useState<LandingTarget | null>(null);
+  // La cadena de preparación termina fuera del ciclo de render, así que la condición "no hay ningún
+  // material abierto" se lee de un ref al día, no del valor capturado cuando empezó la subida.
+  const openMaterialRef = useRef<string | null>(null);
+  useEffect(() => {
+    openMaterialRef.current = selectedMaterialId;
+  }, [selectedMaterialId]);
+
+  // Un único PDF recién preparado y ninguna pantalla que robar: se abre en Mapa, que es donde se ve
+  // de un vistazo lo que se acaba de construir (§11.4, decisión 33, F5-48). Si el alumno ya está
+  // mirando otro material, no se navega.
+  const onMaterialPrepared = (materialId: string) => {
+    if (openMaterialRef.current !== null) {
+      return;
+    }
+    openMaterialRef.current = materialId;
+    setSelectedMaterialId(materialId);
+    setLandingTarget({ materialId, tab: "mindmap" });
   };
   const materials = useAtomValue(materialsQuery);
   const refreshActiveExam = useAtomRefresh(activeAttemptQuery);
@@ -118,6 +146,7 @@ export function App() {
               onSelectMaterial={setSelectedMaterialId}
               collapsed={collapsed}
               onToggleCollapsed={onToggleCollapsed}
+              onMaterialPrepared={onMaterialPrepared}
             />
           </ErrorBoundary>
         )}
@@ -135,6 +164,8 @@ export function App() {
               onOpenCitation={openCitation}
               citationTarget={citationTarget}
               onCitationConsumed={() => setCitationTarget(null)}
+              landingTarget={landingTarget}
+              onLandingConsumed={() => setLandingTarget(null)}
             />
           </ErrorBoundary>
         )}

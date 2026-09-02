@@ -238,6 +238,14 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 - **Las tres zonas del escritorio se distinguen por su fondo.** La barra lateral y Sym van sobre una
   superficie y el material sobre otra un escalón por debajo, con una sombra muy tenue en el borde de
   la barra lateral, en vez de separarse solo con una línea.
+- **El progreso de indexar, generar apuntes, generar una prueba o subir un fichero se ve en una sola
+  línea que avanza**, no en una lista que crece. La línea dice la fase y, cuando hay más de un
+  elemento, el contador (página N de M, tema N de M); si falla, desaparece y queda solo el aviso de
+  error.
+- **Generar un Control o un Examen de prueba abre directamente su solver**, y un Examen real abre su
+  pantalla previa sin crear el intento ni arrancar el reloj, sin tener que ir a buscarlo a la lista.
+  Subir un único PDF sin tener otro material abierto lo deja seleccionado y en la pestaña Mapa en
+  cuanto termina de prepararse; indexar a mano el material que ya tienes abierto hace lo mismo.
 
 ### Corregido
 

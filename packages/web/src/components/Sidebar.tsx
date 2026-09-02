@@ -15,6 +15,9 @@ interface SidebarProps {
   // Plan de correcciones §4.2.8 / C5-13: el estado de contraído lo posee `AppShell` y lo entrega aquí.
   readonly collapsed: boolean;
   readonly onToggleCollapsed: () => void;
+  // Sube tal cual lo que reporta `UploadManager` (§11.4, F5-48): el sidebar no decide si se navega,
+  // solo es por dónde pasa el aviso hasta `App`.
+  readonly onMaterialPrepared: (materialId: string) => void;
 }
 
 // Reescrito visualmente (fase 5, §4.2): 224px fijos, sin `details` contenedor ni tarjeta por fila,
@@ -26,7 +29,7 @@ interface SidebarProps {
 // expandir, subida o progreso, un botón de documento por material (con tooltip y estado) y un único
 // control de tema. Borrar un material no se ofrece en el rail (icono destructivo sin contexto): se
 // hace al expandir.
-export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onToggleCollapsed }: SidebarProps) {
+export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onToggleCollapsed, onMaterialPrepared }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
   const deleteMaterial = useAtomSet(deleteMaterialAction, { mode: "promise" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -60,7 +63,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
       <div className="flex h-screen flex-col items-center gap-2 py-3">
         <BrandMark size={28} className="shrink-0" />
         <IconButton icon="chevron-right" label="Expandir el panel lateral" onClick={onToggleCollapsed} />
-        <UploadManager compact />
+        <UploadManager compact onMaterialPrepared={onMaterialPrepared} />
         <div className="my-1 h-px w-6 shrink-0 bg-border" />
         <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
           {AsyncResult.matchWithError(materials, {
@@ -105,7 +108,7 @@ export function Sidebar({ selectedMaterialId, onSelectMaterial, collapsed, onTog
       </header>
 
       <div className="border-border border-b p-3">
-        <UploadManager />
+        <UploadManager onMaterialPrepared={onMaterialPrepared} />
       </div>
 
       <div className="min-h-0 overflow-y-auto p-2">
