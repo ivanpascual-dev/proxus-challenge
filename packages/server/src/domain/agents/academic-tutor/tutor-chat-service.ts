@@ -3,6 +3,7 @@ import { LanguageModel } from "effect/unstable/ai";
 import {
   ConversationNotFound,
   ConversationStorageError,
+  InvalidScreenContext,
   LIMITS,
   LimitExceeded,
   type Conversation,
@@ -25,6 +26,7 @@ import {
   type SessionRepositoryError
 } from "../harness/index.ts";
 import { makeAcademicTutorHarness } from "../academic-tutor.ts";
+import { resolveScreenContext } from "./screen-context-resolver.ts";
 import { initialTurnBudgetState } from "../../limits/turn-budget.ts";
 import { RateLimiter } from "../../limits/rate-limiter.ts";
 
@@ -32,7 +34,7 @@ export interface TutorChatService {
   readonly sendMessage: (
     input: TutorChatRequest,
     clientKey: string
-  ) => Effect.Effect<TutorChatResponse, ConversationNotFound | ConversationStorageError | LimitExceeded, LanguageModel.LanguageModel>;
+  ) => Effect.Effect<TutorChatResponse, ConversationNotFound | ConversationStorageError | InvalidScreenContext | LimitExceeded, LanguageModel.LanguageModel>;
   readonly streamMessage: (
     input: TutorChatRequest,
     clientKey: string
@@ -112,7 +114,7 @@ export const TutorChatServiceLive = Layer.effect(
       input: TutorChatRequest,
       clientKey: string,
       onMessage: Parameters<AgentSession["runTurn"]>[1]
-    ): Effect.Effect<AgentSessionRunResult, ConversationNotFound | ConversationStorageError | LimitExceeded, LanguageModel.LanguageModel> => Effect.gen(function* () {
+    ): Effect.Effect<AgentSessionRunResult, ConversationNotFound | ConversationStorageError | InvalidScreenContext | LimitExceeded, LanguageModel.LanguageModel> => Effect.gen(function* () {
       const stored = yield* sessionRepository.getSession(input.conversationId).pipe(
         Effect.mapError(mapSessionError)
       );
@@ -131,8 +133,11 @@ export const TutorChatServiceLive = Layer.effect(
 
       // Decisión 5 y 11: el contexto de pantalla viaja dentro del mensaje del usuario, nunca en el
       // system prompt. `ChatContextRef` solo lleva ids y título, así que anexarlo aquí nunca cuela
-      // texto libre del material.
-      const screenContext = renderScreenContext(input.context);
+      // texto libre del material. Fase 5, §5.2: antes de describirlo se comprueba contra los
+      // repositorios (material, página, prueba, apunte, bloque) y el tipo de prueba se deriva del
+      // artefacto real, no del título que mandó el cliente.
+      const resolvedContext = yield* resolveScreenContext(input.context, materialRepository, artifactRepository);
+      const screenContext = renderScreenContext(resolvedContext);
       const turnInput = screenContext === undefined ? input.input : `${input.input}\n\n${screenContext}`;
 
       // §5.1: lo que ve el navegador en directo (streaming) nunca es el mensaje `user` concatenado.
@@ -191,6 +196,11 @@ export const TutorChatServiceLive = Layer.effect(
           // transporte: se emite como el mismo evento `error` que ya usan los fallos del modelo
           // (decisión 7), en vez de romper la conexión NDJSON a medias.
           Effect.catchTag("LimitExceeded", (error) =>
+            Queue.offer(queue, { type: "error" as const, message: error.message }).pipe(Effect.as(null))
+          ),
+          // Lo mismo con el contexto de pantalla que ya no describe nada real (§5.2): es un rechazo
+          // del dominio con su texto, no una conexión rota. El turno no se ejecuta.
+          Effect.catchTag("InvalidScreenContext", (error) =>
             Queue.offer(queue, { type: "error" as const, message: error.message }).pipe(Effect.as(null))
           ),
           Effect.tap((result) => result === null ? Effect.void : Effect.gen(function* () {
