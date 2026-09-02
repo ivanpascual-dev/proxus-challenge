@@ -1402,3 +1402,20 @@ Antes del recorrido §8.4 se pasaron `@guardarrailes` (⚠️ REVISAR, no bloque
   pasa a enumerar los orígenes reales (material, página, apunte, bloque, prueba) y el hueco se queda
   escrito en `docs/notas-tecnicas.md`, no borrado. Reabrirlo sigue pidiendo decidir antes qué referencia describe un
   tema.
+
+## 2026-09-02 · Entrega · informe final, notas técnicas y README
+
+- **`NOTES.md` se movió a `docs/notas-tecnicas.md`.** Con `INFORME_FINAL.md` nuevo en la raíz, había
+  dos documentos de entrega respondiendo a las mismas cinco preguntas del challenge y no quedaba claro
+  cuál era el canónico. Ahora el informe es la entrega y las notas técnicas son el detalle de debajo,
+  fase a fase. Todas las referencias del repo (`CLAUDE.md`, planes, skills, agentes y dos comentarios de
+  código) se actualizaron en el mismo commit del renombrado.
+- **Fallo del tutor detectado y documentado sin corregir: las preguntas de seguimiento salen en la voz
+  de Sym.** El bloque `<<<FOLLOW-UP>>>` produce con frecuencia ofrecimientos (`¿Quieres que te
+  explique…?`) en vez de preguntas que el alumno haría, y como el chip se envía tal cual como mensaje
+  del alumno, este acaba preguntándole a Sym lo que Sym le acababa de ofrecer. Medido en
+  `packages/server/.data/agent-sessions/00c22d35-97c4-4df7-9dd6-deb871c0c1f8.json`: 4 de 8 turnos. El
+  prompt (`academic-tutor.ts:116`) ya pide una pregunta que el alumno pueda hacer; la validación de
+  `harness/follow-up.ts` solo comprueba cantidad y longitud, no la voz. Decisión de Iván: no se corrige
+  para la entrega, es un detalle de redacción que no impide probar nada; queda documentado en
+  `INFORME_FINAL.md` §5, en `docs/notas-tecnicas.md` (fallos conocidos) y en `FUTURE.md` §1.5.
