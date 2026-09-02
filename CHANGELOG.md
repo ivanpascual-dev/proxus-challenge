@@ -318,6 +318,8 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
   de rama del árbol de la interfaz al abrir o cerrar el material, así que se desmontaba y volvía a
   mostrarse como un borrador en blanco; se notaba, por ejemplo, al pulsar una fuente consultada sin
   material abierto. Ahora el chat vive siempre en el mismo hueco y solo cambia cómo se pinta.
+- **Ctrl + rueda sobre el mapa mental ya no amplía también la página del navegador**, y recorrer el
+  mapa con la rueda deja de llenar la consola de avisos.
 
 ### Eliminado
 

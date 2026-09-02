@@ -180,18 +180,30 @@ export function MindMapCanvas({
     setDragging(false);
   };
 
-  const onWheel = (event: React.WheelEvent<SVGSVGElement>) => {
-    event.preventDefault();
-    if (event.ctrlKey) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-      setTransform((current) =>
-        zoomAtPoint(current, current.scale * Math.exp(-event.deltaY * 0.002), anchor),
-      );
+  // La rueda se escucha en nativo y con `passive: false` a propósito. React registra `onWheel` como
+  // listener pasivo, así que su `preventDefault()` no hace nada: la consola avisa en cada rueda y,
+  // peor, ctrl+rueda sobre el mapa acababa aplicando también el zoom global del navegador, que F5-22
+  // manda impedir mientras el cursor está dentro del lienzo.
+  useEffect(() => {
+    const element = svgRef.current;
+    if (element === null) {
       return;
     }
-    setTransform((current) => panBy(current, -event.deltaX, -event.deltaY));
-  };
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey) {
+        const rect = element.getBoundingClientRect();
+        const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        setTransform((current) =>
+          zoomAtPoint(current, current.scale * Math.exp(-event.deltaY * 0.002), anchor),
+        );
+        return;
+      }
+      setTransform((current) => panBy(current, -event.deltaX, -event.deltaY));
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, []);
 
   const activateNode = (node: MindMapNode, trigger: SVGGElement) => {
     if (node.kind === "material") {
@@ -255,7 +267,6 @@ export function MindMapCanvas({
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          onWheel={onWheel}
           onDoubleClick={(event) => {
             if ((event.target as Element).closest("[data-mindmap-node]") === null) {
               fit();
