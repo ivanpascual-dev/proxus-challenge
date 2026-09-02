@@ -274,6 +274,11 @@ material" y no "se añadió un campo `source` al esquema y luego se rellenó des
 
 ### Corregido
 
+- **Borrar el material que tienes abierto ya no rompe la apertura automática del siguiente que
+  subas.** El panel desaparecía y la pantalla quedaba bien, pero por dentro la aplicación seguía
+  creyendo que ese material estaba abierto. Como no abre nada automáticamente cuando ya estás mirando
+  algo, el siguiente PDF que preparabas terminaba su indexado y sus apuntes sin llevarte a su mapa
+  mental, y nada explicaba por qué.
 - **La nota de un intento de examen se redondea a dos decimales.** Antes se enseñaba con todos los
   decimales del cálculo (p. ej. 7.777777...).
 - **Las insignias de estado se leen en el tema claro.** "Sin indexar", "transcrito por el modelo" y

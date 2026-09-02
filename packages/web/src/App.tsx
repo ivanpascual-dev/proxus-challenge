@@ -90,6 +90,20 @@ export function App() {
     setLandingTarget({ materialId, tab: "mindmap" });
   };
   const materials = useAtomValue(materialsQuery);
+  // Borrar el material abierto lo saca de la lista, así que `selectedMaterial` (más abajo) deja de
+  // resolver y el panel desaparece: la pantalla queda bien y por eso no se veía nada raro. Pero
+  // `selectedMaterialId` seguía apuntando a un material que ya no existe, y con él `openMaterialRef`,
+  // así que la siguiente subida de un solo PDF se creía que había una pantalla que robar y no
+  // navegaba a su Mapa. F5-48 dejaba de cumplirse sin que nada lo dijera. Se limpia solo cuando la
+  // consulta ha resuelto: mientras carga, una lista vacía no prueba que el material se haya ido.
+  useEffect(() => {
+    if (selectedMaterialId === null || !AsyncResult.isSuccess(materials)) {
+      return;
+    }
+    if (!materials.value.materials.some((material) => material.id === selectedMaterialId)) {
+      setSelectedMaterialId(null);
+    }
+  }, [materials, selectedMaterialId]);
   const refreshActiveExam = useAtomRefresh(activeAttemptQuery);
   const activeExam = AsyncResult.getOrElse(useAtomValue(activeAttemptQuery), () => NO_ACTIVE_EXAM);
 
