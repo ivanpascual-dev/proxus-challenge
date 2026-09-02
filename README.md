@@ -47,7 +47,11 @@ terceros; los otros dos son fixtures de test y no son material de estudio (ver
   abierto) o real (con reloj y el resto de la aplicación cerrada de verdad, también en el servidor).
 - **Ver el progreso** con aciertos, fallos, blancos, respuestas sin evaluar, pistas y contenido
   marcado como señales separadas, y un siguiente paso que dice por qué te lo recomienda.
-- **Hablar con Sym** sobre lo que tienes delante, con el contexto siempre visible y retirable.
+- **Repasar lo que fallaste**, no el material entero: una prueba `De repaso` se arma con tus fallos,
+  tus pistas y lo que marcaste como importante, y cada pregunta dice por cuál de las tres entró.
+- **Hablar con Sym** sobre lo que tienes delante, con el contexto siempre visible y retirable. Lee
+  también tus intentos y tu perfil, así que `¿qué llevo peor de este material?` se contesta nombrando
+  el tema y la señal real. Solo lectura: no puede crear pruebas, corregirlas ni escribir tu perfil.
 
 ## Comandos
 

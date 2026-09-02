@@ -433,6 +433,19 @@ las hubieras escrito tú, y también se puede ignorar lo que propone y preguntar
 conversaciones separadas, con su historial: se crea una nueva, se cambia de una a otra y se recarga la
 página, y los turnos vuelven desde el servidor, porque la conversación no vive en el navegador.
 
+**Sym también conoce tu historial de estudio, y esa es la parte que más cambia la conversación.** No
+solo lee los materiales y los apuntes: lee también tus intentos y tu perfil, es decir, qué preguntas
+fallaste, cuáles acertaste, cuáles dejaste en blanco, dónde abriste una pista y qué marcaste como
+importante. Pregúntale directamente `¿qué llevo peor de este material?` (es una de las tres
+sugerencias que salen en el chat vacío) y contestará nombrando el tema y **la señal concreta** por la
+que lo dice: "fallaste este tema dos veces", "aquí abriste una pista". Nunca un resumen inventado ni
+un porcentaje de dominio, porque el perfil le llega con las señales separadas y tiene prohibido
+fundirlas.
+
+Es lectura y solo lectura. Sym no puede crear una prueba, ni responderla, ni corregir un intento, ni
+escribir tu perfil. Si pudiera, tendría una vía para moverlo fabricando datos y después recomendarte a
+partir de lo que él mismo escribió, así que esa puerta no existe en el código, no solo en el prompt.
+
 Merece la pena abrir la actividad del agente en un turno cualquiera, por ejemplo pidiéndole que liste
 los materiales. Cerrada, cuenta en una frase qué hizo; abierta, enseña los pasos en orden. Lo que no
 aparece por ninguna parte es la cocina: ni claves, ni imágenes en base64, ni el mensaje de sistema, ni
@@ -532,8 +545,16 @@ que después no se pueda explicar.
 
 Al lado está `Siguiente paso`, que propone qué hacer ahora: repasar un tema que llevas peor, seguir
 con los apuntes o practicar. Lo calcula el código y no el modelo, y siempre dice cuál es la señal
-concreta por la que te lo recomienda, no una frase genérica. Desde ahí se puede generar una prueba
-`De repaso`, en la que cada pregunta indica por qué entró: un fallo, una pista o una marca tuya.
+concreta por la que te lo recomienda, no una frase genérica.
+
+Y aquí es donde el círculo se cierra, que era el objetivo de todo lo anterior. Ese mismo historial lo
+lee Sym cuando le preguntas cómo vas, y es también del que sale el **modo repaso**. Una prueba
+`De repaso` no vuelve a preguntar por el material entero: la arma el código a partir de lo que
+fallaste, de dónde necesitaste una pista y de lo que tú marcaste como importante, así que cada
+pregunta indica por qué entró. Practicar deja de ser repetir lo mismo y pasa a insistir justo donde
+flojeas, que es la parte que de verdad ayuda a estudiar. Y como esas tres señales viajan separadas y
+nunca se suman, siempre se puede explicar por qué apareció una pregunta concreta, en vez de tener que
+fiarse de un número.
 
 ### 3.11. Sym ve lo que estás viendo
 
